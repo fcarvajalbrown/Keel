@@ -1,0 +1,8 @@
+# Keel — automix/automaster engine dependencies (pip install -r requirements.txt)
+# All free, all pure-pip. Wheels are vendored in vendor/ for offline install.
+numpy
+scipy              # polyphase-FIR oversampling (true-peak meter + limiter/soft-clip)
+soundfile          # WAV/FLAC I/O
+pyloudnorm         # ITU-R BS.1770-4 LUFS metering + normalization (Steinmetz)
+pedalboard         # Spotify audio-effects + optional VST3 host (the "mix cook")
+matchering         # reference-matched mastering (the "master cook", optional path)

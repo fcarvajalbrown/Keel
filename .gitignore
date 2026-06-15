@@ -1,0 +1,9 @@
+# Build artifacts and large audio — keep code + docs, drop the audio.
+out/*.wav
+out/*.flac
+out/REPORT.md
+references/*.wav
+references/*.flac
+__pycache__/
+*.pyc
+_revalidate.py
