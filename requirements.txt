@@ -5,4 +5,10 @@ scipy              # polyphase-FIR oversampling (true-peak meter + limiter/soft-
 soundfile          # WAV/FLAC I/O
 pyloudnorm         # ITU-R BS.1770-4 LUFS metering + normalization (Steinmetz)
 pedalboard         # Spotify audio-effects + optional VST3 host (the "mix cook")
-matchering         # reference-matched mastering (the "master cook", optional path)
+
+# Optional: the reference-matched master path. Vendored too, but it drags in a
+# heavy numba/llvmlite/pandas tree, so it is NOT installed by default. Enable it
+# only if you want reference mastering:
+#   pip install matchering
+#   pip install --no-index --find-links vendor matchering   # offline
+# matchering
