@@ -28,7 +28,17 @@ WAVs; they are build artifacts.
 STEMS = ["drums", "bass", "guitar", "synth", "vocals"]  # the known/default labels
 
 STEM_ALIASES = {
-    "drums":  ["drum", "drums", "kit", "perc"],
+    # Drums are usually delivered as separate per-component mics whose names don't
+    # contain the word "drum" (kick / snare / toms / overheads / room). Include the
+    # standard kit-piece names so a multi-mic kit collapses into ONE drums group
+    # instead of scattering across "other" (which would balance the lone room mic
+    # as loud as the whole close-mic'd kit). Deliberately omits ultra-short, high-
+    # collision tokens ("oh", "hh", "bd", "sd", "hat") that would mislabel unrelated
+    # files (e.g. "oh" is a substring of "john") — auto-detect is a guess the user
+    # corrects in keel.json, so it should err toward precision over reach.
+    "drums":  ["drum", "drums", "kit", "perc", "kick", "kik", "snare", "snr",
+               "tom", "toms", "cymbal", "overhead", "ohead", "hihat", "hi-hat",
+               "ride", "crash", "conga", "bongo"],
     "bass":   ["bass", "bs"],
     "guitar": ["guitar", "gtr", "gt"],
     "synth":  ["synth", "syn", "pad", "keys"],
