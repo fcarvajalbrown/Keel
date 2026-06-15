@@ -1,25 +1,55 @@
-# `src/` — the automix / automaster engine (plain-language README)
+# Keel
 
-This folder takes the **finished stems** of each Werther song and produces a
-**balanced stereo mix** and a **loudness-matched master** — from code, the same
-"recipe + cook" way the rest of this project works. Nobody drags faders by hand.
+![status](https://img.shields.io/badge/status-pre--release-orange)
+![engine](https://img.shields.io/badge/engine-validated-brightgreen)
+![python](https://img.shields.io/badge/python-3.14-blue)
+![loudness](https://img.shields.io/badge/loudness-ITU--R%20BS.1770--4-blueviolet)
+![render](https://img.shields.io/badge/render-deterministic-success)
+![license](https://img.shields.io/badge/license-AGPL--3.0-blue)
+![commercial](https://img.shields.io/badge/commercial%20license-available-blueviolet)
 
-> **The stems already have the virtual instruments and effects printed in.** So
-> this engine does NOT re-EQ, re-compress, or re-verb anything. It does the two
-> things you actually asked for: **balance the levels** (so nothing buries
-> anything) and **master** (bring the whole thing up to a competitive, safe
-> loudness). Tone is left exactly as you printed it.
+**Drop in your stems. Get back a balanced mix and a loudness-safe master.**
+
+Keel is a deterministic automix + automaster engine. You give it a folder of
+finished, FX-printed stems; it level-balances them into a stereo mix and masters
+that mix to a clean, streaming-ready loudness. Same stems in, same master out,
+every single time. No AI guessing, no randomness, no faders to ride.
+
+> **Your stems already sound the way you want.** Keel does not re-EQ,
+> re-compress, or re-verb anything. It does the two jobs that actually stand
+> between a pile of stems and a finished track: **balance the levels** so nothing
+> buries anything, and **master** so the whole thing hits a competitive, safe
+> loudness. Your tone is left exactly as you printed it.
+
+---
+
+## Why Keel
+
+You can mix and master a song by hand. It takes hours, an ear you've trained for
+years, and a treated room — and the result drifts a little every time you do it.
+Or you can hand a finished set of stems to an opaque AI service and hope it
+guesses what you wanted.
+
+Keel is the third option: a **transparent, repeatable, rule-based** balance +
+master you can actually reason about. It is built on published loudness science
+(ITU-R BS.1770-4 LUFS, true-peak metering) and a metal-grade clip-then-limit
+master chain — but you drive it with a single command.
+
+- **For the bedroom producer:** you have great stems and don't want to (or can't)
+  mix and master by hand. One command turns them into a balanced, loud, safe
+  track you can upload today.
+- **For the working engineer:** a deterministic, scriptable balance+master stage
+  for your pipeline. Exact LUFS targets, a real 4x-oversampled true-peak meter,
+  reproducible to the sample, and a QC report on every run.
 
 ---
 
 ## The one-sentence version
 
-> **You drop the stems in each song folder. You set a few numbers in a recipe
-> (how loud each stem sits, how loud the final master should be). You press the
-> button. Out come `*_mix.wav` and `*_master.wav`.**
+> **Put your stems in a folder. Run one command. Out come `*_mix.wav` and
+> `*_master.wav` — balanced and mastered.**
 
-Same recipe + same stems in → same mix/master out, every time. Deterministic, no
-AI guessing, no randomness.
+Want it different? Change a number, run it again. That's the whole loop.
 
 ---
 
@@ -27,67 +57,68 @@ AI guessing, no randomness.
 
 | Stage | Does | Does NOT |
 |---|---|---|
-| **Mix** | Loudness-balances each stem to a target, pans (only if you ask), sums to stereo, leaves headroom for the master. | Add EQ, compression, or reverb to the stems (they're already treated). No tone changes. |
-| **Master** | Brings the mix to a target loudness (LUFS), tames peaks with a brick-wall limiter at a true-peak ceiling. Optionally matches a commercial reference track. | Re-balance instruments. A stereo master can't fix the mix — that's the mix stage's job. |
+| **Mix** | Loudness-balances each stem (and groups, like double-tracked guitars) to a target, pans only if you ask, sums to stereo, leaves headroom for the master. | Add EQ, compression, or reverb to your stems. They are already treated — Keel will not touch your tone. |
+| **Master** | Brings the mix to an exact loudness target (LUFS), controls peaks with an oversampled soft-clip + true-peak limiter at a true-peak ceiling. Optionally matches a commercial reference track. | Re-balance instruments. A stereo master can't fix a mix — that's the mix stage's job. Fix the balance, re-run. |
 
 ---
 
-## The files that matter
+## Quick start
 
-| File | Plain meaning | Who edits it |
-|---|---|---|
-| **`recipes.py`** | The **recipe** — per song: how loud each stem sits (the balance), optional pan, the master loudness target, and an optional reference track. | You edit this to change a mix/master. |
-| **`mixer.py`** | The **mix cook** — loudness-balances + pans + sums the stems. | Rarely. |
-| **`mastering.py`** | The **master cook** — loudness + limiter, or Matchering against a reference. | Rarely. |
-| **`meters.py`** | The loudness/peak math (LUFS, true-peak), shared by both cooks. | Rarely. |
-| **`build.py`** | The **button**. Loops every song: mix → master. | Rarely. |
-
----
-
-## How to use it
-
-**1. One-time setup** (installs the audio libraries — none of these touch the
-parent music engine):
+**1. Install** (audio libraries — all free, all pip):
 ```powershell
-pip install -r src/requirements.txt
+pip install -r requirements.txt
 ```
-Offline / no internet? The wheels are vendored — install from disk instead:
+Offline? The wheels are vendored — install from disk:
 ```powershell
-cd src
 python -m pip install --no-index --find-links vendor numpy scipy soundfile pyloudnorm pedalboard
 ```
 
-**2. Put the stems in each song's folder.** The engine reads from `../song{N}/`
-and matches files by name (case-insensitive, aliases allowed):
+**2. Put your stems in a folder.** Files are matched by name (case-insensitive,
+aliases allowed):
 
 ```
-song1/
+my_song/
   drums.wav     (or kit / perc)
   bass.wav
-  guitar.wav    (or gtr)
+  guitar.wav    (or gtr)        - two guitars? guitar_L.wav + guitar_R.wav
   synth.wav     (or pad / keys)
-  vocals.wav    (or vox / "vocal guide")
+  vocals.wav    (or vox / "vocal guide")  - lead + double? vocals1.wav + vocals2.wav
 ```
-A song with only 4 stems mixes fine — missing ones are just skipped. Render all
-stems of one song at the same samplerate.
+A song with only some of these mixes fine — missing types are skipped. Render all
+stems of one song at the same sample rate.
 
-**3. Press the button** (from inside `src/`):
+**3. Run it:**
 ```powershell
-python build.py                # mix + master every song that has stems
-python build.py --mix-only     # just the mixes
-python build.py --master-only  # remaster existing mixes
-python build.py 2 5            # only song 2 and song 5
+python build.py --stems "C:\path\to\my_song" --out out
 ```
+That writes `out/my_song_mix.wav` and `out/my_song_master.wav`, plus a QC sheet
+at `out/REPORT.md`.
 
-**4. Listen** to `src/out/NN_Title_mix.wav` and `src/out/NN_Title_master.wav`.
-Not balanced right? Change the numbers in `recipes.py` and press the button again.
+**4. Listen.** Not balanced right? Adjust and run again (see Tuning below).
+
+### More ways to run
+
+```powershell
+# Name the output, push louder, set the true-peak ceiling
+python build.py --stems ./my_song --name single_v2 --lufs -11 --tp -1
+
+# Master to a commercial reference instead of a fixed LUFS target
+python build.py --stems ./my_song --ref "C:\refs\commercial_master.wav"
+
+# Just the mix, or just re-master an existing mix
+python build.py --stems ./my_song --mix-only
+python build.py --stems ./my_song --master-only
+
+# Batch: mix+master every subfolder of an album folder in one go
+python build.py --batch "C:\path\to\album" --out out
+```
 
 ---
 
-## Tuning a mix (the only thing you normally touch)
+## Tuning the mix
 
-In `recipes.py`, `DEFAULT_BALANCE` is the relative loudness of each stem, in LU,
-measured against the vocal (vocals = 0). More negative = quieter in the mix.
+The balance is relative loudness, in LU, measured against the vocal (vocals = 0).
+More negative = quieter in the mix. The defaults live in `recipes.py`:
 
 ```python
 DEFAULT_BALANCE = {
@@ -99,49 +130,78 @@ DEFAULT_BALANCE = {
 }
 ```
 
-Vocal too quiet? Lower everything else, or raise the vocal toward 0. Want a
-per-song tweak instead of changing the global? Add it under that song's `"mix"`:
+Vocal too quiet? Pull everything else down, or raise the vocal toward 0. These
+are global defaults today; per-song overrides are passed as small dicts in code
+and will become a first-class CLI/GUI control (see `ROADMAP.md`).
 
-```python
-{"idx": 2, "title": "Charlotte", "folder": "song2",
- "mix": {"balance": {"guitar": -2.5, "vocals": 0.0}}, "master": {}},
-```
+## Tuning the master
 
-## Tuning a master
+- `--lufs` — how loud (default **-14**, streaming-optimal). Less negative =
+  louder. The chain holds up cleanly down to about -10/-11.
+- `--tp` — true-peak ceiling (default **-1.0 dBTP**).
+- `--ref` — a reference master. If given, Keel uses **Matchering** to match that
+  track's frequency balance, loudness, and stereo width, and `--lufs` is ignored
+  (the reference sets the loudness). The output is only as good as the reference,
+  so pick a same-genre, same-era, well-mastered track.
 
-Per song, under `"master"`:
-- `target_lufs` — how loud (default **−14**, locked album-wide). Less negative =
-  louder. The chain can go to −10/−11 cleanly if a song ever wants it.
-- `tp_ceiling_db` — true-peak ceiling (default −1.0 dBTP).
-- `reference` — a filename in `src/references/`. If set and the file exists, that
-  song is mastered by **Matchering** to match that commercial track, and
-  `target_lufs` is ignored (the reference sets the loudness). Without a reference
-  it uses the internal chain: tone → soft-clip → oversampled true-peak limiter →
-  normalize to the exact target. True-peak is metered with a real 4× polyphase
-  FIR (BS.1770-4), not an estimate.
+Without a reference, the master uses Keel's internal chain: tone (HPF / gentle
+tilt / glue) -> pre-normalize -> oversampled soft-clip -> oversampled true-peak
+limiter -> normalize to the exact target -> true-peak safety. True-peak is
+metered with a real 4x polyphase FIR (BS.1770-4), not an estimate.
 
-After every `python build.py`, a QC sheet is written to **`out/REPORT.md`**:
-per-song stem balance (pre/post LUFS) and the final master LUFS/dBTP vs target —
-one glance to confirm every song landed.
+After every run, `out/REPORT.md` gives a one-glance QC sheet: per-stem balance
+(pre/post LUFS) and the final master LUFS/dBTP vs. target.
 
 ---
 
-## Reference-matched mastering (optional, recommended)
+## How it's built
 
-Drop a same-genre, same-tempo, well-mastered track into `src/references/`
-(e.g. a Rammstein / SOAD / Cattle Decapitation master), point a song's
-`"reference"` at it, and that song's master will be matched to it (frequency
-balance, loudness, stereo width). The output is only as good as the reference, so
-pick carefully. References are gitignored — they're not committed.
+| File | What it is | Who touches it |
+|---|---|---|
+| **`build.py`** | The button — the command-line entry point. | Run it. |
+| **`recipes.py`** | The defaults — balance, pan, master target, aliases. | Edit to change the house sound. |
+| **`mixer.py`** | The mix engine — loudness-balance + pan + sum. | Rarely. |
+| **`mastering.py`** | The master engine — loudness + limiter, or Matchering. | Rarely. |
+| **`meters.py`** | The loudness/peak math (LUFS, true-peak), shared by both. | Rarely. |
+
+The engine is deterministic and self-contained: no network, no telemetry, no
+project lock-in. Outputs are plain 24-bit WAVs.
 
 ---
 
-## Tied to this project now, song-agnostic later
+## Where Keel is headed
 
-Right now `recipes.py` is hardwired to the 6 Werther songs and reads stems from
-the sibling `../song{N}/` folders. The mix/master cooks themselves know nothing
-about Werther. To reuse this on any project later, the only thing to change is the
-`SONGS` list (point each `stems`/`folder` anywhere). See `ROADMAP.md`.
+Today Keel is a command-line tool. The mission is to make this engine available
+to any musician, not just people comfortable in a terminal:
 
-If you only remember one thing: **stems in → set the balance + loudness numbers →
-press the button → balanced mix + master out.**
+1. **Standalone GUI** — drag a folder of stems onto a window, see the balance and
+   loudness meters, get your mix + master. Same deterministic engine underneath.
+2. **VST / plugin** — run Keel's balance + master stage right inside your DAW.
+
+The DSP core is done and validated. See `ROADMAP.md` for the plan.
+
+---
+
+## License
+
+Keel is **dual-licensed**:
+
+- **Open source: GNU AGPL-3.0** (see `LICENSE`). Free to use, study, modify, and
+  share. The catch: if you distribute Keel or run a modified version as a network
+  service, you must release your full source under the AGPL too. This keeps Keel
+  and everything built on it open.
+- **Commercial license: available.** If you want to build on Keel without the
+  AGPL's copyleft obligations — e.g. ship it inside a closed-source product or
+  service — a separate commercial license is available. See
+  `COMMERCIAL-LICENSE.md`, or contact **Felipe Carvajal Brown**
+  (fcarvajalbrown@gmail.com).
+
+In short: individuals and open projects use it freely under the AGPL; companies
+that want it closed-source pay for a commercial license.
+
+Copyright (C) 2026 Felipe Carvajal Brown.
+
+---
+
+If you only remember one thing: **stems in -> one command -> balanced mix +
+safe master out.**
