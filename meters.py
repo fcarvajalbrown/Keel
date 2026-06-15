@@ -1,3 +1,9 @@
+# Keel — automix + automaster engine.
+# Copyright (C) 2026 Felipe Carvajal Brown
+#
+# Licensed under the GNU Affero General Public License v3.0 (see LICENSE).
+# A commercial license is available — see COMMERCIAL-LICENSE.md
+# or contact fcarvajalbrown@gmail.com.
 """
 meters.py  —  loudness + peak measurement helpers (shared by mixer & mastering).
 
