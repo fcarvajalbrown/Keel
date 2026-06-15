@@ -45,23 +45,36 @@ a tone-shaping suite. See "Non-goals" at the bottom.
       A label holds 1..N files, balanced as one group. Validated end-to-end
       (single + `--batch` + `--scan`) on synthetic multitracks.
 
-## Phase 2 — Validate on real-world material (NEXT)
-- [ ] Run on several genres' stems; confirm the default balance generalizes.
-- [ ] Confirm masters are loud enough and clean (no pumping, no audible clipping,
-      dBTP at/under ceiling) across material.
+## Phase 2 — Validate on real-world material (IN PROGRESS)
+- [x] Run on several real multitracks; confirm the default balance generalizes.
+      Validated on three deliveries (Cambridge MT raw rock kit, a synth-heavy
+      17-track multitrack, and a 5-stem pre-mixed set) at 44.1 and 48 kHz. Two
+      real bugs surfaced and were fixed: a mixed mono/stereo group crash, and
+      per-component drum mics scattering to `other` instead of grouping as one
+      kit. Auto-detect rewritten to token/word-boundary matching + a scan-time
+      mapping review so mislabels are visible before render.
+- [x] Confirm masters are loud enough and clean: all three landed exactly
+      -14.0 LUFS, true-peak 3-4 dB under the -1.0 ceiling, no clipping, no NaN,
+      including hot already-loud input stems (big negative balance gains).
 - [ ] Tune `DEFAULT_BALANCE` and the default target if real material demands it
       (research-before-tweak: cite sources before changing the DSP approach).
+      So far the defaults generalized without tuning.
 - [ ] Decide when internal master vs. a Matchering reference wins; document it.
+      (Matchering is now vendored + verified importable on 3.14; needs a
+      reference track to A/B.)
 - [ ] Optional gentle **bus glue** preset (currently off) — evaluate by ear.
-- [ ] Dither on export if/when rendering below 24-bit.
+- [ ] Dither on export if/when rendering below 24-bit (currently 24-bit in/out,
+      no dither needed).
 
 ## Phase 3 — Presets + richer config
 - [x] Per-project overrides (file -> label, balance/pan/spread/master) via
       `keel.json` — no Python editing to mix a new song.
 - [ ] Named presets / "house sound" profiles (e.g. streaming-safe vs. loud)
       seeded into new `keel.json` files.
-- [ ] Friendlier mapping review: a dry-run summary of the detected labels and any
-      files that landed in `other`, so nothing is silently mislabelled.
+- [x] Friendlier mapping review: a dry-run summary of the detected labels and any
+      files that landed in `other`, so nothing is silently mislabelled. `--scan`
+      now prints per-label file counts and an explicit `[check]` callout for
+      unmatched files.
 
 ## Phase 4 — Standalone GUI
 - [ ] Drag-a-folder window: detect stems, show what was matched/missing.
