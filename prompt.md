@@ -2,9 +2,8 @@
 
 You are picking up work on **Keel**, a deterministic automix + automaster engine
 (stems in -> balanced mix + loudness-safe master out). The long-term goal is a
-**standalone GUI** and a **VST/plugin**. The CLI engine is done and validated,
-including arbitrary-label stems: any number of files, labels auto-detected into an
-editable per-song `keel.json`, files sharing a label balanced as one group.
+**standalone GUI** and a **VST/plugin**. The CLI engine is done and validated on
+real-world material (see Phase 2 status below).
 
 ## Do this first, before writing any code
 
@@ -12,73 +11,114 @@ editable per-song `keel.json`, files sharing a label balanced as one group.
    `ROADMAP.md` (where we are and what's next), `README.md` (the product story).
    Do not skip them — they encode decisions already made.
 2. **Locate the current phase in `ROADMAP.md`.** Phases 0-1 (engine core +
-   song-agnostic standalone) are DONE. The next open phase is **Phase 2 —
-   validate on real-world material**, then Phase 3 (config/presets), Phase 4
-   (GUI), Phase 5 (VST), Phase 6 (distribution).
+   song-agnostic standalone) are DONE. **Phase 2 (validate on real-world
+   material) is IN PROGRESS** — most of it is checked off (see below); Phases 3-6
+   (config/presets, GUI, VST, distribution) follow.
 3. **Confirm direction with the user before proceeding.** Do not assume the next
-   roadmap phase is what they want today. Ask what they want to tackle this
-   session and tailor to their answer. Present the choice using the **interactive
-   arrow-select option UI (the blue selector), not a plain-text list** — this is a
-   firm preference (see CLAUDE.md). Offer the logical next phases as options.
+   roadmap item is what they want today. Ask via the **interactive arrow-select
+   option UI (the blue selector), not a plain-text list** — firm preference (see
+   CLAUDE.md). Offer the open items below as options.
+
+## Where Phase 2 stands (validated last session, 2026-06-15)
+
+Ran Keel on **three real deliveries** and it held up: a Cambridge MT 18-track raw
+rock kit (48 kHz), a 17-track synth-heavy multitrack (44.1 kHz), and the user's
+own **5-stem pre-mixed format** (`Drums`/`Bass`/`Guitar 1`/`Guitar 2`/`Synth`).
+All three auto-labeled correctly and mastered to **exactly -14.0 LUFS, 3-4 dB
+under the -1.0 dBTP ceiling**, clean, no clipping. The test stems live OUTSIDE the
+repo at `C:\Projects\Keel-testdata\song1|song2|song3\` (not committed).
+
+Two real bugs surfaced and were fixed (commits `a1a99a4`, `1a18698`, `89796ce`):
+- Mixed mono/stereo groups crashed the mixer -> groups are now summed to stereo
+  for the loudness measurement, matching the render path.
+- Per-component drum mics (kick/snare/toms/overheads) scattered to `other`
+  instead of grouping as one kit -> auto-detect rewritten to **token /
+  word-boundary matching** (anchored, so `oh` != `john`, `ride` != `pride`), plus
+  a **`--scan` mapping review** that prints per-label counts and a `[check]`
+  callout for anything in `other`.
+
+Infra the user asked for, done:
+- **Dependency vault completed** — the optional `matchering` reference-master tree
+  is now vendored (commit `ed7ec5d`); verified it installs fully offline and
+  imports on CPython 3.14. `vendor/` covers BOTH master paths now.
+- **Venv workflow** — `setup.ps1` builds `.venv` and installs offline from
+  `vendor/` (`-Online` for PyPI, `-Matchering` for the reference path). The venv
+  is gitignored, rebuilt per machine.
+
+## The immediate open task: Matchering reference A/B (Phase 2)
+
+The user chose to run a **Matchering vs. internal-master A/B on ALL THREE songs**,
+then paused to do it "later." It is set up and ready:
+- `matchering` is already installed in `.venv` (offline). Run build/mastering with
+  `.venv\Scripts\python.exe`.
+- **Still needed from the user:** mastered, full-length **WAV/FLAC reference
+  track(s)** — ideally genre-matched per song (rock for song1, electronic for
+  song2, their genre for song3). One reference reused across all is acceptable but
+  skews the match (matchering copies the reference's tonal balance + loudness; the
+  reference SETS loudness, so the -14 target is ignored on that path).
+- **Plan:** for each song, master its existing `out/songN_mix.wav` through the
+  reference path into a separate file (e.g. `out/songN_ref_master.wav`) so the
+  internal master is kept side by side, then compare LUFS / true-peak / how hard
+  each pushes and **document when internal vs. reference wins** (the open
+  ROADMAP Phase 2 item). Easiest via `mastering.master(...)` directly, or
+  `build.py --master-only --ref <path>` (note: `--master-only` looks for
+  `<out>/<name>_mix.wav`, so reuse `--name songN` or call the module directly to
+  avoid clobbering the internal master).
+
+Other remaining Phase 2 items: optional gentle **bus glue** preset (currently
+off, evaluate by ear), and `DEFAULT_BALANCE`/target tuning (so far the defaults
+generalized without tuning — research-before-tweak if you change DSP).
 
 ## How the user likes to work (match this)
 
-- **Decisions -> arrow-select UI.** Every fork, however small, goes through the
-  blue interactive option selector. Chain calls if there are more than 4
-  questions. Only fall back to text if the UI is unavailable.
+- **Decisions -> arrow-select UI.** Every fork, however small, through the blue
+  selector. Chain calls if >4 questions. Text only if the UI is unavailable.
 - **No emojis** anywhere (docs, commits, code, chat). Plain text only.
-- **Conventional + logical commits.** `type(scope): summary`; one atomic,
-  self-contained change per commit. See CLAUDE.md.
-- **Research-before-tweak for DSP.** Before changing the mixing/mastering
-  *approach* (loudness target, limiter design, reference-matching), do ~5 web
-  searches and cite them. Do not tune DSP from memory.
-- **Marketing audience is broad:** lead with simplicity for bedroom/solo
-  producers, surface the LUFS/true-peak rigor for working engineers underneath.
+- **No AI attribution in commits/PRs** — do NOT add a `Co-Authored-By: Claude`
+  trailer (saved to memory: `no-claude-coauthor`).
+- **Conventional + logical commits**, one atomic change each. **Auto-push** to
+  `origin` after each logical commit (don't ask first).
+- **Don't hardcode delivery assumptions.** The user pushed hard on this: the
+  engine must handle any stem-delivery shape (pre-mixed bus, multi-mic kit,
+  doubles, unknown names -> `other`). `STEM_ALIASES` is only an editable
+  auto-detect hint. Saved to memory: `engine-stays-delivery-agnostic`.
+- **Research-before-tweak for DSP.** ~5 web searches + citations before changing
+  the mixing/mastering approach. Do not tune DSP from memory.
 
 ## Hard guardrails (do not violate)
 
-- Scope is **balance + master only**. No tone shaping in the mix stage (stems are
-  pre-treated), no stem separation, no ML, no randomness in the render path.
-- Keep `mixer.py` / `mastering.py` / `meters.py` project-agnostic — they already
-  are. Do not reintroduce song lists, a fixed set of stem types, or folder
-  assumptions (that coupling was removed on 2026-06-14; labels are arbitrary and
-  driven by each song's `keel.json`).
+- Scope is **balance + master only**. No tone shaping in the mix stage, no stem
+  separation, no ML, no randomness in the render path.
+- Keep `mixer.py` / `mastering.py` / `meters.py` project-agnostic. No song lists,
+  no fixed stem-type set, no folder assumptions.
 - Locked DSP defaults: master **-14.0 LUFS / -1.0 dBTP**, internal anchor
   **-20 LUFS**. Change only deliberately, with research.
 - Never hand-edit files in `out/` — build artifacts.
 
-## Open items worth raising with the user
+## Other open items (raise with the user when relevant)
 
-- **Folder rename (do this):** the repo still lives in `C:\Projects\temp`; rename
-  it to `C:\Projects\keel`. It cannot be done from inside a live session (Windows
-  locks the working directory). Steps for the user:
-  1. Close Claude Code (and any editor/terminal with `C:\Projects\temp` open).
-  2. Rename the folder: `Rename-Item C:\Projects\temp C:\Projects\keel`
-  3. Reopen Claude Code in `C:\Projects\keel` and continue.
-  Nothing in the code depends on the folder name (paths come from `__file__` / CLI
-  args), and the git remote is unaffected. Caveat: the memory project key changes
-  from `C--Projects-temp` to `C--Projects-keel`, so prior memories won't auto-load
-  under the new path — re-save the "never add Claude as co-author" rule on the
-  first session in the renamed folder.
-- **License:** done — **AGPL-3.0 + dual commercial**. `LICENSE` is the verbatim
-  AGPLv3; per-file copyright headers (Felipe Carvajal Brown, 2026) are in place;
-  `COMMERCIAL-LICENSE.md` holds the commercial terms + contact
-  (fcarvajalbrown@gmail.com); README has a License section. Remaining only if
-  desired: formal legal review and a dedicated licensing contact address.
+- **Folder rename: DONE.** The repo now lives at `C:\Projects\Keel` (memory
+  project key `C--Projects-Keel`). Memories re-saved under the new key last
+  session (`no-claude-coauthor`, `engine-stays-delivery-agnostic`).
+- **License:** done — AGPL-3.0 + dual commercial (`LICENSE`, per-file headers,
+  `COMMERCIAL-LICENSE.md`, README section). Remaining only if desired: formal
+  legal review.
 - **Trademark:** "Keel" cleared initial web searches; verify formally in target
   markets before public launch.
-- **GUI scaffolding (Phase 4):** keep the engine importable as a shared library
-  so CLI, GUI, and plugin all drive one core. Do not fork the DSP.
+- **GUI scaffolding (Phase 4):** keep the engine importable as a shared library so
+  CLI, GUI, and plugin drive one core. Don't fork the DSP.
 - **Landing assets:** tagline/elevator pitch, logo/wordmark, before/after demo
-  audio (not yet started).
+  audio (not started).
 
 ## Quick sanity check (engine still runs)
 
 ```powershell
+.\setup.ps1                 # build .venv + install core engine offline from vendor/
+.\.venv\Scripts\Activate.ps1
 python -m py_compile recipes.py build.py mixer.py mastering.py meters.py
 python build.py --help
-python build.py --stems "C:\path\to\stems" --out out   # writes keel.json, renders
+python build.py --stems "C:\Projects\Keel-testdata\song3" --out out   # writes keel.json, renders
 ```
 
 Start by reading the three docs, then ask the user (via the option UI) what this
-session is for.
+session is for — the Matchering A/B is teed up and waiting on a reference track.
