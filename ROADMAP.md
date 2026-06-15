@@ -39,6 +39,11 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 - [x] `--batch <dir>` mode: mix+master every subfolder that contains stems.
 - [x] `recipes.py` reduced to generic defaults + the stem alias matcher.
 - [x] Branded as **Keel**; README/ROADMAP rewritten for a general audience.
+- [x] **Arbitrary-label stems:** any number of files, labels auto-detected from
+      filenames and written to an editable per-song `keel.json` (file -> label +
+      per-label balance/pan/spread/master), replacing the fixed 5-type matcher.
+      A label holds 1..N files, balanced as one group. Validated end-to-end
+      (single + `--batch` + `--scan`) on synthetic multitracks.
 
 ## Phase 2 — Validate on real-world material (NEXT)
 - [ ] Run on several genres' stems; confirm the default balance generalizes.
@@ -50,11 +55,13 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 - [ ] Optional gentle **bus glue** preset (currently off) — evaluate by ear.
 - [ ] Dither on export if/when rendering below 24-bit.
 
-## Phase 3 — Project config + presets
-- [ ] Read per-project overrides (balance/pan/target/reference) from a small
-      JSON/TOML so users never edit Python to mix a new song.
-- [ ] Named presets / "house sound" profiles (e.g. streaming-safe vs. loud).
-- [ ] Per-stem-type override surface that's safe for non-coders.
+## Phase 3 — Presets + richer config
+- [x] Per-project overrides (file -> label, balance/pan/spread/master) via
+      `keel.json` — no Python editing to mix a new song.
+- [ ] Named presets / "house sound" profiles (e.g. streaming-safe vs. loud)
+      seeded into new `keel.json` files.
+- [ ] Friendlier mapping review: a dry-run summary of the detected labels and any
+      files that landed in `other`, so nothing is silently mislabelled.
 
 ## Phase 4 — Standalone GUI
 - [ ] Drag-a-folder window: detect stems, show what was matched/missing.

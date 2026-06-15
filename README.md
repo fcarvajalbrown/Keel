@@ -73,32 +73,49 @@ Offline? The wheels are vendored — install from disk:
 python -m pip install --no-index --find-links vendor numpy scipy soundfile pyloudnorm pedalboard
 ```
 
-**2. Put your stems in a folder.** Files are matched by name (case-insensitive,
-aliases allowed):
+**2. Put your stems in a folder** — any number, any names. Keel does not require a
+fixed set of stems; it auto-detects a label for each file from its name, and you
+correct it in the next step.
 
 ```
 my_song/
-  drums.wav     (or kit / perc)
+  drum_kick.wav  drum_snare.wav  oh_L.wav  oh_R.wav
   bass.wav
-  guitar.wav    (or gtr)        - two guitars? guitar_L.wav + guitar_R.wav
-  synth.wav     (or pad / keys)
-  vocals.wav    (or vox / "vocal guide")  - lead + double? vocals1.wav + vocals2.wav
+  gtr_DI_1.wav  gtr_DI_2.wav  gtr_solo.wav
+  lead_vox.wav  harmony.wav
 ```
-A song with only some of these mixes fine — missing types are skipped. Render all
-stems of one song at the same sample rate.
+Render all stems of one song at the same sample rate.
 
 **3. Run it:**
 ```powershell
 python build.py --stems "C:\path\to\my_song" --out out
 ```
-That writes `out/my_song_mix.wav` and `out/my_song_master.wav`, plus a QC sheet
-at `out/REPORT.md`.
+On the first run Keel writes **`my_song/keel.json`** — an auto-detected mapping of
+each file to a label (drums/bass/guitar/synth/vocals; anything unrecognized
+becomes `other`) plus a per-label balance — and renders
+`out/my_song_mix.wav` + `out/my_song_master.wav` and `out/REPORT.md`.
 
-**4. Listen.** Not balanced right? Adjust and run again (see Tuning below).
+**4. Fix the labels, then re-run.** Auto-detect is just a guess. Open `keel.json`,
+reassign any file to the right label (**a label can hold 1 or 10 files** — they're
+balanced together as one group), tweak the per-label balance, and run the same
+command again to apply:
+
+```json
+{
+  "stems": { "oh_L.wav": "drums", "gtr_solo.wav": "guitar", "harmony.wav": "vocals" },
+  "balance": { "vocals": 0.0, "drums": -2.0, "guitar": -3.5 }
+}
+```
 
 ### More ways to run
 
 ```powershell
+# Only (re)write the keel.json mapping for review — don't render
+python build.py --stems ./my_song --scan
+
+# Use a mapping file kept somewhere else
+python build.py --stems ./my_song --map "C:\maps\my_song.json"
+
 # Name the output, push louder, set the true-peak ceiling
 python build.py --stems ./my_song --name single_v2 --lufs -11 --tp -1
 
@@ -110,6 +127,7 @@ python build.py --stems ./my_song --mix-only
 python build.py --stems ./my_song --master-only
 
 # Batch: mix+master every subfolder of an album folder in one go
+# (each subfolder gets its own keel.json)
 python build.py --batch "C:\path\to\album" --out out
 ```
 
@@ -117,22 +135,24 @@ python build.py --batch "C:\path\to\album" --out out
 
 ## Tuning the mix
 
-The balance is relative loudness, in LU, measured against the vocal (vocals = 0).
-More negative = quieter in the mix. The defaults live in `recipes.py`:
+Balance is relative loudness, in LU, measured against the vocal (vocals = 0).
+More negative = quieter in the mix. You set it per label in your song's
+`keel.json`:
 
-```python
-DEFAULT_BALANCE = {
-    "vocals": 0.0,    # the anchor
-    "drums": -2.0,
-    "bass":  -3.0,
-    "guitar": -3.5,
-    "synth": -6.0,
+```json
+"balance": {
+  "vocals": 0.0,
+  "drums": -2.0,
+  "bass":  -3.0,
+  "guitar": -3.5,
+  "synth": -6.0
 }
 ```
 
-Vocal too quiet? Pull everything else down, or raise the vocal toward 0. These
-are global defaults today; per-song overrides are passed as small dicts in code
-and will become a first-class CLI/GUI control (see `ROADMAP.md`).
+Vocal too quiet? Pull everything else down, or raise the vocal toward 0. Any
+label you create (custom or `other`) defaults to 0.0 until you set it. The
+starting numbers come from `recipes.py` (`DEFAULT_BALANCE`) — edit those to change
+the defaults Keel seeds into every new `keel.json`.
 
 ## Tuning the master
 
@@ -149,7 +169,7 @@ tilt / glue) -> pre-normalize -> oversampled soft-clip -> oversampled true-peak
 limiter -> normalize to the exact target -> true-peak safety. True-peak is
 metered with a real 4x polyphase FIR (BS.1770-4), not an estimate.
 
-After every run, `out/REPORT.md` gives a one-glance QC sheet: per-stem balance
+After every run, `out/REPORT.md` gives a one-glance QC sheet: per-label balance
 (pre/post LUFS) and the final master LUFS/dBTP vs. target.
 
 ---
@@ -158,9 +178,10 @@ After every run, `out/REPORT.md` gives a one-glance QC sheet: per-stem balance
 
 | File | What it is | Who touches it |
 |---|---|---|
-| **`build.py`** | The button — the command-line entry point. | Run it. |
-| **`recipes.py`** | The defaults — balance, pan, master target, aliases. | Edit to change the house sound. |
-| **`mixer.py`** | The mix engine — loudness-balance + pan + sum. | Rarely. |
+| **`build.py`** | The button — CLI entry point; writes/reads each song's `keel.json`. | Run it. |
+| **`<song>/keel.json`** | Per-song mapping — file→label, per-label balance/pan/spread, master target. | Edit per song. |
+| **`recipes.py`** | The defaults seeded into new `keel.json` files + the auto-detect alias hints. | Edit to change the house sound. |
+| **`mixer.py`** | The mix engine — group by label, loudness-balance + pan + sum. | Rarely. |
 | **`mastering.py`** | The master engine — loudness + limiter, or Matchering. | Rarely. |
 | **`meters.py`** | The loudness/peak math (LUFS, true-peak), shared by both. | Rarely. |
 

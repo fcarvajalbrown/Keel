@@ -2,7 +2,9 @@
 
 You are picking up work on **Keel**, a deterministic automix + automaster engine
 (stems in -> balanced mix + loudness-safe master out). The long-term goal is a
-**standalone GUI** and a **VST/plugin**. The CLI engine is done and validated.
+**standalone GUI** and a **VST/plugin**. The CLI engine is done and validated,
+including arbitrary-label stems: any number of files, labels auto-detected into an
+editable per-song `keel.json`, files sharing a label balanced as one group.
 
 ## Do this first, before writing any code
 
@@ -38,8 +40,9 @@ You are picking up work on **Keel**, a deterministic automix + automaster engine
 - Scope is **balance + master only**. No tone shaping in the mix stage (stems are
   pre-treated), no stem separation, no ML, no randomness in the render path.
 - Keep `mixer.py` / `mastering.py` / `meters.py` project-agnostic — they already
-  are. Do not reintroduce song lists or folder assumptions (that coupling was
-  removed on 2026-06-14).
+  are. Do not reintroduce song lists, a fixed set of stem types, or folder
+  assumptions (that coupling was removed on 2026-06-14; labels are arbitrary and
+  driven by each song's `keel.json`).
 - Locked DSP defaults: master **-14.0 LUFS / -1.0 dBTP**, internal anchor
   **-20 LUFS**. Change only deliberately, with research.
 - Never hand-edit files in `out/` — build artifacts.
@@ -65,7 +68,7 @@ You are picking up work on **Keel**, a deterministic automix + automaster engine
 ```powershell
 python -m py_compile recipes.py build.py mixer.py mastering.py meters.py
 python build.py --help
-python build.py --stems "C:\path\to\stems" --out out --lufs -14
+python build.py --stems "C:\path\to\stems" --out out   # writes keel.json, renders
 ```
 
 Start by reading the three docs, then ask the user (via the option UI) what this
