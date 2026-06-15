@@ -19,10 +19,13 @@ never have to edit this file to mix a new song. Never hand-tweak the rendered
 WAVs; they are build artifacts.
 """
 
-# The 5 stem types Keel knows about. Stem files are matched case-insensitively by
-# these names, with a few common aliases, so e.g. "vocals.wav", "vox.wav",
-# "Vocal Guide.wav" all map to "vocals".
-STEMS = ["drums", "bass", "guitar", "synth", "vocals"]
+# Labels are ARBITRARY — a project can have any number of stems and any labels.
+# STEM_ALIASES is only the auto-detect HINT table: when Keel first scans a folder
+# it guesses a label per file case-insensitively from these aliases (e.g.
+# "vox.wav" -> "vocals"), writes them into keel.json, and the user edits from
+# there. Anything unmatched is labelled "other". These known labels also seed
+# DEFAULT_BALANCE; custom labels just default to 0.0 until the user sets them.
+STEMS = ["drums", "bass", "guitar", "synth", "vocals"]  # the known/default labels
 
 STEM_ALIASES = {
     "drums":  ["drum", "drums", "kit", "perc"],

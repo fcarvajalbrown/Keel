@@ -20,7 +20,7 @@ import numpy as np
 import soundfile as sf
 
 import meters
-from recipes import STEMS, STEM_ALIASES
+from recipes import STEM_ALIASES
 
 try:
     from pedalboard import (
@@ -32,32 +32,50 @@ except ImportError as e:  # pragma: no cover
     ) from e
 
 INTERNAL_ANCHOR_LUFS = -20.0  # each stem normalized here before balance offsets
+OTHER_LABEL = "other"         # fallback label for files that match no alias
 
 
-# --------------------------------------------------------------------- stem load
-def find_stems(folder):
-    """Map stem-type -> [Path, ...] by matching filenames against STEM_ALIASES.
-
-    Collects MULTIPLE files per type — double-tracked guitars (guitar_L/guitar_R,
-    gtr1/gtr2) and a doubled/room vocal (vocals1/vocals2, vox_double) are standard,
-    so all matches are kept and balanced as one group. Returns {stemtype: [paths]}
-    for whatever is present; missing types are skipped. Raises if nothing matched."""
+# --------------------------------------------------------------------- labeling
+def autodetect(folder):
+    """Guess a label for EVERY audio file in `folder` from its filename, using
+    STEM_ALIASES. Files that match no alias get OTHER_LABEL. Returns an ordered
+    {filename: label} map for ANY number of files — the starting point a user
+    edits (see build.py's keel.json). This is a guess, not a constraint: the
+    label can be anything once edited, and a label may hold 1 or 10 files."""
     folder = Path(folder)
-    found = {s: [] for s in STEM_ALIASES}
+    mapping = {}
     for f in sorted(folder.glob("*.wav")) + sorted(folder.glob("*.flac")):
         name = f.stem.lower()
+        label = OTHER_LABEL
         # longest alias first so "vocal guide" wins over "guitar"-style partials
         for stem, aliases in STEM_ALIASES.items():
             if any(a in name for a in sorted(aliases, key=len, reverse=True)):
-                found[stem].append(f)
+                label = stem
                 break
-    found = {s: ps for s, ps in found.items() if ps}
-    if not found:
+        mapping[f.name] = label
+    return mapping
+
+
+def group_files(folder, mapping=None):
+    """Resolve {label: [Path, ...]} for a stems folder. If `mapping`
+    (filename -> label) is given it is authoritative — only its files are used,
+    files it names that are missing are skipped, and the labels are whatever the
+    user assigned. Without a mapping, labels are auto-detected. Files sharing a
+    label are balanced as one group downstream. Raises if nothing usable found."""
+    folder = Path(folder)
+    if mapping is None:
+        mapping = autodetect(folder)
+    groups = {}
+    for fn, label in mapping.items():
+        p = folder / fn
+        if p.exists():
+            groups.setdefault(label, []).append(p)
+    if not groups:
         raise FileNotFoundError(
-            f"No stem WAV/FLAC found in {folder}. Expected files named like "
-            f"{', '.join(STEMS)} (aliases allowed; multiples like guitar_L/R ok)."
+            f"No usable stems in {folder}. Add .wav/.flac files (the mapping may "
+            f"point at files that don't exist)."
         )
-    return found
+    return groups
 
 
 def _load(path):
@@ -98,11 +116,11 @@ def _pan(stereo, pan):
     return out
 
 
-def _process_group(stem, paths, recipe):
-    """Load all files of one stem-type, balance them AS A GROUP, return a list of
+def _process_group(label, paths, recipe):
+    """Load all files of one label, balance them AS A GROUP, return a list of
     processed stereo buffers + the rate.
 
-    Group balancing: the type's loudness target applies to the *sum* of its files,
+    Group balancing: the label's loudness target applies to the *sum* of its files,
     so two guitars don't end up twice as loud as one. The printed relationship
     between the doubles (their relative levels and any baked-in panning) is kept;
     we apply one shared gain to the whole group. If `spread` > 0 for this type and
@@ -126,13 +144,13 @@ def _process_group(stem, paths, recipe):
         aa = a if a.ndim > 1 else a[:, None]
         summed[: aa.shape[0], : aa.shape[1]] += aa
     group_loud = meters.integrated_lufs(summed, rate)
-    target = INTERNAL_ANCHOR_LUFS + recipe["balance"].get(stem, 0.0)
+    target = INTERNAL_ANCHOR_LUFS + recipe["balance"].get(label, 0.0)
     gain_db = (target - group_loud) if np.isfinite(group_loud) else 0.0
 
-    spec = recipe["chain"].get(stem, {})
+    spec = recipe["chain"].get(label, {})
     board = _build_chain(spec, rate)
-    spread = float(recipe.get("spread", {}).get(stem, 0.0))
-    base_pan = recipe["pan"].get(stem, 0.0)
+    spread = float(recipe.get("spread", {}).get(label, 0.0))
+    base_pan = recipe["pan"].get(label, 0.0)
     positions = (np.linspace(-spread, spread, len(loaded))
                  if spread and len(loaded) > 1 else [base_pan] * len(loaded))
 
@@ -148,7 +166,7 @@ def _process_group(stem, paths, recipe):
         a = _to_stereo(a)
         out.append(_pan(a, pan))
     info = {
-        "stem": stem,
+        "label": label,
         "files": len(loaded),
         "pre_lufs": round(group_loud, 2) if np.isfinite(group_loud) else None,
         "gain_db": round(gain_db, 2),
@@ -158,21 +176,22 @@ def _process_group(stem, paths, recipe):
 
 
 # --------------------------------------------------------------------- public API
-def mix(folder, recipe, out_path, headroom_db=-6.0, glue=False):
-    """Render stems in `folder` to a stereo mix WAV at out_path.
+def mix(folder, recipe, out_path, mapping=None, headroom_db=-6.0, glue=False):
+    """Render the stems in `folder` to a stereo mix WAV at out_path.
 
-    The stems are already FX-printed, so this only level-balances, pans (if asked)
-    and sums — no tone shaping. `glue=False` keeps even the bus compressor off by
-    default; flip it on only if you want a touch of cohesion. Leaves the bus
-    peaking near headroom_db so the master stage has room.
-    Returns a small report dict (stems used, length, peak)."""
-    stems = find_stems(folder)
+    `mapping` is an optional {filename: label} dict (from keel.json); without it,
+    labels are auto-detected. Files sharing a label are balanced as one group,
+    for any number of files per label. The stems are already FX-printed, so this
+    only level-balances, pans (if asked) and sums — no tone shaping. `glue=False`
+    keeps even the bus compressor off by default. Leaves the bus peaking near
+    headroom_db so the master stage has room. Returns a small report dict."""
+    groups = group_files(folder, mapping)
     buffers, rate, balance = [], None, []
-    for stem, paths in stems.items():
-        bufs, r, info = _process_group(stem, paths, recipe)
+    for label, paths in groups.items():
+        bufs, r, info = _process_group(label, paths, recipe)
         rate = rate or r
         if r != rate:
-            raise ValueError(f"{stem} samplerate {r} != mix rate {rate}; "
+            raise ValueError(f"{label} samplerate {r} != mix rate {rate}; "
                              "render all stems at one rate.")
         buffers.extend(bufs)
         balance.append(info)
@@ -197,8 +216,9 @@ def mix(folder, recipe, out_path, headroom_db=-6.0, glue=False):
     out_path.parent.mkdir(parents=True, exist_ok=True)
     sf.write(str(out_path), bus, rate, subtype="PCM_24")
     return {
-        "stems": [f"{s}x{len(p)}" if len(p) > 1 else s for s, p in stems.items()],
-        "missing": [s for s in STEMS if s not in stems],
+        "groups": [f"{l}x{len(p)}" if len(p) > 1 else l
+                   for l, p in groups.items()],
+        "labels": list(groups.keys()),
         "rate": rate,
         "seconds": round(n / rate, 1),
         "peak_dbfs": round(20 * np.log10(float(np.max(np.abs(bus))) or 1e-9), 2),

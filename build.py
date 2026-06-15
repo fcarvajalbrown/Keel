@@ -12,25 +12,42 @@ stereo mix and a loudness-safe master:
 
     out/<name>_mix.wav      out/<name>_master.wav
 
-Two modes:
+LABELING (any number of stems). Keel does NOT assume a fixed set of stem types.
+On the first run over a folder it AUTO-DETECTS a label for every audio file
+(from its filename) and writes an editable mapping, `keel.json`, into that
+folder:
 
-  SINGLE  (default) — mix + master ONE folder of stems:
+    {
+      "stems":   { "kick.wav": "drums", "gtr_DI_1.wav": "guitar", ... },
+      "balance": { "vocals": 0.0, "drums": -2.0, "guitar": -3.5, ... },
+      "pan":     {},               # label -> -1.0 (L) .. +1.0 (R)
+      "spread":  {},               # label -> 0..1 auto-spread multi-file groups
+      "master":  { "target_lufs": -14.0, "tp_ceiling_db": -1.0, "reference": null }
+    }
+
+Edit the labels (assign guitar/bass/vocals/... to each file — a label can hold 1
+or 10 files) and the per-label balance, then re-run to apply. Files sharing a
+label are balanced as one group. Auto-detect is only a starting guess; the
+mapping is the source of truth.
+
+MODES:
+  SINGLE  (default) — one folder of stems:
       python build.py --stems "C:\\path\\to\\stems" --out out
-      python build.py --stems ./stems --name my_song --lufs -11 --tp -1
-      python build.py --stems ./stems --ref "C:\\refs\\commercial_master.wav"
-
-  BATCH — mix + master EVERY immediate subfolder that contains stems:
+      python build.py --stems ./stems --scan         # only (re)write keel.json
+      python build.py --stems ./stems --map my.json  # use a mapping elsewhere
+  BATCH — every immediate subfolder that contains stems:
       python build.py --batch "C:\\path\\to\\album" --out out
-    Each subfolder becomes one project named after that folder.
 
-Stage controls (either mode):
-      --mix-only        stop after the mix stage
-      --master-only     remaster existing out/<name>_mix.wav
+STAGE / MASTER controls:
+      --mix-only / --master-only          stop after mix / remaster existing mix
+      --lufs -11 --tp -1                  override the mapping's master target
+      --ref "C:\\refs\\master.wav"         match a reference (ignores --lufs)
 
-Deterministic: same stems + same options -> identical output, every run.
-A QC sheet is written to <out>/REPORT.md after every run.
+Deterministic: same stems + same mapping + same options -> identical output.
+A QC sheet is written to <out>/REPORT.md after every render.
 """
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -38,46 +55,98 @@ import recipes
 import mixer
 import mastering
 
+MAPPING_NAME = "keel.json"
+
 
 def _resolve_ref(ref):
-    """Split a --ref path into (references_dir, filename) for mastering.master,
-    which looks a reference up by name inside a directory."""
+    """Split a --ref path into (references_dir, filename) for mastering.master."""
     if not ref:
         return None, None
     p = Path(ref).expanduser().resolve()
     return p.parent, p.name
 
 
-def process_one(stems_dir, out_dir, name, *, target_lufs, tp_ceiling, ref,
-                do_mix=True, do_master=True, mix_overrides=None,
-                master_overrides=None):
-    """Mix and/or master one folder of stems. Returns a REPORT.md row dict, or
-    None if it was skipped (no stems / no mix to master)."""
+def mapping_path(stems_dir, explicit=None):
+    return Path(explicit) if explicit else Path(stems_dir) / MAPPING_NAME
+
+
+def build_mapping_doc(stems_dir):
+    """Auto-detect labels for every file and seed an editable mapping document:
+    file->label plus per-label balance seeded from recipes.DEFAULT_BALANCE
+    (unknown labels default to 0.0), and the default master target."""
+    fmap = mixer.autodetect(stems_dir)
+    labels = list(dict.fromkeys(fmap.values()))  # ordered, unique
+    balance = {lb: recipes.DEFAULT_BALANCE.get(lb, 0.0) for lb in labels}
+    return {
+        "stems": fmap,
+        "balance": balance,
+        "pan": {},
+        "spread": {},
+        "master": {
+            "target_lufs": recipes.DEFAULT_MASTER["target_lufs"],
+            "tp_ceiling_db": recipes.DEFAULT_MASTER["tp_ceiling_db"],
+            "reference": None,
+        },
+    }
+
+
+def load_mapping_doc(path):
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def write_mapping_doc(path, doc):
+    Path(path).write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+
+
+def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
+                target_lufs=None, tp_ceiling=None, ref=None,
+                do_mix=True, do_master=True):
+    """Mix and/or master one folder of stems via its keel.json mapping. Returns a
+    REPORT.md row dict, or None if it was skipped."""
     stems_dir = Path(stems_dir)
     out_dir = Path(out_dir)
+    mpath = mapping_path(stems_dir, map_file)
+
+    # resolve the mapping document: regenerate on --scan or when absent
+    if scan or not mpath.exists():
+        doc = build_mapping_doc(stems_dir)
+        if not doc["stems"]:
+            print(f"  [skip] no audio files in {stems_dir}")
+            return None
+        write_mapping_doc(mpath, doc)
+        labels = list(dict.fromkeys(doc["stems"].values()))
+        print(f"  mapping -> {mpath}  (auto-detected labels: {', '.join(labels)})")
+        print(f"            edit labels/balance in {mpath.name} and re-run to refine.")
+        if scan:
+            return None  # --scan only writes the mapping
+    else:
+        doc = load_mapping_doc(mpath)
+
     out_dir.mkdir(parents=True, exist_ok=True)
     mix_wav = out_dir / f"{name}_mix.wav"
     master_wav = out_dir / f"{name}_master.wav"
-
-    print(f"\n=== {name} ===")
+    print(f"=== {name} ===")
     row = {"slug": name, "mix": None, "master": None}
+
+    mix_ov = {"balance": doc.get("balance", {}), "pan": doc.get("pan", {}),
+              "spread": doc.get("spread", {}), "chain": doc.get("chain", {})}
 
     if do_mix:
         try:
-            rep = mixer.mix(stems_dir, recipes.mix_recipe(mix_overrides), mix_wav)
+            rep = mixer.mix(stems_dir, recipes.mix_recipe(mix_ov), mix_wav,
+                            mapping=doc.get("stems"))
         except FileNotFoundError as e:
             print(f"  [skip] {e}")
             return None
         row["mix"] = rep
-        miss = f" (missing: {', '.join(rep['missing'])})" if rep["missing"] else ""
         print(f"  mix    -> {rep['out']}  {rep['seconds']}s "
-              f"{rep['peak_dbfs']} dBFS  stems: {', '.join(rep['stems'])}{miss}")
+              f"{rep['peak_dbfs']} dBFS  groups: {', '.join(rep['groups'])}")
 
     if do_master:
         if not mix_wav.exists():
             print(f"  [skip master] no mix at {mix_wav}")
             return row if row["mix"] else None
-        m_ov = dict(master_overrides or {})
+        m_ov = dict(doc.get("master", {}))
         if target_lufs is not None:
             m_ov["target_lufs"] = target_lufs
         if tp_ceiling is not None:
@@ -96,25 +165,22 @@ def process_one(stems_dir, out_dir, name, *, target_lufs, tp_ceiling, ref,
 
 
 def discover_batch(parent):
-    """Immediate subfolders of `parent` that hold at least one stem, each becoming
-    a project named after the subfolder."""
+    """Immediate subfolders of `parent` that hold at least one audio file, each a
+    project named after the subfolder."""
     parent = Path(parent)
     jobs = []
     for sub in sorted(p for p in parent.iterdir() if p.is_dir()):
-        try:
-            mixer.find_stems(sub)
-        except FileNotFoundError:
-            continue
-        jobs.append((sub, sub.name))
+        if mixer.autodetect(sub):
+            jobs.append((sub, sub.name))
     return jobs
 
 
 def write_report(report, out_dir):
-    """One-glance QC sheet: per-project stem balance (pre/post LUFS) + master
+    """One-glance QC sheet: per-project group balance (pre/post LUFS) + master
     loudness/true-peak vs. target. Written to <out>/REPORT.md."""
     L = ["# Keel — mix / master QC report",
          "",
-         "Auto-generated by `build.py`. Per-project stem balance and final "
+         "Auto-generated by `build.py`. Per-project group balance and final "
          "master loudness / true-peak vs. target.",
          ""]
     for row in report:
@@ -122,16 +188,14 @@ def write_report(report, out_dir):
         L.append("")
         m = row.get("mix")
         if m:
-            stems = ", ".join(m["stems"]) + (
-                f"  (missing: {', '.join(m['missing'])})" if m["missing"] else "")
             L.append(f"- Mix: {m['seconds']}s, bus peak {m['peak_dbfs']} dBFS, "
-                     f"stems: {stems}")
+                     f"groups: {', '.join(m['groups'])}")
             if m.get("balance"):
                 L.append("")
-                L.append("| stem | files | pre LUFS | gain dB | post LUFS |")
+                L.append("| label | files | pre LUFS | gain dB | post LUFS |")
                 L.append("|---|---|---|---|---|")
                 for b in m["balance"]:
-                    L.append(f"| {b['stem']} | {b['files']} | {b['pre_lufs']} "
+                    L.append(f"| {b['label']} | {b['files']} | {b['pre_lufs']} "
                              f"| {b['gain_db']} | {b['post_lufs']} |")
                 L.append("")
         ms = row.get("master")
@@ -161,13 +225,16 @@ def main(argv):
     ap.add_argument("--name", metavar="BASE",
                     help="output basename in single mode "
                          "(default: the stems folder name)")
+    ap.add_argument("--map", metavar="FILE", dest="map_file",
+                    help="mapping file to use (default: <stems>/keel.json)")
+    ap.add_argument("--scan", action="store_true",
+                    help="(re)write the keel.json mapping and exit, no render")
     ap.add_argument("--lufs", type=float, metavar="LUFS",
-                    help="master loudness target (default: -14.0)")
+                    help="override the mapping's master loudness target")
     ap.add_argument("--tp", type=float, metavar="dBTP",
-                    help="master true-peak ceiling (default: -1.0)")
+                    help="override the mapping's true-peak ceiling")
     ap.add_argument("--ref", metavar="FILE",
-                    help="reference master; if set, Keel matches it (Matchering) "
-                         "and --lufs is ignored")
+                    help="reference master; if set, Keel matches it (--lufs ignored)")
     ap.add_argument("--mix-only", action="store_true", help="stop after the mix")
     ap.add_argument("--master-only", action="store_true",
                     help="remaster existing out/<name>_mix.wav")
@@ -183,13 +250,12 @@ def main(argv):
             return
     else:
         stems = Path(args.stems).expanduser().resolve()
-        name = args.name or stems.name
-        jobs = [(stems, name)]
+        jobs = [(stems, args.name or stems.name)]
 
     report = []
     for stems_dir, name in jobs:
         row = process_one(
-            stems_dir, args.out, name,
+            stems_dir, args.out, name, map_file=args.map_file, scan=args.scan,
             target_lufs=args.lufs, tp_ceiling=args.tp, ref=args.ref,
             do_mix=do_mix, do_master=do_master)
         if row:
@@ -197,7 +263,8 @@ def main(argv):
 
     if report:
         write_report(report, args.out)
-    print(f"\nDone. Outputs in {Path(args.out).resolve()}")
+    if not args.scan:
+        print(f"\nDone. Outputs in {Path(args.out).resolve()}")
 
 
 if __name__ == "__main__":
