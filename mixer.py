@@ -136,13 +136,18 @@ def _process_group(label, paths, recipe):
                              "render all stems at one rate.")
         loaded.append(a)
 
-    # group loudness: measure the summed group, derive ONE balance gain
+    # group loudness: measure the summed group AS RENDERED, derive ONE balance gain.
+    # Each file lands on a stereo bus (via _to_stereo) downstream, so the group is
+    # summed to stereo here too. This both handles labels that mix mono and stereo
+    # files (e.g. a kit with mono close mics + stereo overheads/room) and keeps
+    # mono-source and stereo-source groups on one perceptual basis — BS.1770 reads
+    # a dual-mono stereo ~3 dB louder than the same signal as a single channel, so
+    # measuring every group as stereo is what makes their relative balance consistent.
     n = max(a.shape[0] for a in loaded)
-    summed = np.zeros((n, loaded[0].shape[1] if loaded[0].ndim > 1 else 1),
-                      dtype=np.float64)
+    summed = np.zeros((n, 2), dtype=np.float64)
     for a in loaded:
-        aa = a if a.ndim > 1 else a[:, None]
-        summed[: aa.shape[0], : aa.shape[1]] += aa
+        aa = _to_stereo(a)
+        summed[: aa.shape[0]] += aa
     group_loud = meters.integrated_lufs(summed, rate)
     target = INTERNAL_ANCHOR_LUFS + recipe["balance"].get(label, 0.0)
     gain_db = (target - group_loud) if np.isfinite(group_loud) else 0.0
