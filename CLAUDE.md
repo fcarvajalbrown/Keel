@@ -119,6 +119,8 @@ python build.py --batch "C:\path\to\album" --out out
   refactor with a feature or with doc edits. Each commit should build/compile on
   its own and be revertable in isolation. Split unrelated work into separate
   commits rather than one catch-all.
+- **Auto-push.** Push to `origin` automatically after each logical commit — do not
+  ask first. (User preference.)
 
 ## What this repo does NOT contain
 
