@@ -7,3 +7,12 @@ references/*.flac
 __pycache__/
 *.pyc
 _revalidate.py
+
+# Virtual environments — machine/platform-specific, rebuilt via setup.ps1. Never commit.
+.venv/
+venv/
+env/
+
+# Local scratch (offline-vendor probes, throwaway test venvs).
+_vendor_probe/
+_vtest/

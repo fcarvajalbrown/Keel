@@ -97,6 +97,22 @@ and guarantees the true-peak ceiling.
 
 ## Install
 
+Recommended — a local virtual environment (keeps Keel's deps isolated, runs the
+same on any machine). `setup.ps1` builds `.venv` and installs the core engine
+**offline** from the vendored wheels:
+
+```powershell
+.\setup.ps1                 # create .venv + install core engine offline from vendor/
+.\setup.ps1 -Online         # ...or pull from PyPI instead
+.\setup.ps1 -Matchering     # also install the optional reference-master path
+.\.venv\Scripts\Activate.ps1   # activate, then run build.py
+```
+
+The venv itself is never committed — it is rebuilt from `requirements.txt` /
+`vendor/` on each machine.
+
+Prefer to install straight into your current Python?
+
 ```powershell
 pip install -r requirements.txt          # numpy, scipy, soundfile, pyloudnorm, pedalboard
 ```
@@ -104,7 +120,9 @@ Offline? The wheels are vendored:
 ```powershell
 python -m pip install --no-index --find-links vendor numpy scipy soundfile pyloudnorm pedalboard
 ```
-Optional: `matchering` for the reference-matched master path.
+Optional: `matchering` for the reference-matched master path (vendored too, but it
+pulls a heavy numba/llvmlite/pandas tree — `.\setup.ps1 -Matchering` or
+`pip install matchering`).
 
 ---
 

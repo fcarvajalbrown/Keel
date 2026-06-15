@@ -86,11 +86,20 @@ technique and cite them. Don't tune DSP from memory.
 ## Setup / running
 
 ```powershell
-# online
-pip install -r requirements.txt
-# offline (wheels vendored for Windows / CPython 3.14, cp314-win_amd64)
-python -m pip install --no-index --find-links vendor numpy scipy soundfile pyloudnorm pedalboard
+# recommended: a local venv, deps installed offline from vendored wheels
+.\setup.ps1                 # builds .venv, installs core engine from vendor/
+.\setup.ps1 -Online         # ...from PyPI instead
+.\setup.ps1 -Matchering     # also install the optional reference-master path
+.\.venv\Scripts\Activate.ps1
+
+# or install into the current Python directly:
+pip install -r requirements.txt                                  # online
+python -m pip install --no-index --find-links vendor `
+    numpy scipy soundfile pyloudnorm pedalboard                  # offline (cp314-win_amd64)
 ```
+The `.venv` is never committed — `setup.ps1` rebuilds it from `requirements.txt` /
+`vendor/`. The full dependency set (incl. the optional Matchering tree) is vendored
+in `vendor/` for offline install; see `vendor/README.md`.
 Deps: numpy, scipy, soundfile, pyloudnorm, pedalboard (+ optional matchering for
 the reference-master path). All pip-only, vendored in `vendor/` for offline use.
 
