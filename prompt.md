@@ -49,8 +49,17 @@ editable per-song `keel.json`, files sharing a label balanced as one group.
 
 ## Open items worth raising with the user
 
-- **Folder rename:** repo still lives in `temp/`; rename to `keel/` when ready
-  (could not be done from inside the live working dir).
+- **Folder rename (do this):** the repo still lives in `C:\Projects\temp`; rename
+  it to `C:\Projects\keel`. It cannot be done from inside a live session (Windows
+  locks the working directory). Steps for the user:
+  1. Close Claude Code (and any editor/terminal with `C:\Projects\temp` open).
+  2. Rename the folder: `Rename-Item C:\Projects\temp C:\Projects\keel`
+  3. Reopen Claude Code in `C:\Projects\keel` and continue.
+  Nothing in the code depends on the folder name (paths come from `__file__` / CLI
+  args), and the git remote is unaffected. Caveat: the memory project key changes
+  from `C--Projects-temp` to `C--Projects-keel`, so prior memories won't auto-load
+  under the new path — re-save the "never add Claude as co-author" rule on the
+  first session in the renamed folder.
 - **License:** done — **AGPL-3.0 + dual commercial**. `LICENSE` is the verbatim
   AGPLv3; per-file copyright headers (Felipe Carvajal Brown, 2026) are in place;
   `COMMERCIAL-LICENSE.md` holds the commercial terms + contact
