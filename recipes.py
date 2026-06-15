@@ -28,21 +28,23 @@ WAVs; they are build artifacts.
 STEMS = ["drums", "bass", "guitar", "synth", "vocals"]  # the known/default labels
 
 STEM_ALIASES = {
-    # Drums are usually delivered as separate per-component mics whose names don't
-    # contain the word "drum" (kick / snare / toms / overheads / room). Include the
-    # standard kit-piece names so a multi-mic kit collapses into ONE drums group
-    # instead of scattering across "other" (which would balance the lone room mic
-    # as loud as the whole close-mic'd kit). Deliberately omits ultra-short, high-
-    # collision tokens ("oh", "hh", "bd", "sd", "hat") that would mislabel unrelated
-    # files (e.g. "oh" is a substring of "john") — auto-detect is a guess the user
-    # corrects in keel.json, so it should err toward precision over reach.
+    # An alias matches when it is a PREFIX of a whole filename TOKEN (mixer.py
+    # splits names on separators, camelCase, and letter/digit runs: "BassAmp1" ->
+    # bass, amp; "01_Kick" -> kick; "ElecGtr2DT" -> elec, gtr, dt). Anchoring at a
+    # token start is why short tokens are safe here: "oh" matches an overhead mic
+    # "OH" but never "john", "hat" never "that" — a substring-in-filename match
+    # could not tell them apart. Drum kits ship as per-component mics whose names
+    # rarely contain "drum" (kick/snare/toms/overheads), so the kit-piece names are
+    # listed to collapse a multi-mic kit into ONE drums group rather than scatter
+    # it across "other". Auto-detect is still only a first guess the user edits in
+    # keel.json; the scan prints a mapping review so nothing is silently mislabeled.
     "drums":  ["drum", "drums", "kit", "perc", "kick", "kik", "snare", "snr",
-               "tom", "toms", "cymbal", "overhead", "ohead", "hihat", "hi-hat",
-               "ride", "crash", "conga", "bongo"],
+               "tom", "toms", "cymbal", "crash", "ride", "hat", "hihat", "oh",
+               "overhead", "conga", "bongo"],
     "bass":   ["bass", "bs"],
     "guitar": ["guitar", "gtr", "gt"],
     "synth":  ["synth", "syn", "pad", "keys"],
-    "vocals": ["vocals", "vocal", "vox", "vocal guide", "voc", "lead"],
+    "vocals": ["vocals", "vocal", "vox", "voc", "lead"],
 }
 
 # Multiple files of one type are normal — double-tracked guitars (guitar_L.wav +

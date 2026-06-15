@@ -15,6 +15,7 @@ stem through a built-in pedalboard chain (HPF/EQ/comp/reverb), sum, glue-bus.
 Deterministic: same stems + same recipe -> same mix, every time. No ML, no
 randomness. (VST3 hosting is a documented future hook — see ROADMAP.)
 """
+import re
 from pathlib import Path
 import numpy as np
 import soundfile as sf
@@ -36,6 +37,37 @@ OTHER_LABEL = "other"         # fallback label for files that match no alias
 
 
 # --------------------------------------------------------------------- labeling
+def _tokenize(stem_name):
+    """Split a filename stem into lowercase word tokens for label matching.
+
+    Splits on separators, camelCase boundaries, and letter<->digit runs, then
+    drops pure-digit tokens, so real-world stem names resolve to clean words:
+        "Guitar 1"    -> ["guitar"]
+        "BassAmp1"    -> ["bass", "amp"]
+        "01_Kick"     -> ["kick"]
+        "ELE GTR1 Dis-M80" -> ["ele", "gtr", "dis", "m"]
+        "DrumsRoom"   -> ["drums", "room"]
+    Matching an alias against these tokens (anchored at a token start) is what
+    makes short aliases safe — "oh" hits an "OH" overhead mic, never "john"."""
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", stem_name).lower()
+    tokens = []
+    for part in re.split(r"[^a-z0-9]+", spaced):
+        tokens += re.findall(r"[a-z]+|[0-9]+", part)
+    return [t for t in tokens if not t.isdigit()]
+
+
+def _match_label(stem_name):
+    """Guess a label for one filename: the first STEM_ALIASES entry with an alias
+    that prefixes any token of the name. OTHER_LABEL if none match."""
+    tokens = _tokenize(stem_name)
+    for label, aliases in STEM_ALIASES.items():
+        # longest alias first so a more specific hint wins within a label
+        for a in sorted(aliases, key=len, reverse=True):
+            if any(t.startswith(a) for t in tokens):
+                return label
+    return OTHER_LABEL
+
+
 def autodetect(folder):
     """Guess a label for EVERY audio file in `folder` from its filename, using
     STEM_ALIASES. Files that match no alias get OTHER_LABEL. Returns an ordered
@@ -45,14 +77,7 @@ def autodetect(folder):
     folder = Path(folder)
     mapping = {}
     for f in sorted(folder.glob("*.wav")) + sorted(folder.glob("*.flac")):
-        name = f.stem.lower()
-        label = OTHER_LABEL
-        # longest alias first so "vocal guide" wins over "guitar"-style partials
-        for stem, aliases in STEM_ALIASES.items():
-            if any(a in name for a in sorted(aliases, key=len, reverse=True)):
-                label = stem
-                break
-        mapping[f.name] = label
+        mapping[f.name] = _match_label(f.stem)
     return mapping
 
 

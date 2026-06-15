@@ -90,6 +90,28 @@ def build_mapping_doc(stems_dir):
     }
 
 
+def _print_mapping_review(mpath, doc):
+    """Dry-run summary of an auto-detected mapping: every label with its file
+    count and files, so the user can spot a mislabel before rendering. Files that
+    matched no alias (OTHER_LABEL) are called out explicitly — that's where a
+    silently mis-detected stem would hide."""
+    stems = doc["stems"]
+    by_label = {}
+    for fn, lb in stems.items():
+        by_label.setdefault(lb, []).append(fn)
+    print(f"  mapping -> {mpath}  ({len(stems)} files, "
+          f"{len(by_label)} labels)")
+    for lb, files in by_label.items():
+        head = ", ".join(files[:4]) + (" ..." if len(files) > 4 else "")
+        print(f"      {lb:<8} x{len(files):<3} {head}")
+    other = by_label.get(mixer.OTHER_LABEL, [])
+    if other:
+        print(f"  [check] {len(other)} file(s) matched no label -> "
+              f"'{mixer.OTHER_LABEL}' (balance 0.0): {', '.join(other)}")
+        print(f"          reassign them in {Path(mpath).name} if that's wrong.")
+    print(f"  edit labels/balance in {Path(mpath).name} and re-run to refine.")
+
+
 def load_mapping_doc(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
@@ -114,9 +136,7 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
             print(f"  [skip] no audio files in {stems_dir}")
             return None
         write_mapping_doc(mpath, doc)
-        labels = list(dict.fromkeys(doc["stems"].values()))
-        print(f"  mapping -> {mpath}  (auto-detected labels: {', '.join(labels)})")
-        print(f"            edit labels/balance in {mpath.name} and re-run to refine.")
+        _print_mapping_review(mpath, doc)
         if scan:
             return None  # --scan only writes the mapping
     else:
