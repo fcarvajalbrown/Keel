@@ -188,6 +188,7 @@ from there. Custom labels and `other` are fine and default to 0.0 balance.
   "balance": { "vocals": 0.0, "drums": -2.0, "bass": -3.0, "guitar": -3.5, "synth": -6.0 },
   "pan":     {},
   "spread":  {},
+  "glue":    false,
   "master":  { "target_lufs": -14.0, "tp_ceiling_db": -1.0, "reference": null }
 }
 ```
@@ -198,6 +199,9 @@ from there. Custom labels and `other` are fine and default to 0.0 balance.
   width is kept).
 - **spread** — `0..1`; auto-pans a multi-file label symmetrically (e.g. doubled
   guitars hard L/R). Default 0.
+- **glue** — `true/false`; a gentle bus-glue compressor over the summed mix.
+  Default `false` (the stems are already mix-ready). CLI `--glue/--no-glue`
+  overrides it. Leave off unless a sum genuinely wants light cohesion.
 - **master** — `target_lufs`, `tp_ceiling_db`, and an optional `reference`
   filename. CLI `--lufs/--tp/--ref` override these.
 

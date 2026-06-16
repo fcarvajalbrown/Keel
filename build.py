@@ -22,6 +22,7 @@ folder:
       "balance": { "vocals": 0.0, "drums": -2.0, "guitar": -3.5, ... },
       "pan":     {},               # label -> -1.0 (L) .. +1.0 (R)
       "spread":  {},               # label -> 0..1 auto-spread multi-file groups
+      "glue":    false,            # gentle bus-glue compressor (off by default)
       "master":  { "target_lufs": -14.0, "tp_ceiling_db": -1.0, "reference": null }
     }
 
@@ -40,6 +41,7 @@ MODES:
 
 STAGE / MASTER controls:
       --mix-only / --master-only          stop after mix / remaster existing mix
+      --glue / --no-glue                  force the bus-glue compressor on/off
       --preset loud                       house-sound loudness profile (see below)
       --lufs -11 --tp -1                  override the mapping's master target
       --ref "C:\\refs\\master.wav"         match a reference (ignores --lufs)
@@ -104,6 +106,7 @@ def build_mapping_doc(stems_dir):
         "balance": balance,
         "pan": {},
         "spread": {},
+        "glue": False,   # gentle bus-glue compressor; OFF (stems are mix-ready)
         "master": {
             "target_lufs": recipes.DEFAULT_MASTER["target_lufs"],
             "tp_ceiling_db": recipes.DEFAULT_MASTER["tp_ceiling_db"],
@@ -144,7 +147,7 @@ def write_mapping_doc(path, doc):
 
 def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
                 preset=None, target_lufs=None, tp_ceiling=None, ref=None,
-                do_mix=True, do_master=True):
+                glue=None, do_mix=True, do_master=True):
     """Mix and/or master one folder of stems via its keel.json mapping. Returns a
     REPORT.md row dict, or None if it was skipped."""
     stems_dir = Path(stems_dir)
@@ -174,15 +177,18 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
               "spread": doc.get("spread", {}), "chain": doc.get("chain", {})}
 
     if do_mix:
+        # glue: CLI --glue/--no-glue (True/False) overrides the mapping's "glue"
+        use_glue = doc.get("glue", False) if glue is None else glue
         try:
             rep = mixer.mix(stems_dir, recipes.mix_recipe(mix_ov), mix_wav,
-                            mapping=doc.get("stems"))
+                            mapping=doc.get("stems"), glue=use_glue)
         except FileNotFoundError as e:
             print(f"  [skip] {e}")
             return None
         row["mix"] = rep
+        gtag = "  glue:on" if use_glue else ""
         print(f"  mix    -> {rep['out']}  {rep['seconds']}s "
-              f"{rep['peak_dbfs']} dBFS  groups: {', '.join(rep['groups'])}")
+              f"{rep['peak_dbfs']} dBFS  groups: {', '.join(rep['groups'])}{gtag}")
 
     if do_master:
         if not mix_wav.exists():
@@ -286,6 +292,13 @@ def main(argv):
                     help="override the mapping's true-peak ceiling")
     ap.add_argument("--ref", metavar="FILE",
                     help="reference master; if set, Keel matches it (--lufs ignored)")
+    glue_grp = ap.add_mutually_exclusive_group()
+    glue_grp.add_argument("--glue", dest="glue", action="store_const", const=True,
+                          default=None,
+                          help="force the gentle bus-glue compressor ON "
+                               "(overrides keel.json; default OFF)")
+    glue_grp.add_argument("--no-glue", dest="glue", action="store_const",
+                          const=False, help="force bus glue OFF")
     ap.add_argument("--mix-only", action="store_true", help="stop after the mix")
     ap.add_argument("--master-only", action="store_true",
                     help="remaster existing out/<name>_mix.wav")
@@ -318,7 +331,7 @@ def main(argv):
         row = process_one(
             stems_dir, args.out, name, map_file=args.map_file, scan=args.scan,
             preset=args.preset, target_lufs=args.lufs, tp_ceiling=args.tp,
-            ref=args.ref, do_mix=do_mix, do_master=do_master)
+            ref=args.ref, glue=args.glue, do_mix=do_mix, do_master=do_master)
         if row:
             report.append(row)
 
