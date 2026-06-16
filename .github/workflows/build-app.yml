@@ -1,0 +1,65 @@
+name: build-app
+
+# Builds the desktop GUI into downloadable artifacts:
+#   * Windows  -> dist/Keel.exe   (onefile)
+#   * macOS    -> dist/Keel.dmg   (.app bundle, Apple Silicon / arm64)
+#
+# Triggered MANUALLY (Actions tab -> Run workflow) or by a version tag (v*) only
+# -- it deliberately does NOT run on every push, so day-to-day commits never
+# spam build failures. Each job self-tests the frozen app before uploading, so a
+# broken bundle fails its own job instead of shipping.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    strategy:
+      fail-fast: false   # one OS failing must not cancel the other
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows
+            artifact_name: Keel-windows-exe
+            artifact_path: dist/Keel.exe
+          - os: macos-latest        # Apple Silicon (arm64)
+            label: macos-arm64
+            artifact_name: Keel-macos-arm64-dmg
+            artifact_path: dist/Keel.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-gui.txt -r requirements-build.txt
+
+      - name: Build (PyInstaller)
+        run: pyinstaller Keel.spec --noconfirm
+
+      - name: Self-test the frozen app (Windows)
+        if: runner.os == 'Windows'
+        run: dist\Keel.exe --selftest
+
+      - name: Self-test + package DMG (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ./dist/Keel.app/Contents/MacOS/Keel --selftest
+          hdiutil create -volname Keel -srcfolder dist/Keel.app -ov -format UDZO dist/Keel.dmg
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
