@@ -91,7 +91,15 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 - [~] One-click render to mix + master; reference-match picker; preset save/load.
       Render button (mix+master in a worker thread), reference picker, and
       save/load of both user presets and the project `keel.json`.
-- [ ] Package as a signed desktop app (Windows first, then macOS).
+- [~] Package as a desktop app (Windows first, then macOS). `Keel.spec`
+      (PyInstaller) builds a Windows onefile `Keel.exe` and a macOS `Keel.app`;
+      a GitHub Actions matrix (`.github/workflows/build-app.yml`) builds both on
+      each version tag / manual run and uploads `Keel.exe` + `Keel.dmg` as
+      artifacts, each gated by the frozen app's `--selftest`. macOS target is
+      Apple Silicon (arm64 — the only macOS arch with a cp314 pedalboard wheel);
+      Intel would need a separate 3.13 job. STILL TODO: code-signing /
+      notarization (Win Authenticode + Apple notarization) for an unsigned-warning
+      -free install, and a proper installer.
 - GUI toolkit decision: **PySide6 (Qt)**. Kivy was ruled out — no cp314 wheels,
   fails to install on the project's Python 3.14. PySide6 ships a stable-ABI
   (abi3) wheel that runs on 3.14, looks native, and is **LGPL** — it links into

@@ -315,6 +315,27 @@ a background thread, post-render **LUFS / true-peak meters** (the same
 (`keel.json`). Real-time playback metering and a signed installer are next (see
 [`ROADMAP.md`](ROADMAP.md) Phase 4).
 
+### Download the app (prebuilt)
+
+GitHub Actions builds standalone executables on every version tag (and on demand
+from the **Actions -> build-app -> Run workflow** button):
+
+- **Windows:** `Keel.exe` — a single onefile, just run it.
+- **macOS (Apple Silicon):** `Keel.dmg` — open it and drag Keel to Applications.
+  It is currently unsigned, so first launch needs right-click -> Open. (Intel
+  Macs aren't built yet — ask and a `macos-13` job can be added.)
+
+Grab them from the latest **build-app** run's artifacts. Each build self-tests
+the frozen app before it's uploaded.
+
+### Build the app yourself
+
+```powershell
+.\setup.ps1 -Gui
+.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+.\.venv\Scripts\pyinstaller Keel.spec --noconfirm     # -> dist\Keel.exe (or dist/Keel.app on macOS)
+```
+
 ---
 
 ## Where Keel is headed
