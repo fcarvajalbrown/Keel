@@ -251,6 +251,7 @@ gain) and the final master LUFS/dBTP vs. target — one glance to confirm it lan
 ```
 keel.py         # public library API: one import surface for CLI/GUI/plugin
 build.py        # CLI entry point: scan -> write/read keel.json -> mix -> master -> REPORT
+tests/          # stdlib-unittest safety net (determinism, landing, balance, labeling)
 recipes.py      # default balance/pan/master tables + the auto-detect alias hints
 mixer.py        # the mix engine: autodetect/group by label, loudness-balance, pan, sum
 mastering.py    # the master engine: tone -> clip -> true-peak limit -> exact LUFS, or Matchering
@@ -277,6 +278,16 @@ keel.mix("my_song", recipe, "out/song_mix.wav", mapping=mapping)
 keel.master("out/song_mix.wav",
             keel.master_recipe(keel.preset_master("streaming")),
             "out/song_master.wav")
+```
+
+### Tests
+
+A stdlib-`unittest` suite synthesizes tiny stems and checks the guarantees
+(deterministic byte-identical output, exact master LUFS under the true-peak
+ceiling, group balance, label matching) — no committed audio, no extra deps:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests
 ```
 
 ---
