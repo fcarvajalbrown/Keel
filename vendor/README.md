@@ -46,6 +46,19 @@ Optional (Matchering reference-master path):
 | pandas / statsmodels / patsy | 3.0.3 / 0.14.6 / 1.0.2 | matchering's analysis stack |
 | python-dateutil / six / tzdata / packaging | — | sub-deps of the above |
 
+## Not vendored: the GUI (PySide6)
+
+The desktop GUI's only extra dependency, **PySide6 (Qt)**, is deliberately NOT
+vendored here. Its Qt binaries are ~150 MB and would bloat the repo, and unlike
+the engine the GUI is an optional front-end. It installs online instead:
+
+```powershell
+.\setup.ps1 -Gui            # or:  pip install -r requirements-gui.txt
+```
+
+PySide6 ships a stable-ABI (`abi3`) wheel, so a single wheel runs on CPython
+3.10+ including this project's 3.14. The core engine above stays offline-first.
+
 ## Platform note
 
 These are **Windows 64-bit, CPython 3.14** wheels (`cp314-win_amd64`), matching

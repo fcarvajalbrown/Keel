@@ -1,0 +1,12 @@
+# Keel desktop GUI — extra dependency (on top of requirements.txt).
+#
+# Install online:  pip install -r requirements-gui.txt   (or:  .\setup.ps1 -Gui)
+#
+# PySide6 (Qt for Python) is the GUI toolkit. It is NOT vendored for offline
+# install like the core engine: the Qt binaries are ~150 MB and would bloat the
+# repo. The GUI is an opt-in online install; the core engine stays offline-first.
+#
+# Licensing note: PySide6 is LGPL, so it links into a closed, commercially-
+# licensed build of the GUI (see COMMERCIAL-LICENSE.md). It ships a stable-ABI
+# (abi3) wheel, so one wheel runs on CPython 3.10+ including 3.14.
+PySide6

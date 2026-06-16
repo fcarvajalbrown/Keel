@@ -16,3 +16,6 @@ env/
 # Local scratch (offline-vendor probes, throwaway test venvs).
 _vendor_probe/
 _vtest/
+
+# User-created GUI presets (local data, not part of the engine).
+userpresets.json
