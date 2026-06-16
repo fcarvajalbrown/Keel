@@ -16,6 +16,11 @@ on:
 permissions:
   contents: read
 
+# GitHub is migrating JS actions off Node 20; opt every action into Node 24 so
+# the runs stay warning-free.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     name: ${{ matrix.label }}
@@ -33,9 +38,9 @@ jobs:
             artifact_path: dist/Keel.dmg
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
