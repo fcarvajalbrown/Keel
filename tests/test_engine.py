@@ -106,6 +106,41 @@ class TestRecipes(unittest.TestCase):
                          recipes.DEFAULT_MASTER["tp_ceiling_db"])
 
 
+class TestUserPresets(unittest.TestCase):
+    def setUp(self):
+        import userpresets
+        self.up = userpresets
+        # isolate the store to a temp file so the real one is never touched
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig = self.up.STORE
+        self.up.STORE = Path(self._tmp.name) / "userpresets.json"
+
+    def tearDown(self):
+        self.up.STORE = self._orig
+        self._tmp.cleanup()
+
+    def test_save_load_delete_roundtrip(self):
+        self.up.save_user_preset("mine", {"target_lufs": -12.0,
+                                          "tp_ceiling_db": -1.0})
+        self.assertEqual(self.up.load_user_presets()["mine"]["target_lufs"], -12.0)
+        # built-ins overlaid with the user preset
+        merged = self.up.all_presets()
+        self.assertIn("streaming", merged)
+        self.assertIn("mine", merged)
+        self.up.delete_user_preset("mine")
+        self.assertNotIn("mine", self.up.load_user_presets())
+
+    def test_cannot_shadow_builtin(self):
+        with self.assertRaises(ValueError):
+            self.up.save_user_preset("streaming", {"target_lufs": -1.0,
+                                                   "tp_ceiling_db": -1.0})
+
+    def test_empty_name_rejected(self):
+        with self.assertRaises(ValueError):
+            self.up.save_user_preset("  ", {"target_lufs": -14.0,
+                                            "tp_ceiling_db": -1.0})
+
+
 class TestLabeling(unittest.TestCase):
     def test_tokenize(self):
         self.assertEqual(mixer._tokenize("Guitar 1"), ["guitar"])
