@@ -69,6 +69,21 @@ pushed, 19-test suite green):
   matching. Run: `.venv\Scripts\python.exe -m unittest discover -s tests`.
 - **Robustness.** `_to_stereo` handles >2 channels explicitly; build.py errors
   clearly on a missing `--stems`/`--batch` folder.
+- **Desktop GUI scaffold (Phase 4 IN PROGRESS).** `gui.py` (PySide6/Qt) drives
+  `import keel` (no DSP fork): drop/open a stems folder -> editable file->label
+  table -> per-label balance faders (LU) -> loudness preset picker with user
+  save/load (`userpresets.py`, gitignored JSON) -> optional reference + bus-glue
+  toggle -> one-click mix+master in a worker thread -> post-render LUFS/TP meters
+  (via meters.py) -> save/load project keel.json. Headless-smoke-tested
+  (QT_QPA_PLATFORM=offscreen) end to end on song3. Toolkit decision: PySide6, not
+  Kivy (Kivy has no cp314 wheels, won't install on 3.14; PySide6 is abi3 + LGPL,
+  fits the commercial build). GUI deps install ONLINE via `setup.ps1 -Gui` /
+  `requirements-gui.txt` -- NOT vendored (~150 MB Qt; core engine stays offline).
+  Still open in Phase 4: real-time playback metering, live re-render on fader
+  move, and a signed installer.
+- **Commercial model (ROADMAP Phase 6).** AGPL engine stays free; the packaged
+  GUI is the paid product (~USD 20) sold from a GitHub Pages static site under
+  COMMERCIAL-LICENSE.md (LGPL PySide6 makes the closed build legal).
 
 ## The immediate open task: Matchering reference A/B (Phase 2)
 
