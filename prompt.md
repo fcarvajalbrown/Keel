@@ -45,6 +45,31 @@ Infra the user asked for, done:
   `vendor/` (`-Online` for PyPI, `-Matchering` for the reference path). The venv
   is gitignored, rebuilt per machine.
 
+## Since then (this session, 2026-06-16)
+
+Shipped four listening-free items (engine still validated, all committed +
+pushed, 19-test suite green):
+- **Named master presets (Phase 3 DONE).** `build.py --preset NAME` picks a
+  house-sound loudness profile, applied live at render over keel.json's master
+  block (explicit `--lufs/--tp` still win). Shipped `streaming` (-14, default),
+  `loud` (-10), `broadcast` (-16), all at -1.0 dBTP; values web-researched +
+  cited (Spotify/YouTube/Tidal -14; club -10; Apple Music / AES TD1008 -16).
+  `--list-presets` prints them. Master-target-only by design (a preset sets how
+  loud it lands, not the balance). See `recipes.PRESETS` / `preset_master()`.
+- **Bus glue wired.** The pre-existing off-by-default `mixer.mix(glue=...)`
+  compressor is now reachable: keel.json `"glue": false` + `--glue/--no-glue`
+  (CLI beats the mapping). Still OFF by default — the remaining call is the
+  by-ear evaluate, which needs the user. No DSP change when unset.
+- **Library facade (Phase 4 prep DONE).** `keel.py` is the public API
+  (`import keel` -> mix/master/recipes/presets/meters). Single import surface so
+  the future GUI/plugin share one core; DSP not forked.
+- **Test suite.** `tests/test_engine.py` (stdlib unittest, no new dep) checks
+  determinism (byte-identical), exact master LUFS under the TP ceiling, the
+  group-balance invariant, the mono+stereo regression, >2ch coercion, and label
+  matching. Run: `.venv\Scripts\python.exe -m unittest discover -s tests`.
+- **Robustness.** `_to_stereo` handles >2 channels explicitly; build.py errors
+  clearly on a missing `--stems`/`--batch` folder.
+
 ## The immediate open task: Matchering reference A/B (Phase 2)
 
 The user chose to run a **Matchering vs. internal-master A/B on ALL THREE songs**,
@@ -65,9 +90,10 @@ then paused to do it "later." It is set up and ready:
   `<out>/<name>_mix.wav`, so reuse `--name songN` or call the module directly to
   avoid clobbering the internal master).
 
-Other remaining Phase 2 items: optional gentle **bus glue** preset (currently
-off, evaluate by ear), and `DEFAULT_BALANCE`/target tuning (so far the defaults
-generalized without tuning — research-before-tweak if you change DSP).
+Other remaining Phase 2 items: **bus glue** is now wired (keel.json `"glue"` +
+`--glue`) but still OFF — the open part is the by-ear evaluate (needs the user);
+and `DEFAULT_BALANCE`/target tuning (so far the defaults generalized without
+tuning — research-before-tweak if you change DSP).
 
 ## How the user likes to work (match this)
 
