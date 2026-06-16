@@ -80,7 +80,17 @@ pushed, 19-test suite green):
   fits the commercial build). GUI deps install ONLINE via `setup.ps1 -Gui` /
   `requirements-gui.txt` -- NOT vendored (~150 MB Qt; core engine stays offline).
   Still open in Phase 4: real-time playback metering, live re-render on fader
-  move, and a signed installer.
+  move.
+- **Executables + CI (Phase 4).** `Keel.spec` (PyInstaller) builds a Windows
+  onefile `Keel.exe` and a macOS `Keel.app`; `gui.py --selftest` lets the frozen
+  app verify itself headlessly. `.github/workflows/build-app.yml` builds BOTH on
+  windows-latest + macos-latest(arm64) on manual/tag trigger only (never on
+  push, so no failure spam), each gated by --selftest, uploading `Keel.exe` +
+  `Keel.dmg` artifacts. Validated green end-to-end via `gh` (run 27649684004,
+  zero annotations; Keel.exe ~93 MB, Keel.dmg ~64 MB). macOS is arm64 only (the
+  only arch with a cp314 pedalboard wheel). STILL OPEN: code-signing /
+  notarization (the .app/.exe are unsigned) and a proper installer; an Intel-mac
+  (macos-13 + py3.13) job if needed.
 - **Commercial model (ROADMAP Phase 6).** AGPL engine stays free; the packaged
   GUI is the paid product (~USD 20) sold from a GitHub Pages static site under
   COMMERCIAL-LICENSE.md (LGPL PySide6 makes the closed build legal).
