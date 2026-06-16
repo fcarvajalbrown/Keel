@@ -3,21 +3,39 @@
 You are picking up work on **Keel**, a deterministic automix + automaster engine
 (stems in -> balanced mix + loudness-safe master out). The long-term goal is a
 **standalone GUI** and a **VST/plugin**. The CLI engine is done and validated on
-real-world material (see Phase 2 status below).
+real-world material; the GUI scaffold + cross-platform builds now exist too.
 
-## Do this first, before writing any code
+## >>> START HERE — immediate next task (agreed with the user 2026-06-16)
+
+**Phase 4 GUI polish:** two remaining items in `gui.py` —
+1. **Real-time playback metering** — play the rendered master and drive the
+   LUFS / true-peak meters live (today they only update post-render). Use the
+   same `meters.py` math; keep it deterministic for the render path (playback
+   metering is display-only, so that's fine).
+2. **Live re-render on fader move** — when a balance fader changes, re-render
+   (debounced, in the worker thread) so the user hears/sees the new balance
+   without clicking Render each time. Mind the scope lock (ADR-0001): faders
+   change level balance only, never tone.
+
+Confirm with the user first (blue option UI) — they may want to re-pick — but
+this is where we left off. Other live threads if they redirect: code-signing /
+notarization (needs them to pay the publication fee first), the Matchering A/B
+(needs a reference track), and the Phase 6 GitHub Pages landing page.
+
+## Before writing any code
 
 1. **Read these, in order:** `CLAUDE.md` (scope, locked DSP, conventions),
-   `ROADMAP.md` (where we are and what's next), `README.md` (the product story).
-   Do not skip them — they encode decisions already made.
-2. **Locate the current phase in `ROADMAP.md`.** Phases 0-1 (engine core +
-   song-agnostic standalone) are DONE. **Phase 2 (validate on real-world
-   material) is IN PROGRESS** — most of it is checked off (see below); Phases 3-6
-   (config/presets, GUI, VST, distribution) follow.
-3. **Confirm direction with the user before proceeding.** Do not assume the next
-   roadmap item is what they want today. Ask via the **interactive arrow-select
-   option UI (the blue selector), not a plain-text list** — firm preference (see
-   CLAUDE.md). Offer the open items below as options.
+   `ROADMAP.md` (phases + status), `docs/adr/` (the decision records — *why*
+   things are the way they are), `README.md` (the product story). Do not skip
+   them — they encode decisions already made.
+2. **Locate the current phase in `ROADMAP.md`.** DONE: Phase 0-1 (engine core +
+   song-agnostic standalone), Phase 3 (presets/config). IN PROGRESS: Phase 2
+   (validate — only the Matchering A/B + optional tuning remain) and **Phase 4
+   (GUI — scaffold + executables + CI done; polish remaining, see START HERE)**.
+   Phases 5-6 (VST, distribution) follow.
+3. **Confirm direction with the user before proceeding.** Ask via the
+   **interactive arrow-select option UI (the blue selector), not a plain-text
+   list** — firm preference (see CLAUDE.md).
 
 ## Where Phase 2 stands (validated last session, 2026-06-15)
 
@@ -90,7 +108,13 @@ pushed, 19-test suite green):
   zero annotations; Keel.exe ~93 MB, Keel.dmg ~64 MB). macOS is arm64 only (the
   only arch with a cp314 pedalboard wheel). STILL OPEN: code-signing /
   notarization (the .app/.exe are unsigned) and a proper installer; an Intel-mac
-  (macos-13 + py3.13) job if needed.
+  (macos-13 + py3.13) job if needed. User is on an **Apple Silicon M4** (arm64),
+  so the existing arm64 .dmg is correct — no Intel job needed. User said they'll
+  **pay the publication/signing fee later**; unsigned builds are fine for testing.
+- **ADRs backfilled.** `docs/adr/` now holds 24 Nygard-format decision records
+  (+ index) covering every load-bearing decision (DSP locks, scope, engine
+  behaviour, toolkit, licensing, packaging, CI, distribution). When a decision
+  changes, add a superseding ADR — don't silently reverse one.
 - **Commercial model (ROADMAP Phase 6).** AGPL engine stays free; the packaged
   GUI is the paid product (~USD 20) sold from a GitHub Pages static site under
   COMMERCIAL-LICENSE.md (LGPL PySide6 makes the closed build legal).

@@ -1,5 +1,15 @@
 # CLAUDE.md — Keel (automix / automaster engine)
 
+## Session start — READ FIRST
+
+**At the start of every session (e.g. when the user just says "hi" or "continue"),
+read [`prompt.md`](prompt.md) before doing anything else.** It is the live
+hand-off: current state, what shipped last, and the agreed immediate next task.
+Then read `ROADMAP.md` (phases/status) and `docs/adr/` (decision records — *why*
+things are the way they are). Confirm direction with the user via the blue
+arrow-select option UI before writing code; don't assume the next roadmap item is
+today's task.
+
 ## What this is
 
 **Keel** is a deterministic, code-driven **automix + automaster engine**. It
