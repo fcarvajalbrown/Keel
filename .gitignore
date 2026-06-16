@@ -19,3 +19,7 @@ _vtest/
 
 # User-created GUI presets (local data, not part of the engine).
 userpresets.json
+
+# PyInstaller packaging output (the .exe/.app are built, not committed).
+build/
+dist/

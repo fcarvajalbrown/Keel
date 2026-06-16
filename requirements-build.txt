@@ -1,0 +1,9 @@
+# Keel desktop-app packaging — build-time only (on top of requirements*.txt).
+#
+#   pip install -r requirements.txt -r requirements-gui.txt -r requirements-build.txt
+#   pyinstaller Keel.spec --noconfirm
+#
+# Produces  dist/Keel.exe  (Windows, onefile)  or  dist/Keel.app  (macOS, .app).
+# The GitHub Actions workflow (.github/workflows/build.yml) does this on both a
+# Windows and a macOS runner and uploads the .exe / .dmg as artifacts.
+pyinstaller

@@ -511,12 +511,28 @@ class KeelWindow(QMainWindow):
         self.tp_val.setText("–" if tp is None else f"{tp:.2f} dBTP")
 
 
+def _selftest():
+    """Headless smoke test of the *packaged* app: build the window offscreen and
+    confirm the engine is reachable, then exit. Run as `Keel.exe --selftest` in
+    CI (and locally) to prove a frozen build actually imports Qt + the engine."""
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication(sys.argv)
+    KeelWindow()
+    print(f"Keel selftest OK — engine {keel.__version__}, "
+          f"presets {sorted(keel.PRESETS)}")
+    app.quit()
+    return 0
+
+
 def main():
+    if "--selftest" in sys.argv[1:]:
+        return _selftest()
     app = QApplication(sys.argv)
     win = KeelWindow()
     win.show()
-    sys.exit(app.exec())
+    return app.exec()
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
