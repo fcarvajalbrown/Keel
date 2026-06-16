@@ -16,11 +16,6 @@ on:
 permissions:
   contents: read
 
-# GitHub is migrating JS actions off Node 20; opt every action into Node 24 so
-# the runs stay warning-free.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   build:
     name: ${{ matrix.label }}
@@ -63,7 +58,7 @@ jobs:
           hdiutil create -volname Keel -srcfolder dist/Keel.app -ov -format UDZO dist/Keel.dmg
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_path }}
