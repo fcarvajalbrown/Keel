@@ -121,6 +121,31 @@ DEFAULT_MASTER = {
     "reference": None,   # or a filename resolved against build.py's references dir
 }
 
+# ------------------------------------------------------------- MASTER PRESETS
+# Named "house sound" loudness profiles. A preset only sets the master loudness
+# target + true-peak ceiling — it picks how LOUD the master lands, not how the
+# instruments sit, so balance/pan/spread are untouched. Selected at render time
+# with `build.py --preset NAME`, which overrides keel.json's master block (an
+# explicit --lufs / --tp still wins over the preset). The true-peak ceiling stays
+# -1.0 dBTP across all three: streaming services recommend keeping true peaks
+# at/under -1 dBTP so lossy transcoding (AAC/Ogg) doesn't clip. The targets are
+# platform loudness-normalization references, not arbitrary numbers:
+#   streaming  -14 LUFS  Spotify / YouTube / Tidal / Amazon normalize to here.
+#   loud       -10 LUFS  club / aggressive; Keel's oversampled soft-clip + true-
+#                        peak limiter hold this cleanly (see locked DSP note).
+#                        On streaming it's turned down ~4 LU but keeps headroom.
+#   broadcast  -16 LUFS  Apple Music / Apple Podcasts / AES TD1008 — quieter,
+#                        more dynamic delivery (every -1 LUFS buys headroom).
+# (EBU R128 TV/radio broadcast is the much quieter -23 LUFS; add a preset for it
+# if a delivery ever calls for it.)
+DEFAULT_PRESET = "streaming"
+
+PRESETS = {
+    "streaming": {"target_lufs": -14.0, "tp_ceiling_db": -1.0},
+    "loud":      {"target_lufs": -10.0, "tp_ceiling_db": -1.0},
+    "broadcast": {"target_lufs": -16.0, "tp_ceiling_db": -1.0},
+}
+
 
 def _deep_merge(base, override):
     """Per-key merge; nested dicts merge, scalars/lists from override win."""
@@ -150,3 +175,15 @@ def master_recipe(overrides=None):
     """Resolve a full master recipe (DEFAULT_MASTER + optional per-project
     overrides like {"target_lufs": -11.0, "reference": "ref.wav"})."""
     return _deep_merge(DEFAULT_MASTER, overrides or {})
+
+
+def preset_master(name):
+    """Return the master overrides ({target_lufs, tp_ceiling_db}) for a named
+    preset, as a fresh copy. Raises ValueError naming the valid presets on an
+    unknown name, so the CLI can surface a helpful message."""
+    try:
+        return dict(PRESETS[name])
+    except KeyError:
+        raise ValueError(
+            f"unknown preset {name!r}; choose one of: "
+            f"{', '.join(sorted(PRESETS))}")

@@ -40,8 +40,14 @@ MODES:
 
 STAGE / MASTER controls:
       --mix-only / --master-only          stop after mix / remaster existing mix
+      --preset loud                       house-sound loudness profile (see below)
       --lufs -11 --tp -1                  override the mapping's master target
       --ref "C:\\refs\\master.wav"         match a reference (ignores --lufs)
+
+PRESETS (named master loudness profiles, applied live at render — they override
+the mapping's master block; an explicit --lufs/--tp still wins). `--list-presets`
+prints them. Built in: streaming (-14 LUFS, the default normalization target),
+loud (-10), broadcast (-16). All at a -1.0 dBTP ceiling.
 
 Deterministic: same stems + same mapping + same options -> identical output.
 A QC sheet is written to <out>/REPORT.md after every render.
@@ -56,6 +62,22 @@ import mixer
 import mastering
 
 MAPPING_NAME = "keel.json"
+
+
+class _ListPresets(argparse.Action):
+    """`--list-presets`: print the named loudness profiles and exit (before the
+    --stems/--batch requirement is enforced, so it works on its own)."""
+    def __init__(self, option_strings, dest, **kw):
+        super().__init__(option_strings, dest, nargs=0, **kw)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        print("Presets (master loudness target / true-peak ceiling):")
+        for nm in sorted(recipes.PRESETS):
+            m = recipes.PRESETS[nm]
+            dflt = "  (default)" if nm == recipes.DEFAULT_PRESET else ""
+            print(f"  {nm:<10} {m['target_lufs']:>6} LUFS / "
+                  f"{m['tp_ceiling_db']:>5} dBTP{dflt}")
+        parser.exit()
 
 
 def _resolve_ref(ref):
@@ -121,7 +143,7 @@ def write_mapping_doc(path, doc):
 
 
 def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
-                target_lufs=None, tp_ceiling=None, ref=None,
+                preset=None, target_lufs=None, tp_ceiling=None, ref=None,
                 do_mix=True, do_master=True):
     """Mix and/or master one folder of stems via its keel.json mapping. Returns a
     REPORT.md row dict, or None if it was skipped."""
@@ -167,7 +189,9 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
             print(f"  [skip master] no mix at {mix_wav}")
             return row if row["mix"] else None
         m_ov = dict(doc.get("master", {}))
-        if target_lufs is not None:
+        if preset:  # named profile overrides the mapping's master block
+            m_ov.update(recipes.preset_master(preset))
+        if target_lufs is not None:  # explicit --lufs/--tp still beat the preset
             m_ov["target_lufs"] = target_lufs
         if tp_ceiling is not None:
             m_ov["tp_ceiling_db"] = tp_ceiling
@@ -178,8 +202,9 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
         rep = mastering.master(mix_wav, recipe, master_wav, references_dir=refs_dir)
         row["master"] = rep
         row["target_lufs"] = recipe.get("target_lufs")
+        ptag = f"  preset:{preset}" if preset else ""
         print(f"  master -> {rep['out']}  [{rep['path']}]  "
-              f"{rep['lufs']} LUFS  {rep['true_peak_db']} dBTP")
+              f"{rep['lufs']} LUFS  {rep['true_peak_db']} dBTP{ptag}")
 
     return row if (row["mix"] or row["master"]) else None
 
@@ -249,6 +274,12 @@ def main(argv):
                     help="mapping file to use (default: <stems>/keel.json)")
     ap.add_argument("--scan", action="store_true",
                     help="(re)write the keel.json mapping and exit, no render")
+    ap.add_argument("--preset", metavar="NAME",
+                    help="named master loudness profile "
+                         f"({', '.join(sorted(recipes.PRESETS))}); "
+                         "overrides the mapping's target, beaten by --lufs/--tp")
+    ap.add_argument("--list-presets", action=_ListPresets,
+                    help="list the named loudness presets and exit")
     ap.add_argument("--lufs", type=float, metavar="LUFS",
                     help="override the mapping's master loudness target")
     ap.add_argument("--tp", type=float, metavar="dBTP",
@@ -263,6 +294,12 @@ def main(argv):
     do_mix = not args.master_only
     do_master = not args.mix_only
 
+    if args.preset:  # fail fast on a typo'd preset name
+        try:
+            recipes.preset_master(args.preset)
+        except ValueError as e:
+            ap.error(str(e))
+
     if args.batch:
         jobs = discover_batch(args.batch)
         if not jobs:
@@ -276,8 +313,8 @@ def main(argv):
     for stems_dir, name in jobs:
         row = process_one(
             stems_dir, args.out, name, map_file=args.map_file, scan=args.scan,
-            target_lufs=args.lufs, tp_ceiling=args.tp, ref=args.ref,
-            do_mix=do_mix, do_master=do_master)
+            preset=args.preset, target_lufs=args.lufs, tp_ceiling=args.tp,
+            ref=args.ref, do_mix=do_mix, do_master=do_master)
         if row:
             report.append(row)
 
