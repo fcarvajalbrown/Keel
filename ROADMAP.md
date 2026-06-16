@@ -82,11 +82,23 @@ a tone-shaping suite. See "Non-goals" at the bottom.
       unmatched files.
 
 ## Phase 4 — Standalone GUI
-- [ ] Drag-a-folder window: detect stems, show what was matched/missing.
-- [ ] Live balance faders (relative LU) + LUFS / true-peak meters reading the
-      same `meters.py` math the engine uses.
-- [ ] One-click render to mix + master; reference-match picker; preset save/load.
+- [~] Drag-a-folder window: detect stems, show what was matched/missing.
+      Scaffold built in `gui.py` (PySide6): drop/open a folder, auto-detect
+      labels into an editable file->label table.
+- [~] Live balance faders (relative LU) + LUFS / true-peak meters reading the
+      same `meters.py` math the engine uses. Faders + post-render LUFS/TP meters
+      in place; real-time playback metering is a later polish pass.
+- [~] One-click render to mix + master; reference-match picker; preset save/load.
+      Render button (mix+master in a worker thread), reference picker, and
+      save/load of both user presets and the project `keel.json`.
 - [ ] Package as a signed desktop app (Windows first, then macOS).
+- GUI toolkit decision: **PySide6 (Qt)**. Kivy was ruled out — no cp314 wheels,
+  fails to install on the project's Python 3.14. PySide6 ships a stable-ABI
+  (abi3) wheel that runs on 3.14, looks native, and is **LGPL** — it links into
+  a closed, commercially-licensed build (PyQt's GPL would not), so it fits the
+  dual-license model below. GUI deps install online (`setup.ps1 -Gui`), not
+  vendored — ~150 MB of Qt binaries would bloat the repo; the core engine stays
+  offline-vendored.
 - [x] Keep the engine importable as a library so GUI and CLI share one core:
       `keel.py` is the public API facade (re-exports mix/master/recipes/meters);
       `import keel` is the single entry point every front-end drives. No DSP fork.
@@ -102,8 +114,15 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 ## Phase 6 — Distribution
 - [ ] Naming/trademark check before public launch (Keel cleared initial searches;
       verify in target markets).
-- [ ] Landing page + demo audio (before/after, A/B vs. a reference).
-- [ ] Licensing/pricing model for GUI + plugin.
+- [ ] Landing page + demo audio (before/after, A/B vs. a reference), hosted as a
+      **static site on GitHub Pages** (free, no server to run).
+- [ ] Licensing / pricing model. The engine stays **AGPL-3.0** (free, open). The
+      packaged **GUI app is the paid product**: a one-time low price (~USD 20),
+      sold from the GitHub Pages landing site via a checkout/license link (e.g.
+      Gumroad / Lemon Squeezy / Stripe Payment Link) under the commercial license
+      (`COMMERCIAL-LICENSE.md`). This works because the GUI stack is LGPL-safe:
+      PySide6 (LGPL) links into a closed commercial build, so the app can be sold
+      while the engine remains open. Same model later for the VST/plugin.
 
 ## Explicit non-goals (keep scope tight)
 - No ML/neural mixing — Keel is deterministic and explainable by design.

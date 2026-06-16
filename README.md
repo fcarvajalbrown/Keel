@@ -250,6 +250,8 @@ gain) and the final master LUFS/dBTP vs. target — one glance to confirm it lan
 
 ```
 keel.py         # public library API: one import surface for CLI/GUI/plugin
+gui.py          # desktop GUI (PySide6): drag-folder -> faders/meters -> one-click render
+userpresets.py  # user-saved loudness presets (small JSON store; GUI save/load)
 build.py        # CLI entry point: scan -> write/read keel.json -> mix -> master -> REPORT
 tests/          # stdlib-unittest safety net (determinism, landing, balance, labeling)
 recipes.py      # default balance/pan/master tables + the auto-detect alias hints
@@ -289,6 +291,29 @@ ceiling, group balance, label matching) — no committed audio, no extra deps:
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests
 ```
+
+---
+
+## Desktop GUI (preview)
+
+A standalone window drives the same engine — drop a folder of stems, tweak the
+balance, click once for mix + master. Built on **PySide6 (Qt)**, installed
+online (the Qt binaries are large, so they are not vendored offline like the
+core engine):
+
+```powershell
+.\setup.ps1 -Gui        # adds PySide6 to the venv  (or: pip install -r requirements-gui.txt)
+python gui.py
+```
+
+What the scaffold does today: drag-a-folder / open-folder with auto-detected
+labels in an editable table, per-label **balance faders** (relative LU), a
+loudness **preset** picker with **save/load** of your own presets, an optional
+**reference** picker, a bus-glue toggle, **one-click render** to mix + master in
+a background thread, post-render **LUFS / true-peak meters** (the same
+`meters.py` math the engine uses), and **save/load** of the whole project
+(`keel.json`). Real-time playback metering and a signed installer are next (see
+[`ROADMAP.md`](ROADMAP.md) Phase 4).
 
 ---
 
