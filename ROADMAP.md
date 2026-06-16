@@ -87,7 +87,9 @@ a tone-shaping suite. See "Non-goals" at the bottom.
       same `meters.py` math the engine uses.
 - [ ] One-click render to mix + master; reference-match picker; preset save/load.
 - [ ] Package as a signed desktop app (Windows first, then macOS).
-- [ ] Keep the engine importable as a library so GUI and CLI share one core.
+- [x] Keep the engine importable as a library so GUI and CLI share one core:
+      `keel.py` is the public API facade (re-exports mix/master/recipes/meters);
+      `import keel` is the single entry point every front-end drives. No DSP fork.
 
 ## Phase 5 — VST / plugin
 - [ ] Wrap the master chain (and, where it fits, the balance stage) as a VST3 /

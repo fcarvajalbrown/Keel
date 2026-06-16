@@ -249,6 +249,7 @@ gain) and the final master LUFS/dBTP vs. target — one glance to confirm it lan
 ## Project structure
 
 ```
+keel.py         # public library API: one import surface for CLI/GUI/plugin
 build.py        # CLI entry point: scan -> write/read keel.json -> mix -> master -> REPORT
 recipes.py      # default balance/pan/master tables + the auto-detect alias hints
 mixer.py        # the mix engine: autodetect/group by label, loudness-balance, pan, sum
@@ -261,6 +262,22 @@ vendor/         # offline pip wheels
 
 The engine is deterministic and self-contained: no network, no telemetry, no
 project lock-in. Outputs are plain 24-bit WAVs.
+
+### Use it as a library
+
+Every front-end drives the same core through `keel.py` — the DSP is never forked
+per front-end:
+
+```python
+import keel
+
+mapping = keel.autodetect("my_song")                       # {file: label}
+recipe  = keel.mix_recipe({"balance": {"synth": -4.0}})    # defaults + overrides
+keel.mix("my_song", recipe, "out/song_mix.wav", mapping=mapping)
+keel.master("out/song_mix.wav",
+            keel.master_recipe(keel.preset_master("streaming")),
+            "out/song_master.wav")
+```
 
 ---
 
