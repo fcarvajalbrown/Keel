@@ -110,8 +110,15 @@ def _load(path):
 
 
 def _to_stereo(audio):
-    if audio.shape[1] == 1:
+    """Coerce any channel count to a stereo (frames, 2) buffer.
+    Mono is duplicated to both sides; stereo passes through; a >2-channel file
+    (an accidental multichannel/surround export) keeps its first two channels —
+    deterministic and never crashes, rather than guessing a surround downmix."""
+    ch = audio.shape[1]
+    if ch == 1:
         return np.repeat(audio, 2, axis=1)
+    if ch == 2:
+        return audio
     return audio[:, :2]
 
 

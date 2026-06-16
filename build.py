@@ -301,12 +301,16 @@ def main(argv):
             ap.error(str(e))
 
     if args.batch:
+        if not Path(args.batch).expanduser().is_dir():
+            ap.error(f"--batch folder not found: {args.batch}")
         jobs = discover_batch(args.batch)
         if not jobs:
             print(f"No subfolders with stems found under {args.batch}")
             return
     else:
         stems = Path(args.stems).expanduser().resolve()
+        if not stems.is_dir():
+            ap.error(f"--stems folder not found: {stems}")
         jobs = [(stems, args.name or stems.name)]
 
     report = []
