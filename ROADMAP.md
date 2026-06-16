@@ -69,8 +69,13 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 ## Phase 3 — Presets + richer config
 - [x] Per-project overrides (file -> label, balance/pan/spread/master) via
       `keel.json` — no Python editing to mix a new song.
-- [ ] Named presets / "house sound" profiles (e.g. streaming-safe vs. loud)
-      seeded into new `keel.json` files.
+- [x] Named presets / "house sound" loudness profiles, selected at render with
+      `build.py --preset NAME` (overrides the mapping's master block; an explicit
+      `--lufs/--tp` still wins). Master-target-only by design — a preset picks how
+      loud the master lands, not the instrument balance. Shipped: `streaming`
+      (-14 LUFS, the default), `loud` (-10), `broadcast` (-16), all at -1.0 dBTP.
+      Targets grounded in platform norms (Spotify/YouTube/Tidal -14; club -10;
+      Apple Music / AES TD1008 -16). `--list-presets` prints the table.
 - [x] Friendlier mapping review: a dry-run summary of the detected labels and any
       files that landed in `other`, so nothing is silently mislabelled. `--scan`
       now prints per-label file counts and an explicit `[check]` callout for

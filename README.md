@@ -164,6 +164,8 @@ again:
 ```powershell
 python build.py --stems ./my_song --scan                  # only (re)write keel.json, no render
 python build.py --stems ./my_song --map "C:\maps\x.json"  # use a mapping file elsewhere
+python build.py --stems ./my_song --preset loud           # house-sound loudness profile
+python build.py --list-presets                            # list the named presets
 python build.py --stems ./my_song --lufs -11 --tp -1      # push louder, set TP ceiling
 python build.py --stems ./my_song --ref "C:\refs\ref.wav" # match a reference (Matchering)
 python build.py --stems ./my_song --mix-only              # stop after the mix
@@ -198,6 +200,24 @@ from there. Custom labels and `other` are fine and default to 0.0 balance.
   guitars hard L/R). Default 0.
 - **master** — `target_lufs`, `tp_ceiling_db`, and an optional `reference`
   filename. CLI `--lufs/--tp/--ref` override these.
+
+### Presets (house-sound loudness profiles)
+
+Instead of remembering numbers, pick a named target with `--preset`. A preset
+sets only the master loudness target + true-peak ceiling (it picks how loud the
+master lands, not how the instruments sit), applied at render time over the
+mapping's `master` block. An explicit `--lufs/--tp` still wins over a preset.
+
+| preset | target | ceiling | for |
+|---|---|---|---|
+| `streaming` (default) | -14 LUFS | -1 dBTP | Spotify / YouTube / Tidal / Amazon normalization target |
+| `loud` | -10 LUFS | -1 dBTP | club / aggressive; held clean by the oversampled clip + true-peak limiter |
+| `broadcast` | -16 LUFS | -1 dBTP | Apple Music / Apple Podcasts / AES TD1008 — quieter, more dynamic |
+
+```powershell
+python build.py --stems ./my_song --preset loud
+python build.py --list-presets
+```
 
 ---
 
