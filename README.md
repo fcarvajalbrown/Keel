@@ -347,7 +347,9 @@ same deterministic engine:
    meters, get your mix + master.
 2. **VST / plugin** — run Keel's balance + master stage inside your DAW.
 
-The DSP core is done and validated. See [`ROADMAP.md`](ROADMAP.md).
+The DSP core is done and validated. See [`ROADMAP.md`](ROADMAP.md) for the plan
+and [`docs/adr/`](docs/adr/) for the decision records (why the engine, config,
+toolkit, licensing, and packaging are the way they are).
 
 ---
 
