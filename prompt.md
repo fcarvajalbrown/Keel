@@ -98,19 +98,33 @@ readout + target/ceiling ticks) both ported from `gui_theme.py`, and card panels
 Build clean, zero warnings. **By-ear + by-eye check is the user's** (load it,
 confirm the look reads right and the master sounds right).
 
-**>>> NEXT TASKS:**
-1. **By-ear A/B** the plugin master vs a `build.py` render of the same audio
-   (expect close, not identical).
-2. Optional later: wire the "Bus glue" / "Reference" toggles into the live chain;
-   libebur128 meter; round out remaining LookAndFeel details if the user wants the
-   plugin pixel-matched to `gui.py`.
+**>>> NEXT TASKS — the road to 1.0 is now staged (see `ROADMAP.md`).** The
+forward roadmap was restructured (2026-06-17) from open-ended phases into version
+milestones: `v0.4.0-beta` (Harden & CI) -> `v0.5.0-beta` (Plugin parity +
+cross-platform) -> `v0.6.0-beta` (Go-to-market) -> `v1.0.0` (sign + freeze +
+stamp). Decisions behind the shape (confirmed with the user): 1.0 =
+**feature-complete + hardened**; plugin reaches **full parity (toggles wired) +
+macOS build**; **1.0 ships signed** (signing is the LAST gate but it does gate the
+1.0 stamp); cadence = **staged betas**. Code-signing depends on the publication
+fee; nothing before `v1.0.0` does.
 
-Other candidates still open (confirm direction first):
-- **Phase 4 packaging:** code-signing / notarization (needs the publication fee
-  paid first) + a proper installer beyond the unsigned Inno one.
-- **Phase 6 landing page:** GitHub Pages static site (tagline, demo, donate +
-  commercial-checkout links).
-- **Loose end:** expand `README.es.md` to full parity if wanted.
+**Immediate next milestone: `v0.4.0-beta` — Harden & CI.** Confirm direction via
+the blue option UI first, but the teed-up work is:
+1. Run the `tests/` unittest suite in CI as a release gate (Win + macOS).
+2. Build the **plugin in CI** (Windows VST3 first) + auto-attach to the release
+   (today it's built locally and uploaded by hand).
+3. **Edge-case tests:** missing/malformed `keel.json`, corrupt/NaN/silent audio,
+   samplerate-mismatch paths, a `--batch` integration test.
+4. Wire the GUI `--selftest` + a plugin smoke check into CI as gates.
+
+Then `v0.5.0-beta` (wire the Bus-glue + Reference toggles into the live C++ chain
+-- honour the DSP SYNC RULE; macOS VST3/AU in CI; by-ear A/B) and `v0.6.0-beta`
+(landing page, donation + commercial checkout, trademark, `README.es` parity).
+
+**OPEN CALL for `v0.5`:** the plugin's **Reference toggle** -- wiring a live
+reference match into the real-time C++ chain is a real chunk of work (Matchering
+is offline/Python). The roadmap lets you either wire it OR remove the control;
+that's an ADR-worthy decision when you reach `v0.5`.
 
 ## Before writing any code
 
@@ -118,12 +132,12 @@ Other candidates still open (confirm direction first):
    `ROADMAP.md` (phases + status), `docs/adr/` (the decision records — *why*
    things are the way they are), `README.md` (the product story). Do not skip
    them — they encode decisions already made.
-2. **Locate the current phase in `ROADMAP.md`.** DONE: Phase 0-1 (engine core +
-   song-agnostic standalone), Phase 3 (presets/config). IN PROGRESS: Phase 2
-   (validate — DONE this session) and **Phase 4
-   (GUI — scaffold + executables + CI + polish done; only code-signing /
-   installer remain, see START HERE)**.
-   Phases 5-6 (VST, distribution) follow.
+2. **Locate the current milestone in `ROADMAP.md`.** The roadmap is now staged by
+   version, not phase. SHIPPED through `v0.3.0-alpha`: engine core, song-agnostic
+   CLI, real-world validation, presets/config, the desktop GUI (unsigned), and the
+   first VST3 plugin (Windows, built locally). NEXT: `v0.4.0-beta` (Harden & CI),
+   then `v0.5.0-beta` (plugin parity + macOS), `v0.6.0-beta` (go-to-market),
+   `v1.0.0` (sign + freeze + stamp). See "Road to 1.0" in `ROADMAP.md`.
 3. **Confirm direction with the user before proceeding.** Ask via the
    **interactive arrow-select option UI (the blue selector), not a plain-text
    list** — firm preference (see CLAUDE.md).
