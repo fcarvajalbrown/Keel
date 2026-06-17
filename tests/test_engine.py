@@ -278,5 +278,171 @@ class TestBuildIntegration(unittest.TestCase):
             self.assertIsNotNone(on["mix"])
 
 
+class TestEdgeCases(unittest.TestCase):
+    """Bad / degenerate input must degrade gracefully, never crash with a raw
+    traceback or leak a `nan` into the output or the report."""
+
+    # --- silent audio: handled, not an error ---
+    def test_silent_stem_renders_finite(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "silent.wav"
+            sf.write(str(p), np.zeros((int(SECONDS * RATE), 1), np.float32),
+                     RATE, subtype="PCM_24")
+            bufs, _rate, info = mixer._process_group("vocals", [p],
+                                                     recipes.mix_recipe())
+            self.assertIsNone(info["pre_lufs"])     # below the gate -> None
+            self.assertEqual(info["gain_db"], 0.0)  # no gain guessed on silence
+            self.assertTrue(all(np.all(np.isfinite(b)) for b in bufs))
+
+    def test_silent_master_no_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            mix = Path(d) / "mix.wav"
+            sf.write(str(mix), np.zeros((int(SECONDS * RATE), 2), np.float32),
+                     RATE, subtype="PCM_24")
+            rep = mastering.master(mix, recipes.master_recipe(),
+                                   Path(d) / "master.wav")
+            self.assertFalse(np.isfinite(rep["lufs"]))     # -inf, not a crash
+            self.assertTrue((Path(d) / "master.wav").exists())
+
+    # --- NaN/Inf audio: sanitized to silence at load ---
+    def test_nan_inf_sanitized_at_load(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "nan.wav"
+            data = np.full((int(SECONDS * RATE), 1), 0.2, np.float32)
+            data[1000] = np.nan
+            data[2000] = np.inf
+            data[3000] = -np.inf
+            # a FLOAT-subtype WAV preserves non-finite samples on disk (PCM would
+            # clamp them), so this is the real "corrupt take" case.
+            sf.write(str(p), data, RATE, subtype="FLOAT")
+            back, _ = sf.read(str(p), dtype="float32", always_2d=True)
+            self.assertTrue(not np.all(np.isfinite(back)))   # really on disk
+            audio, _ = mixer._load(p)
+            self.assertTrue(np.all(np.isfinite(audio)))      # guard cleaned it
+
+    def test_nan_stem_yields_finite_mix_report(self):
+        # regression for the leak the probe found: a single NaN sample used to
+        # propagate into the mix bus and surface as peak_dbfs == nan in the
+        # report. Both the rendered bus and the report must stay finite now.
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "nan.wav"
+            data = np.full((int(SECONDS * RATE), 1), 0.2, np.float32)
+            data[1000] = np.nan
+            sf.write(str(p), data, RATE, subtype="FLOAT")
+            rep = mixer.mix(d, recipes.mix_recipe(), Path(d) / "mix.wav",
+                            mapping={"nan.wav": "vocals"})
+            self.assertTrue(np.isfinite(rep["peak_dbfs"]))
+            a, _ = sf.read(str(Path(d) / "mix.wav"), dtype="float32",
+                           always_2d=True)
+            self.assertTrue(np.all(np.isfinite(a)))
+
+    # --- corrupt / unreadable audio: clear error, no raw LibsndfileError ---
+    def test_corrupt_audio_clear_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "corrupt.wav"
+            p.write_text("this is not audio", encoding="utf-8")
+            with self.assertRaises(ValueError) as cm:
+                mixer._load(p)
+            self.assertIn("not a readable audio file", str(cm.exception))
+
+    # --- samplerate mismatch within a group: clear error ---
+    def test_samplerate_mismatch_in_group(self):
+        with tempfile.TemporaryDirectory() as d:
+            a, b = Path(d) / "a.wav", Path(d) / "b.wav"
+            _sine(a, rate=44100)
+            t = np.arange(int(SECONDS * 48000)) / 48000
+            sf.write(str(b), (0.2 * np.sin(2 * np.pi * 220 * t)
+                              ).astype(np.float32).reshape(-1, 1),
+                     48000, subtype="PCM_24")
+            with self.assertRaises(ValueError) as cm:
+                mixer._process_group("vocals", [a, b], recipes.mix_recipe())
+            self.assertIn("samplerate", str(cm.exception))
+
+    # --- malformed keel.json: clear error, file left untouched ---
+    def test_malformed_keeljson_clear_error_and_preserved(self):
+        with tempfile.TemporaryDirectory() as d:
+            mpath = Path(d) / "keel.json"
+            broken = '{ "stems": { not valid '
+            mpath.write_text(broken, encoding="utf-8")
+            with self.assertRaises(ValueError) as cm:
+                build.load_mapping_doc(mpath)
+            self.assertIn("not valid JSON", str(cm.exception))
+            self.assertEqual(mpath.read_text(encoding="utf-8"), broken)
+
+    def test_process_one_malformed_keeljson_not_overwritten(self):
+        # a hand-edit typo must NOT be silently overwritten by auto-detect.
+        with tempfile.TemporaryDirectory() as d, \
+                tempfile.TemporaryDirectory() as out:
+            folder = _make_song(d)
+            mpath = Path(d) / "keel.json"
+            broken = '{ oops '
+            mpath.write_text(broken, encoding="utf-8")
+            with self.assertRaises(ValueError):
+                build.process_one(folder, out, "song")
+            self.assertEqual(mpath.read_text(encoding="utf-8"), broken)
+
+    # --- keel.json is NOT required: a missing one is auto-detected ---
+    def test_missing_keeljson_autoregenerated(self):
+        with tempfile.TemporaryDirectory() as d, \
+                tempfile.TemporaryDirectory() as out:
+            folder = _make_song(d)
+            self.assertFalse((Path(d) / "keel.json").exists())
+            row = build.process_one(folder, out, "song", do_master=False)
+            self.assertTrue((Path(d) / "keel.json").exists())   # seeded by detect
+            self.assertTrue((Path(out) / "song_mix.wav").exists())
+            self.assertIsNotNone(row["mix"])
+
+
+class TestBatchIntegration(unittest.TestCase):
+    """End-to-end --batch coverage: discovery, a full two-song render, and
+    resilience when one job has bad input."""
+
+    def _album(self, parent):
+        for name in ("songA", "songB"):
+            sub = Path(parent) / name
+            sub.mkdir()
+            _make_song(sub)
+        # a subfolder with no stems must be ignored by discovery
+        notes = Path(parent) / "notes"
+        notes.mkdir()
+        (notes / "readme.txt").write_text("x", encoding="utf-8")
+
+    def test_discover_batch_only_stem_folders(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._album(d)
+            names = sorted(n for _, n in build.discover_batch(d))
+            self.assertEqual(names, ["songA", "songB"])   # 'notes' excluded
+
+    def test_batch_end_to_end_via_main(self):
+        with tempfile.TemporaryDirectory() as d, \
+                tempfile.TemporaryDirectory() as out:
+            self._album(d)
+            build.main(["--batch", d, "--out", out, "--preset", "streaming"])
+            for name in ("songA", "songB"):
+                self.assertTrue((Path(out) / f"{name}_mix.wav").exists())
+                self.assertTrue((Path(out) / f"{name}_master.wav").exists())
+            report = (Path(out) / "REPORT.md")
+            self.assertTrue(report.exists())
+            txt = report.read_text(encoding="utf-8")
+            self.assertIn("songA", txt)
+            self.assertIn("songB", txt)
+
+    def test_batch_continues_past_a_bad_job(self):
+        # good folder + a folder with a malformed keel.json: the good one still
+        # renders, the bad one is reported but does not abort the batch.
+        with tempfile.TemporaryDirectory() as d, \
+                tempfile.TemporaryDirectory() as out:
+            good = Path(d) / "good"
+            good.mkdir()
+            _make_song(good)
+            bad = Path(d) / "bad"
+            bad.mkdir()
+            _make_song(bad)
+            (bad / "keel.json").write_text("{ broken", encoding="utf-8")
+            build.main(["--batch", d, "--out", out, "--mix-only"])
+            self.assertTrue((Path(out) / "good_mix.wav").exists())
+            self.assertFalse((Path(out) / "bad_mix.wav").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
