@@ -316,6 +316,13 @@ class KeelWindow(QMainWindow):
         self.faders_layout.addStretch(1)
         scroll.setWidget(self.faders_holder)
         bb.addWidget(scroll)
+        self.reset_bal_btn = QPushButton("Reset to recommended")
+        self.reset_bal_btn.setToolTip(
+            "Restore Keel's recommended house balance for the current labels "
+            "(relative LU vs the vocal). Unknown labels reset to 0.0.")
+        self.reset_bal_btn.clicked.connect(self._reset_balance)
+        self.reset_bal_btn.setEnabled(False)
+        bb.addWidget(self.reset_bal_btn)
         mid.addWidget(bal_box, 3)
 
         # right: master + meters + actions
@@ -523,6 +530,7 @@ class KeelWindow(QMainWindow):
             self.faders_layout.addWidget(row)
             self.balance_sliders[label] = (slider, vlbl)
         self.faders_layout.addStretch(1)
+        self.reset_bal_btn.setEnabled(bool(self.balance_sliders))
 
     def _rebuild_faders_from_table(self):
         # read edited labels out of the table, keep existing fader values
@@ -536,6 +544,15 @@ class KeelWindow(QMainWindow):
         self.doc["stems"] = stems
         self._rebuild_faders(cur, labels=list(dict.fromkeys(labels)))
         self._say("Rebuilt faders from edited labels.")
+
+    def _reset_balance(self):
+        """Restore each fader to Keel's recommended house balance (LU vs vocal);
+        labels with no house default reset to 0.0."""
+        if not self.balance_sliders:
+            return
+        for label, (slider, _) in self.balance_sliders.items():
+            slider.setValue(int(round(keel.DEFAULT_BALANCE.get(label, 0.0) * 10)))
+        self._say("Balance reset to Keel's recommended defaults.")
 
     def _collect_balance(self):
         return {lb: s.value() / 10.0 for lb, (s, _) in self.balance_sliders.items()}
