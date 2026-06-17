@@ -29,3 +29,8 @@ userpresets.json
 # PyInstaller packaging output (the .exe/.app are built, not committed).
 build/
 dist/
+
+# Plugin (Phase 5) build output. plugin/build/ is caught by build/ above;
+# these are the stray configure/build logs.
+plugin/build-configure.log
+plugin/build-*.log
