@@ -13,196 +13,159 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 
 ---
 
-## Phase 0 — Engine core (DONE)
-- [x] Modules: `recipes.py` (data), `mixer.py` / `mastering.py` / `meters.py`
-      (engine), `build.py` (CLI), `out/`, `references/`.
-- [x] `requirements.txt` + vendored offline wheels (`vendor/`).
-- [x] Loudness-balancing mixer (per-stem LUFS -> relative balance -> pan -> sum),
-      tone processing OFF by default (stems are pre-treated).
-- [x] Group handling for multi-file delivery (2 guitars / 2 vocals balanced as a
-      group; printed image preserved; optional `spread` for dry dual-tracks).
-- [x] **Real true-peak meter + limiter:** 4x polyphase-FIR oversampling
-      (scipy `resample_poly`, Kaiser beta 12), master chain runs an oversampled
-      soft-clip -> oversampled true-peak limiter. Research-cited (BS.1770-4,
-      clipper-then-limiter, ISP/oversampling). Validated: at -14 LUFS it barely
-      limits, leaving ~3-4 dB true-peak headroom. Graceful fallback if scipy is
-      absent.
-- [x] Mastering: internal LUFS+limiter chain AND optional Matchering reference path.
-- [x] `out/REPORT.md` QC sheet on every run (per-stem balance + master LUFS/dBTP
-      vs. target).
+## Where we are: `v0.3.0-alpha`
 
-## Phase 1 — Song-agnostic standalone tool (DONE)
-- [x] Decouple the engine from any single project: removed the hardcoded song
-      list, no `../song{N}/` assumptions.
-- [x] `build.py` CLI: `--stems <dir> --out <dir> [--name --lufs --tp --ref
-      --mix-only --master-only]` masters any folder of named stems.
-- [x] `--batch <dir>` mode: mix+master every subfolder that contains stems.
-- [x] `recipes.py` reduced to generic defaults + the stem alias matcher.
-- [x] Branded as **Keel**; README/ROADMAP rewritten for a general audience.
-- [x] **Arbitrary-label stems:** any number of files, labels auto-detected from
-      filenames and written to an editable per-song `keel.json` (file -> label +
-      per-label balance/pan/spread/master), replacing the fixed 5-type matcher.
-      A label holds 1..N files, balanced as one group. Validated end-to-end
-      (single + `--batch` + `--scan`) on synthetic multitracks.
+The DSP core is **done and validated**; the CLI, the desktop GUI, and the VST3
+plugin all drive the same engine and all build green. There are no unfinished
+code stubs left — the remaining distance to a stable **1.0** is about
+**trust, parity, reach, and launch**, not unwritten features:
 
-## Phase 2 — Validate on real-world material (DONE)
-- [x] Run on several real multitracks; confirm the default balance generalizes.
-      Validated on three deliveries (Cambridge MT raw rock kit, a synth-heavy
-      17-track multitrack, and a 5-stem pre-mixed set) at 44.1 and 48 kHz. Two
-      real bugs surfaced and were fixed: a mixed mono/stereo group crash, and
-      per-component drum mics scattering to `other` instead of grouping as one
-      kit. Auto-detect rewritten to token/word-boundary matching + a scan-time
-      mapping review so mislabels are visible before render.
-- [x] Confirm masters are loud enough and clean: all three landed exactly
-      -14.0 LUFS, true-peak 3-4 dB under the -1.0 ceiling, no clipping, no NaN,
-      including hot already-loud input stems (big negative balance gains).
-- [x] Tune `DEFAULT_BALANCE` and the default target if real material demands it.
-      Closed: no tuning needed. The defaults and the -14 LUFS target generalized
-      across all three real deliveries without adjustment, so they are left
-      unchanged by decision (changing them would need fresh research per the
-      research-before-tweak rule).
-- [x] Optional gentle **bus glue** (wired: keel.json `glue` + `--glue` + the GUI
-      toggle, OFF by default). By-ear A/B rendered for song3 (glue off vs on);
-      both masters land at exactly -14.0 LUFS / -4.08 dBTP and the user judged
-      them ~identical, confirming glue is inaudible on already-mixed-ready stems.
-      Decision: stays OFF by default (ADR-0015), kept only as an opt-in escape
-      hatch. Closed.
-- [x] Dither on export. Closed/not-needed: Keel is 24-bit in and out throughout,
-      where dither is unnecessary. Documented future hook: add TPDF dither only
-      if a sub-24-bit export path is ever introduced.
-      (Dropped: a formal Matchering reference-vs-internal A/B. The optional
-      reference-master path stays an opt-in GUI/CLI feature, ADR-0009; the
-      internal chain is the default and recommended master, so there is no
-      requirement to benchmark a reference the user does not want to match.)
+- **Trust** — engine tests and the plugin build aren't in CI yet; edge cases
+  (malformed `keel.json`, bad audio, `--batch`) aren't tested.
+- **Parity** — the plugin's Reference / Bus-glue toggles exist in the UI but
+  aren't wired to the live chain, and there's no macOS plugin build.
+- **Reach** — no landing page, no live donation / commercial-checkout links, no
+  trademark check, `README.es` is condensed not full.
+- **Launch** — the installers and the plugin are **unsigned** (SmartScreen /
+  Gatekeeper warnings); signing needs the publication fee paid.
 
-## Phase 3 — Presets + richer config
-- [x] Per-project overrides (file -> label, balance/pan/spread/master) via
-      `keel.json` — no Python editing to mix a new song.
-- [x] Named presets / "house sound" loudness profiles, selected at render with
-      `build.py --preset NAME` (overrides the mapping's master block; an explicit
-      `--lufs/--tp` still wins). Master-target-only by design — a preset picks how
-      loud the master lands, not the instrument balance. Shipped: `streaming`
-      (-14 LUFS, the default), `loud` (-10), `broadcast` (-16), all at -1.0 dBTP.
-      Targets grounded in platform norms (Spotify/YouTube/Tidal -14; club -10;
-      Apple Music / AES TD1008 -16). `--list-presets` prints the table.
-- [x] Friendlier mapping review: a dry-run summary of the detected labels and any
-      files that landed in `other`, so nothing is silently mislabelled. `--scan`
-      now prints per-label file counts and an explicit `[check]` callout for
-      unmatched files.
+The road from here to 1.0 is staged as **betas** (`v0.4` → `v0.5` → `v0.6`),
+then the **`v1.0.0`** stamp. The GUI and the plugin are **versioned in lockstep**
+— one version number, bumped together (see CLAUDE.md "Versioning (STRICT)").
 
-## Phase 4 — Standalone GUI
-- [~] Drag-a-folder window: detect stems, show what was matched/missing.
-      Scaffold built in `gui.py` (PySide6): drop/open a folder, auto-detect
-      labels into an editable file->label table.
-- [x] Live balance faders (relative LU) + LUFS / true-peak meters reading the
-      same `meters.py` math the engine uses. Faders, post-render LUFS/TP meters,
-      and real-time playback metering — "Play master" streams the rendered master
-      via QtMultimedia QAudioSink and drives the meters live over a trailing 3 s
-      window (display-only; the render path stays deterministic) — all in place.
-- [x] One-click render to mix + master; reference-match picker; preset save/load.
-      Render button (mix+master in a worker thread), reference picker, and
-      save/load of both user presets and the project `keel.json`. A default-off
-      "Live preview" re-renders mix + master (debounced) on each fader move.
-- [~] Package as a desktop app (Windows first, then macOS). `Keel.spec`
-      (PyInstaller) builds a Windows onefile `Keel.exe` and a macOS `Keel.app`;
-      a GitHub Actions matrix (`.github/workflows/build-app.yml`) builds both on
-      each version tag / manual run and uploads `Keel.exe` + `Keel.dmg` as
-      artifacts, each gated by the frozen app's `--selftest`. macOS target is
-      Apple Silicon (arm64 — the only macOS arch with a cp314 pedalboard wheel);
-      Intel would need a separate 3.13 job. A Windows installer
-      (`installer/keel.iss`, Inno Setup) wraps the onefile `Keel.exe` —
-      Program Files / per-user install, Start Menu + optional desktop shortcut,
-      and an uninstaller — built in CI and uploaded as `Keel-windows-installer`.
-      STILL TODO: code-signing / notarization (Win Authenticode + Apple
-      notarization) for an unsigned-warning-free install — the installer is UX
-      only and does not by itself remove the SmartScreen "unknown publisher"
-      prompt; that needs signing. A macOS installer (.pkg) is a follow-on.
-- GUI toolkit decision: **PySide6 (Qt)**. Kivy was ruled out — no cp314 wheels,
-  fails to install on the project's Python 3.14. PySide6 ships a stable-ABI
-  (abi3) wheel that runs on 3.14, looks native, and is **LGPL** — it links into
-  a closed, commercially-licensed build (PyQt's GPL would not), so it fits the
-  dual-license model below. GUI deps install online (`setup.ps1 -Gui`), not
-  vendored — ~150 MB of Qt binaries would bloat the repo; the core engine stays
-  offline-vendored.
-- [x] Keep the engine importable as a library so GUI and CLI share one core:
-      `keel.py` is the public API facade (re-exports mix/master/recipes/meters);
-      `import keel` is the single entry point every front-end drives. No DSP fork.
+---
 
-## Phase 5 — VST / plugin
-Architecture (**ADR-0029**, supersedes ADR-0027/0026): the plugin is a
-**self-contained real-time C++ master** — a faithful port of `mastering.py`'s
-chain (tone -> static Makeup -> oversampled tanh soft-clip -> 4x oversampled
-true-peak limiter) running live, with live LUFS/TP meters. You hear the Keel
-master and tweak it like Ozone, then **deliver by exporting from the DAW** with it
-active — there is no offline Finalize, no bundled engine, no shell-out (the earlier
-ADR-0027 Finalize model was dropped: the live chain already masters and a DAW
-export bakes it in). Loudness is **approximate** — you set Makeup so the live meter
-sits at target; the true-peak ceiling is enforced live so exports are TP-safe.
-Exact -14 LUFS / -1 dBTP byte-identical delivery stays in the **CLI + GUI** (the
-Python engine). **DSP SYNC RULE:** the C++ chain and `mastering.py` are two
-disconnected impls of the same master character — any change to the Python master
-math must be mirrored into `plugin/Source/` and re-A/B'd (CLAUDE.md). The plugin
-and GUI are **versioned in lockstep** (CLAUDE.md "Versioning (STRICT)"). Toolchain:
-MSVC 14.50 + CMake 4.2.3 + VS Community 2026.
-- [x] **Master-bus plugin** (clearest fit); stem balancer is a possible follow-on.
-      Scope = **master stage only**: on the master bus the signal is one summed
-      stereo mix, and a stereo master cannot re-balance instruments (ADR-0001) — so
-      the plugin masters, it does not mix. Its GUI is **distinct from and simpler
-      than** the standalone: no file->label table / balance faders — just preset /
-      LUFS reference / TP / Makeup + reference/glue toggles + the two live meters.
-- [x] **Live C++ master chain** ported (`plugin/Source/`): tone (HPF 28 /
-      low-shelf / air / glue comp) -> static Makeup -> oversampled soft-clip -> 4x
-      oversampled true-peak limiter. Built from the same `juce::dsp` blocks
-      pedalboard wraps; faithful, not byte-identical (won't null pedalboard's
-      limiter). The DSP fork the SYNC RULE governs (ADR-0029, amends ADR-0013).
-- [x] **Self-contained delivery** (no Finalize): export from the DAW with the
-      plugin active. Manual static Makeup (no intro ramp on bounce); TP enforced
-      live. Exact-loudness delivery lives in the CLI/GUI.
-- [x] JUCE/C++ shell: DAW integration, UI, live LUFS/TP meters (C++ BS.1770 /
-      true-peak), auto-install to the per-user VST3 folder. Build green, zero
-      warnings; loaded + confirmed in Mixcraft.
-- [x] **Visual language matched** to the standalone (`KeelLookAndFeel`): teal
-      palette, Space Grotesk (embedded), hull mark, gradient meters, card panels.
-- [x] **Shipped in `v0.3.0-alpha`** (2026-06-17): Windows `Keel.vst3` attached to
-      the release (`Keel-VST3-windows-0.3.0.zip`), alongside the GUI app.
-- [ ] **Remaining:** by-ear A/B of the live master vs a `build.py` render; a
-      **macOS** plugin build + CI for the VST3/AU (today it is a local Windows
-      build, not in CI); wire the reference/glue toggles into the live chain;
-      code-signing / notarization (shared with Phase 4); optional libebur128 meter;
-      ARA2 as later polish.
-- Licensing (ADR-0026): JUCE under AGPLv3 for the open plugin (engine is already
-      AGPL); JUCE Starter (free under 20k/yr incl. donations) covers commercial
-      seats until revenue crosses the threshold, then Indie (USD 800 perpetual).
-      Same hybrid product model as the GUI (ADR-0025). VENOM (GPLv3) and an
-      embedded Python interpreter were both rejected (ADR-0026).
+## Shipped so far (through `v0.3.0-alpha`)
 
-## Phase 6 — Distribution
-- Release process is in [`docs/RELEASE.md`](docs/RELEASE.md). RULE: every release
-  (CI or local) uses one annotated notes text, single-sourced in
-  [`docs/release-notes.md`](docs/release-notes.md) — CI and a manual `gh release`
-  both read that file, so there is nothing to sync by hand. CI (`build-app.yml`)
-  builds Win exe + installer + macOS dmg and publishes the prerelease on a `v*` tag.
-- [ ] Naming/trademark check before public launch (Keel cleared initial searches;
-      verify in target markets).
-- [ ] Landing page + demo audio (before/after, A/B vs. a reference), hosted as a
-      **static site on GitHub Pages** (free, no server to run).
-- [x] Licensing / funding model. The engine stays **AGPL-3.0** (free, open). The
-      packaged **GUI app is free** for non-commercial use and for individual
-      musicians making (and selling) their own music — PolyForm Noncommercial
-      plus an additional grant (`LICENSE-NONCOMMERCIAL.md`); funded by **donations**
-      (PayPal, GitHub Sponsor button via `.github/FUNDING.yml`). A **commercial
-      license** (`COMMERCIAL-LICENSE.md`), **USD 20 one-time per seat**, is
-      required only for business / redistribution use (paid product/service,
-      studio/agency client work, redistribution, or closed-source engine use).
-      This is lawful because the GUI stack is LGPL-safe (PySide6, ADR-0019) and
-      the author holds copyright on all original code. Same model later for the
-      VST/plugin. See ADR-0025 (supersedes the earlier paid-GUI plan, ADR-0024).
-- [ ] Stand up the donation/commercial-purchase links on the landing page (a
-      PayPal donate button; a commercial-license checkout, e.g. Gumroad / Lemon
-      Squeezy / Stripe Payment Link).
+Condensed history; the *why* for each lives in [`docs/adr/`](docs/adr/).
+
+### Engine core + song-agnostic CLI (DONE)
+- [x] Modules: `recipes.py` (data) · `mixer.py` / `mastering.py` / `meters.py`
+      (engine) · `build.py` (CLI) · `keel.py` (public library facade). Offline
+      vendored wheels in `vendor/`.
+- [x] Loudness-balancing mixer (per-stem LUFS → relative balance → pan → sum),
+      tone processing OFF by default (stems are pre-treated). Group handling for
+      multi-file delivery (N files per label balanced as one group; printed image
+      preserved; optional `spread`).
+- [x] Master chain: tone → pre-normalize → **oversampled soft-clip** → **4x
+      true-peak limiter** → exact-LUFS normalize → TP safety; optional Matchering
+      reference path. Real BS.1770-4 LUFS + 4x polyphase-FIR true-peak meters.
+- [x] Song-agnostic: no hardcoded song list or folder assumptions. Arbitrary
+      labels, auto-detected (token/word-boundary matching) into an editable
+      per-song `keel.json`. `--stems` / `--batch` / `--scan` / `--map` modes.
+      `out/REPORT.md` QC sheet on every run.
+
+### Validated on real material (DONE — Phase 2)
+- [x] Ran on three real deliveries (Cambridge MT raw rock kit, a 17-track
+      synth-heavy multitrack, a 5-stem pre-mixed set) at 44.1 + 48 kHz; all
+      auto-labeled correctly and mastered to exactly -14.0 LUFS, 3–4 dB under the
+      -1.0 dBTP ceiling, clean. Two real bugs fixed (mono/stereo group crash;
+      drum-mic scatter). Balance + target left unchanged (generalized as-is);
+      dither not needed (24-bit throughout); bus glue stays OFF by default.
+
+### Presets + config (DONE — Phase 3)
+- [x] Per-project `keel.json` overrides; named loudness presets
+      (`streaming` -14 / `loud` -10 / `broadcast` -16, all -1 dBTP) via
+      `--preset`; `--list-presets`; `--scan` mapping review with `[check]`
+      callouts for `other`.
+
+### Standalone GUI (DONE — Phase 4 except signing)
+- [x] PySide6 app: drop-a-folder → editable file→label table → per-label balance
+      faders → preset save/load → reference picker → bus-glue toggle → one-click
+      mix+master in a worker thread → post-render + live-playback LUFS/TP meters
+      → save/load project. Optional debounced "Live preview" re-render on fader
+      move. `keel.py` is the shared library all front-ends drive (no DSP fork).
+- [x] Packaged: `Keel.spec` (PyInstaller) → Windows onefile `Keel.exe` + macOS
+      arm64 `Keel.app`/`.dmg`; Inno Setup installer (`installer/keel.iss`);
+      `.github/workflows/build-app.yml` builds both on a `v*` tag and publishes a
+      prerelease. **Unsigned** (see v1.0.0 below).
+
+### VST3 plugin (DONE — Phase 5 first cut)
+- [x] Self-contained real-time master (ADR-0029): a faithful C++ port of
+      `mastering.py`'s chain (tone → static Makeup → oversampled soft-clip → 4x
+      true-peak limiter), live LUFS/TP meters, delivery by DAW export. No offline
+      Finalize, no bundled engine. Master-bus only (a stereo master can't
+      re-balance — ADR-0001).
+- [x] JUCE 8.0.9 / CMake / MSVC; auto-installs to the per-user VST3 folder;
+      `KeelLookAndFeel` matches the standalone's visual language. Shipped in
+      `v0.3.0-alpha` as `Keel-VST3-windows-0.3.0.zip` (built locally, attached by
+      hand — **not in CI yet**).
+
+### Licensing / funding (DONE — Phase 6 partial)
+- [x] Hybrid model (ADR-0025): engine **AGPL-3.0**; GUI **free** for
+      non-commercial + individual musicians (PolyForm + grant,
+      `LICENSE-NONCOMMERCIAL.md`); **USD 20 one-time per seat**
+      (`COMMERCIAL-LICENSE.md`) only for business/redistribution; donations
+      (PayPal + `.github/FUNDING.yml`). Same model for the plugin (JUCE AGPLv3 /
+      Starter, ADR-0026). 29 ADRs backfilled.
+
+---
+
+## Road to 1.0
+
+Four milestones. Each is a real release, revertable in isolation; the betas are
+publishable so changes can be tested in stages. **Code-signing is deliberately
+the very last step** — it gates only the `v1.0.0` stamp, nothing before it.
+
+### `v0.4.0-beta` — Harden & CI (trust every build)
+Make the build trustworthy before adding reach.
+- [ ] Run the `tests/` unittest suite in CI as a **merge/release gate**
+      (Python job on Windows + macOS).
+- [ ] Build the **plugin in CI** (Windows VST3 first) and attach the zip to the
+      release automatically, instead of building locally and uploading by hand.
+- [ ] **Edge-case tests:** missing/malformed `keel.json`, corrupt / NaN / silent
+      audio, samplerate-mismatch error paths, a `--batch` integration test.
+- [ ] Wire the GUI `--selftest` (and a plugin smoke check) into CI as gates.
+- [ ] Release pipeline: one `v*` tag produces GUI + plugin assets together.
+
+### `v0.5.0-beta` — Plugin parity + cross-platform
+Bring the plugin level with the GUI's reach.
+- [ ] **Wire the Bus-glue toggle** into the live C++ chain (today glue is
+      always-on); honour the DSP SYNC RULE (mirror against `mastering.py`, re-A/B).
+- [ ] **Wire the Reference toggle** into the live chain — or, if a live reference
+      match is out of scope for the plugin, remove the control and document why.
+- [ ] **macOS plugin build (VST3 + AU)** in CI, attached to the release.
+- [ ] **By-ear A/B** sign-off: plugin live master vs a `build.py` render of the
+      same audio (expect close, not identical) — user task.
+- [ ] Optional: libebur128-backed meter for tighter parity with `pyloudnorm`.
+
+### `v0.6.0-beta` — Go-to-market
+Stand up everything a stranger needs to find, trust, and pay for Keel.
+- [ ] **Landing page** on GitHub Pages (tagline, before/after demo, download
+      buttons, donate + commercial-checkout links).
+- [ ] Stand up **donation + commercial-license checkout** links (PayPal donate;
+      a USD 20/seat checkout — Gumroad / Lemon Squeezy / Stripe Payment Link).
+- [ ] **Trademark verification** for "Keel" in target markets (cleared initial
+      web searches; verify formally before public launch).
+- [ ] **`README.es` full parity** (does/doesn't table, full `keel.json` schema,
+      presets table, project structure, library/tests/GUI-build sections).
+- [ ] Before/after demo audio from the user's **own** material (publish-safe).
+
+### `v1.0.0` — Stable (signing is the last gate)
+Sign, freeze, stamp. This is the only milestone that depends on paying the fee.
+- [ ] **Windows Authenticode** signing of the installer + `Keel.exe` (removes the
+      SmartScreen "unknown publisher" warning).
+- [ ] **Apple notarization** of `Keel.app` / `.dmg` and the macOS plugin (removes
+      the Gatekeeper warning).
+- [ ] Drop the `-alpha`/`-beta` tag; **freeze the DSP** (note the two-disconnected-
+      impls risk per the DSP SYNC RULE before declaring it frozen).
+- [ ] Final docs/links sweep so nothing points at a stale version or asset URL
+      (part of every release per CLAUDE.md "Versioning (STRICT)").
+- [ ] Tag **`v1.0.0`** covering the GUI + plugin **in lockstep**.
+
+---
+
+## Post-1.0 (later polish, not blocking)
+- ARA2 support for the plugin (seamless host integration).
+- Intel-mac builds (the author is on Apple Silicon; arm64 is the current target).
+- A macOS `.pkg` installer; a Linux frozen binary (the script already runs there).
+- AAX (Pro Tools) plugin format.
+- Formal legal review of the dual-license texts.
+
+---
 
 ## Explicit non-goals (keep scope tight)
 - No ML/neural mixing — Keel is deterministic and explainable by design.
 - No per-instrument tone shaping in the mix stage — stems are already treated.
 - No stem separation — Keel receives finished stems, it does not make them.
-- No DAW project writing — outputs are plain WAVs (until the plugin phase).
+- No DAW project writing — outputs are plain WAVs (the plugin masters in-DAW).
