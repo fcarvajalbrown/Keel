@@ -141,13 +141,20 @@ a tone-shaping suite. See "Non-goals" at the bottom.
       verify in target markets).
 - [ ] Landing page + demo audio (before/after, A/B vs. a reference), hosted as a
       **static site on GitHub Pages** (free, no server to run).
-- [ ] Licensing / pricing model. The engine stays **AGPL-3.0** (free, open). The
-      packaged **GUI app is the paid product**: a one-time low price (~USD 20),
-      sold from the GitHub Pages landing site via a checkout/license link (e.g.
-      Gumroad / Lemon Squeezy / Stripe Payment Link) under the commercial license
-      (`COMMERCIAL-LICENSE.md`). This works because the GUI stack is LGPL-safe:
-      PySide6 (LGPL) links into a closed commercial build, so the app can be sold
-      while the engine remains open. Same model later for the VST/plugin.
+- [x] Licensing / funding model. The engine stays **AGPL-3.0** (free, open). The
+      packaged **GUI app is free** for non-commercial use and for individual
+      musicians making (and selling) their own music — PolyForm Noncommercial
+      plus an additional grant (`LICENSE-GUI.md`); funded by **donations**
+      (PayPal, GitHub Sponsor button via `.github/FUNDING.yml`). A **commercial
+      license** (`COMMERCIAL-LICENSE.md`), **USD 20 one-time per seat**, is
+      required only for business / redistribution use (paid product/service,
+      studio/agency client work, redistribution, or closed-source engine use).
+      This is lawful because the GUI stack is LGPL-safe (PySide6, ADR-0019) and
+      the author holds copyright on all original code. Same model later for the
+      VST/plugin. See ADR-0025 (supersedes the earlier paid-GUI plan, ADR-0024).
+- [ ] Stand up the donation/commercial-purchase links on the landing page (a
+      PayPal donate button; a commercial-license checkout, e.g. Gumroad / Lemon
+      Squeezy / Stripe Payment Link).
 
 ## Explicit non-goals (keep scope tight)
 - No ML/neural mixing — Keel is deterministic and explainable by design.

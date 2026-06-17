@@ -1,34 +1,42 @@
 # Keel — commercial license
 
-Keel is dual-licensed.
+Keel is free to use for the people it is built for. This commercial license
+exists only for **business and redistribution** use. Here is the whole picture.
 
-- The open-source license is the **GNU AGPL-3.0** (see `LICENSE`). It is free to
-  use, but it is **copyleft**: if you distribute Keel, build it into a product you
-  distribute, or run a modified version as a network/hosted service, you must
-  release the complete corresponding source of your work under the AGPL as well.
-- This **commercial license** is an alternative for anyone who cannot or does not
-  want to meet those copyleft obligations.
+## How Keel is licensed
+
+- **The engine** (Python library + CLI) is **GNU AGPL-3.0** ([`LICENSE`](LICENSE)) —
+  free and open source. It is copyleft: if you distribute it or run a modified
+  version as a network service, you must release your source under the AGPL too.
+- **The desktop GUI** (the `Keel.exe` / `Keel.app` app) is **free for
+  non-commercial use** and **free for individual musicians making their own
+  music** — including selling that music — under the PolyForm Noncommercial
+  License plus an additional grant ([`LICENSE-GUI.md`](LICENSE-GUI.md)). If you
+  find it useful, [donations](README.md#support--donate) keep it alive.
+
+You do **not** need to pay anything to mix and master your own songs with Keel,
+hobby or professional, even if you sell the results.
 
 ## Who needs a commercial license
 
-You need a commercial license if you want to do any of the following **without**
-releasing your own source under the AGPL:
+You need a commercial license if you use Keel for **business or redistribution**,
+specifically:
 
-- Ship Keel (or a derivative, including a VST/plugin or GUI built on it) inside a
-  **closed-source** product.
-- Offer Keel's functionality as a **hosted or SaaS** service without publishing
-  your service's source.
-- Integrate Keel into a proprietary internal toolchain where AGPL compliance is
-  not acceptable.
+- offering Keel's functionality as a **paid product or service** (hosted,
+  bundled, embedded, or resold);
+- using the GUI inside a **company, studio, or agency to process other people's
+  material as a paid service** at commercial scale;
+- **distributing the GUI** (modified or not) as part of another product; or
+- building Keel's **engine** into a **closed-source** product/service without
+  meeting the AGPL's copyleft obligations.
 
-Personal use, study, modification, and open-source projects that comply with the
-AGPL do **not** need a commercial license.
+## Price
 
-## What it grants
+- **USD 20, one-time, per seat** (one seat = one user / workstation), perpetual
+  for the version purchased.
+- No subscription. Pay once per seat, keep using it.
 
-A commercial license grants the rights above — use, modify, and distribute Keel
-as part of your product — **without** the AGPL's source-disclosure (copyleft)
-requirements. Exact scope, term, support, and pricing are agreed per deal.
+Volume or site licensing for larger teams: ask.
 
 ## How to obtain one
 
@@ -37,11 +45,12 @@ Contact the copyright holder:
 - **Felipe Carvajal Brown**
 - **fcarvajalbrown@gmail.com**
 
-Please include: your company/project, how you intend to use Keel (product, SaaS,
-internal), and expected distribution scale.
+Tell me your company/project, how you intend to use Keel (product, service,
+studio work, distribution), and how many seats. A purchase/payment link will be
+offered from the project's landing page.
 
 ---
 
 Copyright (C) 2026 Felipe Carvajal Brown. "Keel" and this engine are the work of
-the copyright holder; the AGPL-3.0 and any commercial license are granted by the
-copyright holder.
+the copyright holder; the AGPL-3.0, the PolyForm Noncommercial grant, and any
+commercial license are granted by the copyright holder.

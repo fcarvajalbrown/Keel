@@ -1,8 +1,12 @@
 # ADR-0024: Distribution & pricing — paid GUI (~USD 20) via GitHub Pages
 
-- Status: Accepted
+- Status: Superseded by [ADR-0025](0025-gui-noncommercial-license-and-donations.md)
 - Date: 2026-06-16
 - Deciders: Felipe Carvajal Brown
+
+> **Superseded (2026-06-17):** the GUI is no longer a paid product. It is now
+> free for non-commercial use and for individual musicians (donation-funded),
+> with a USD 20/seat commercial license for business use. See ADR-0025.
 
 ## Context
 

@@ -39,9 +39,10 @@ DisableProgramGroupPage=yes
 ; Allow per-user install when not running elevated, so no UAC prompt is forced.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
-; AGPL-3.0 is the repo license shown here. If distributing the paid GUI under
-; the commercial terms, point this at ..\COMMERCIAL-LICENSE.md instead.
-LicenseFile=..\LICENSE
+; The installer ships the GUI app, so it shows the GUI license (PolyForm
+; Noncommercial + the free-use grant). The engine remains AGPL (..\LICENSE);
+; business use needs the commercial license (..\COMMERCIAL-LICENSE.md).
+LicenseFile=..\LICENSE-GUI.md
 OutputDir=..\dist
 OutputBaseFilename=KeelSetup-{#MyAppVersion}
 Compression=lzma2/max

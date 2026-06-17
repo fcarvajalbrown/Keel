@@ -1,9 +1,11 @@
-# Keel — automix + automaster engine.
+# Keel — desktop GUI.
 # Copyright (C) 2026 Felipe Carvajal Brown
 #
-# Licensed under the GNU Affero General Public License v3.0 (see LICENSE).
-# A commercial license is available — see COMMERCIAL-LICENSE.md
-# or contact fcarvajalbrown@gmail.com.
+# Part of the Keel GUI: licensed under the PolyForm Noncommercial License 1.0.0
+# plus an additional free-use grant for individual musicians making their own
+# music — see LICENSE-GUI.md. Business/redistribution use needs a commercial
+# license (COMMERCIAL-LICENSE.md) or contact fcarvajalbrown@gmail.com.
+# (The engine it imports — keel/recipes/mixer/mastering/meters — is AGPL-3.0.)
 """
 userpresets.py  —  user-saved master loudness presets (a tiny JSON store).
 

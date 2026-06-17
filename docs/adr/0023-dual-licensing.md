@@ -21,8 +21,11 @@ version as a closed network service.
   closed-source product/service without the AGPL's copyleft, take a commercial
   license from the author.
 
-This is the legal basis for the paid GUI (ADR-0024); the LGPL GUI stack
-(ADR-0019) keeps the closed build lawful.
+This is the legal basis for the commercial license; the LGPL GUI stack
+(ADR-0019) keeps any closed build lawful. The GUI's own licensing/funding model
+evolved in [ADR-0025](0025-gui-noncommercial-license-and-donations.md) (free
+non-commercial + donations; USD 20/seat commercial) — this engine dual-license
+still holds.
 
 ## Consequences
 

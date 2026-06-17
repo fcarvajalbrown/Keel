@@ -122,9 +122,14 @@ pushed, 19-test suite green):
   (+ index) covering every load-bearing decision (DSP locks, scope, engine
   behaviour, toolkit, licensing, packaging, CI, distribution). When a decision
   changes, add a superseding ADR — don't silently reverse one.
-- **Commercial model (ROADMAP Phase 6).** AGPL engine stays free; the packaged
-  GUI is the paid product (~USD 20) sold from a GitHub Pages static site under
-  COMMERCIAL-LICENSE.md (LGPL PySide6 makes the closed build legal).
+- **Licensing/funding model (ROADMAP Phase 6, ADR-0025).** Hybrid: the **engine
+  stays AGPL-3.0**; the **GUI is free** for non-commercial use and for individual
+  musicians making/selling their own music (PolyForm Noncommercial + an extra
+  grant, `LICENSE-GUI.md`), funded by **donations** (PayPal + GitHub Sponsor via
+  `.github/FUNDING.yml`). A **commercial license** (`COMMERCIAL-LICENSE.md`),
+  **USD 20 one-time per seat**, is required only for business/redistribution use.
+  Supersedes the old paid-GUI plan (ADR-0024). Still TODO: stand up the donate /
+  commercial-checkout links on the landing page.
 
 ## Phase 2 tail — wrapped up (2026-06-17)
 
@@ -177,8 +182,10 @@ With this, **Phase 2 is DONE** — every validation item is resolved or dropped.
 - **Folder rename: DONE.** The repo now lives at `C:\Projects\Keel` (memory
   project key `C--Projects-Keel`). Memories re-saved under the new key last
   session (`no-claude-coauthor`, `engine-stays-delivery-agnostic`).
-- **License:** done — AGPL-3.0 + dual commercial (`LICENSE`, per-file headers,
-  `COMMERCIAL-LICENSE.md`, README section). Remaining only if desired: formal
+- **License:** done — hybrid (ADR-0025): engine AGPL-3.0 (`LICENSE`); GUI free
+  non-commercial via PolyForm + grant (`LICENSE-GUI.md`, per-file headers on
+  gui.py/userpresets.py); commercial USD 20/seat (`COMMERCIAL-LICENSE.md`);
+  donations (README + `.github/FUNDING.yml`). Remaining only if desired: formal
   legal review.
 - **Trademark:** "Keel" cleared initial web searches; verify formally in target
   markets before public launch.
