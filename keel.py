@@ -27,6 +27,7 @@ Everything here is deterministic: same stems + same recipe -> identical output.
 # --- recipe / data layer -------------------------------------------------
 from recipes import (
     STEMS,
+    KNOWN_LABELS,
     STEM_ALIASES,
     DEFAULT_BALANCE,
     DEFAULT_PAN,
@@ -59,7 +60,8 @@ __version__ = "0.3.0"
 
 __all__ = [
     # data / recipes
-    "STEMS", "STEM_ALIASES", "DEFAULT_BALANCE", "DEFAULT_PAN", "DEFAULT_SPREAD",
+    "STEMS", "KNOWN_LABELS", "STEM_ALIASES", "DEFAULT_BALANCE", "DEFAULT_PAN",
+    "DEFAULT_SPREAD",
     "DEFAULT_CHAIN", "DEFAULT_MASTER", "PRESETS", "DEFAULT_PRESET",
     "mix_recipe", "master_recipe", "preset_master",
     # mix engine

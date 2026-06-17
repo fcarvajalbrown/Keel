@@ -278,6 +278,51 @@ class TestBuildIntegration(unittest.TestCase):
             self.assertIsNotNone(on["mix"])
 
 
+class TestExpandedInstruments(unittest.TestCase):
+    """The known set now covers piano, organ/keys, backing vocals, and aux
+    percussion (each its own balance group + a GUI dropdown entry)."""
+
+    def test_known_labels_and_balances(self):
+        for lb in ("piano", "keys", "backing", "perc"):
+            self.assertIn(lb, keel.KNOWN_LABELS)
+            self.assertIn(lb, recipes.DEFAULT_BALANCE)
+        self.assertEqual(recipes.DEFAULT_BALANCE["piano"], -4.0)
+        self.assertEqual(recipes.DEFAULT_BALANCE["keys"], -5.0)
+        self.assertEqual(recipes.DEFAULT_BALANCE["backing"], -4.0)
+        self.assertEqual(recipes.DEFAULT_BALANCE["perc"], -8.0)
+        self.assertEqual(recipes.DEFAULT_BALANCE["vocals"], 0.0)  # still the anchor
+
+    def test_autodetect_new_instruments(self):
+        self.assertEqual(mixer._match_label("Piano"), "piano")
+        self.assertEqual(mixer._match_label("Grand_Pno"), "piano")
+        self.assertEqual(mixer._match_label("Organ_B3"), "keys")
+        self.assertEqual(mixer._match_label("Rhodes"), "keys")
+        self.assertEqual(mixer._match_label("Keys_1"), "keys")
+        self.assertEqual(mixer._match_label("Tambourine"), "perc")
+        self.assertEqual(mixer._match_label("Shaker"), "perc")
+        self.assertEqual(mixer._match_label("Congas"), "perc")
+
+    def test_backing_vs_lead_disambiguation(self):
+        # a backing/harmony stem resolves to 'backing', not the lead 'vocals'...
+        self.assertEqual(mixer._match_label("BackingVox"), "backing")
+        self.assertEqual(mixer._match_label("BGV_1"), "backing")
+        self.assertEqual(mixer._match_label("Harmony_Hi"), "backing")
+        # ...while a lead vocal stays 'vocals' and a lead guitar stays 'guitar'
+        self.assertEqual(mixer._match_label("Lead_Vox"), "vocals")
+        self.assertEqual(mixer._match_label("Lead_Gtr"), "guitar")
+
+    def test_aux_perc_splits_from_kit(self):
+        # kit-piece mics still group as drums; aux percussion is now its own group
+        self.assertEqual(mixer._match_label("Kick"), "drums")
+        self.assertEqual(mixer._match_label("OH_L"), "drums")
+        self.assertEqual(mixer._match_label("Conga"), "perc")
+        self.assertEqual(mixer._match_label("Tamb"), "perc")
+
+    def test_keys_splits_from_synth(self):
+        self.assertEqual(mixer._match_label("Synth_Pad"), "synth")
+        self.assertEqual(mixer._match_label("Keys"), "keys")
+
+
 class TestEdgeCases(unittest.TestCase):
     """Bad / degenerate input must degrade gracefully, never crash with a raw
     traceback or leak a `nan` into the output or the report."""

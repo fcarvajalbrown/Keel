@@ -25,7 +25,16 @@ WAVs; they are build artifacts.
 # "vox.wav" -> "vocals"), writes them into keel.json, and the user edits from
 # there. Anything unmatched is labelled "other". These known labels also seed
 # DEFAULT_BALANCE; custom labels just default to 0.0 until the user sets them.
-STEMS = ["drums", "bass", "guitar", "synth", "vocals"]  # the known/default labels
+# The known/default labels (also the GUI's instrument dropdown — see KNOWN_LABELS
+# below). Ordered roughly front-to-back of a rock arrangement.
+STEMS = ["vocals", "backing", "drums", "perc", "bass", "guitar",
+         "piano", "keys", "synth"]
+
+# The single source of truth for the GUI's per-file instrument dropdown, so the
+# UI choices can never drift from the engine's known set. The dropdown stays
+# editable (custom labels allowed) — Keel is delivery-agnostic, any label works,
+# unknowns fall to "other". STEM_ALIASES is only the auto-detect HINT table.
+KNOWN_LABELS = STEMS
 
 STEM_ALIASES = {
     # An alias matches when it is a PREFIX of a whole filename TOKEN (mixer.py
@@ -36,14 +45,25 @@ STEM_ALIASES = {
     # could not tell them apart. Drum kits ship as per-component mics whose names
     # rarely contain "drum" (kick/snare/toms/overheads), so the kit-piece names are
     # listed to collapse a multi-mic kit into ONE drums group rather than scatter
-    # it across "other". Auto-detect is still only a first guess the user edits in
-    # keel.json; the scan prints a mapping review so nothing is silently mislabeled.
-    "drums":  ["drum", "drums", "kit", "perc", "kick", "kik", "snare", "snr",
+    # it across "other". Aux percussion (tambourine/shaker/congas) is its OWN label
+    # so it groups + balances apart from the kit; organ/keys is its own label apart
+    # from synth pads. ORDER MATTERS: _match_label returns the first label with a
+    # matching alias, so "backing" precedes "vocals" (a "backing vox" file must not
+    # be caught as a lead vocal) and "guitar" precedes "vocals" (a "lead gtr" is a
+    # guitar). Auto-detect is still only a first guess the user edits in keel.json;
+    # the scan prints a mapping review so nothing is silently mislabeled.
+    "drums":  ["drum", "drums", "kit", "kick", "kik", "snare", "snr",
                "tom", "toms", "cymbal", "crash", "ride", "hat", "hihat", "oh",
-               "overhead", "conga", "bongo"],
+               "overhead"],
+    "perc":   ["perc", "tamb", "shake", "conga", "bongo", "cowbell",
+               "triangle", "cabasa", "woodblock"],
     "bass":   ["bass", "bs"],
     "guitar": ["guitar", "gtr", "gt"],
-    "synth":  ["synth", "syn", "pad", "keys"],
+    "piano":  ["piano", "pno", "grand", "upright"],
+    "keys":   ["keys", "key", "organ", "org", "hammond", "rhodes", "wurli",
+               "wurlitzer", "epiano"],
+    "synth":  ["synth", "syn", "pad"],
+    "backing": ["backing", "bgv", "bvox", "harmony", "harmonies"],
     "vocals": ["vocals", "vocal", "vox", "voc", "lead"],
 }
 
@@ -60,12 +80,20 @@ STEM_ALIASES = {
 # engine normalizes each stem to an internal anchor then applies these offsets.
 # (Loudness-balancing approach — Ward/Reiss, "Multitrack mixing using a model of
 # loudness and partial loudness".) More negative = quieter in the mix.
+# New-instrument levels are research-backed (typical roles in a rock mix): keys /
+# piano sit just under the guitars in a supporting role; backing vocals sit
+# clearly under the lead (subtle doubles go lower — dial by hand); aux percussion
+# is a quiet seasoning well below the kit. All editable per song.
 DEFAULT_BALANCE = {
-    "vocals": 0.0,
-    "drums": -2.0,
-    "bass":  -3.0,
+    "vocals":  0.0,
+    "backing": -4.0,
+    "drums":  -2.0,
+    "perc":   -8.0,
+    "bass":   -3.0,
     "guitar": -3.5,
-    "synth": -6.0,
+    "piano":  -4.0,
+    "keys":   -5.0,
+    "synth":  -6.0,
 }
 
 # Stereo placement, -1.0 (hard L) .. +1.0 (hard R). Equal-power pan in the engine.
@@ -73,11 +101,15 @@ DEFAULT_BALANCE = {
 # image (instruments + FX baked in). Only set a pan here if you deliberately want
 # to nudge a mono/centered stem; otherwise leave the stems' own width intact.
 DEFAULT_PAN = {
-    "vocals": 0.0,
-    "drums":  0.0,
-    "bass":   0.0,
-    "guitar": 0.0,
-    "synth":  0.0,
+    "vocals":  0.0,
+    "backing": 0.0,
+    "drums":   0.0,
+    "perc":    0.0,
+    "bass":    0.0,
+    "guitar":  0.0,
+    "piano":   0.0,
+    "keys":    0.0,
+    "synth":   0.0,
 }
 
 # Auto-spread for multi-file groups: if a type has >1 file AND spread > 0, its
@@ -99,11 +131,15 @@ DEFAULT_SPREAD = {
 #   hpf:    highpass corner (Hz)         eq:     list of (freq, gain_db, q) bells
 #   comp:   (threshold_db, ratio)        reverb: 0.0..1.0 wet mix
 DEFAULT_CHAIN = {
-    "drums":  {},
-    "bass":   {},
-    "guitar": {},
-    "synth":  {},
-    "vocals": {},
+    "vocals":  {},
+    "backing": {},
+    "drums":   {},
+    "perc":    {},
+    "bass":    {},
+    "guitar":  {},
+    "piano":   {},
+    "keys":    {},
+    "synth":   {},
 }
 
 # ----------------------------------------------------------------- MASTER DEFAULTS
