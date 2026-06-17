@@ -15,17 +15,23 @@ never forked. Workflow:
      groups files (balanced as one).
   3. Tweak per-label balance faders (relative LU), pick a loudness preset or set
      a custom target/ceiling, optionally a reference master, toggle bus glue.
+     With "Live preview" on, a fader move re-renders automatically (debounced).
   4. One click renders mix + master in a background thread; the LUFS / true-peak
      meters (read via meters.py, the engine's own math) show where it landed.
+     "Play master" streams the result and drives those meters live (short-term).
   5. Save/load named user presets and the whole project (its keel.json).
 
 Run:  .venv\\Scripts\\python.exe gui.py   (install Qt first: setup.ps1 -Gui)
 """
+import math
 import sys
 from pathlib import Path
 
+import numpy as np
+import soundfile as sf
+
 try:
-    from PySide6.QtCore import Qt, QThread, QTimer, Signal
+    from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
     from PySide6.QtWidgets import (
         QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
         QGridLayout, QLabel, QPushButton, QSlider, QComboBox, QDoubleSpinBox,
@@ -38,6 +44,12 @@ except ImportError as e:  # pragma: no cover - GUI is an optional extra
         "PySide6 is required for the GUI. Install it with:\n"
         "    .\\setup.ps1 -Gui        (or:  pip install PySide6)"
     ) from e
+
+try:
+    from PySide6.QtMultimedia import QAudioFormat, QAudioSink, QMediaDevices
+    _HAVE_AUDIO = True
+except Exception:  # pragma: no cover - QtMultimedia absent / no audio backend
+    _HAVE_AUDIO = False
 
 import keel
 import build
@@ -90,6 +102,107 @@ class RenderWorker(QThread):
             self.failed.emit(f"{type(e).__name__}: {e}")
 
 
+class PlaybackMeter(QObject):
+    """Stream a rendered WAV to the audio device and meter it live.
+
+    Pushes Int16 PCM to a QAudioSink in small chunks; on a timer it reads the
+    sink's playback position and measures a trailing window with keel's own
+    LUFS / true-peak math (the same meters.py the engine uses) so the meters
+    move with the audio. Strictly display-only — nothing here touches the
+    deterministic render path. Degrades to a no-op if QtMultimedia or an audio
+    output device is unavailable (see `available`)."""
+    levels = Signal(float, float)   # short-term LUFS, true-peak dBTP
+    finished = Signal()
+
+    WINDOW_S = 3.0        # trailing window for the short-term LUFS / TP readout
+    METER_EVERY_MS = 150  # throttle the meter recompute (the push tick is faster)
+    TICK_MS = 40
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.sink = None
+        self.io = None
+        self.audio = None
+        self.rate = None
+        self.pcm = b""
+        self.cursor = 0
+        self.frame_bytes = 4
+        self.total_us = 0
+        self._since_meter = 0
+        self.timer = QTimer(self)
+        self.timer.setInterval(self.TICK_MS)
+        self.timer.timeout.connect(self._tick)
+
+    def available(self):
+        """True only if Qt multimedia loaded AND a default output device exists."""
+        return _HAVE_AUDIO and not QMediaDevices.defaultAudioOutput().isNull()
+
+    @property
+    def playing(self):
+        return self.sink is not None
+
+    def play(self, wav_path):
+        """Load `wav_path`, open a QAudioSink in push mode, and start streaming."""
+        self.stop()
+        audio, rate = sf.read(str(wav_path), dtype="float32", always_2d=True)
+        ch = audio.shape[1]
+        self.audio, self.rate = audio, rate
+        self.frame_bytes = ch * 2  # Int16 -> 2 bytes/sample/channel
+        self.pcm = (np.clip(audio, -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
+        self.cursor = 0
+        self.total_us = int(audio.shape[0] / rate * 1_000_000)
+        self._since_meter = 0
+
+        fmt = QAudioFormat()
+        fmt.setSampleRate(int(rate))
+        fmt.setChannelCount(int(ch))
+        fmt.setSampleFormat(QAudioFormat.SampleFormat.Int16)
+        self.sink = QAudioSink(QMediaDevices.defaultAudioOutput(), fmt)
+        self.io = self.sink.start()  # push-mode QIODevice
+        self.timer.start()
+
+    def _tick(self):
+        if self.sink is None:
+            return
+        # feed the device as much frame-aligned data as it will currently take
+        free = self.sink.bytesFree()
+        free -= free % self.frame_bytes
+        if free > 0 and self.cursor < len(self.pcm):
+            end = min(self.cursor + free, len(self.pcm))
+            written = self.io.write(self.pcm[self.cursor:end])
+            if written > 0:
+                self.cursor += written
+        # update the meters off the actual playback position, throttled
+        self._since_meter += self.TICK_MS
+        if self._since_meter >= self.METER_EVERY_MS:
+            self._since_meter = 0
+            self._emit_levels()
+        # done once everything pushed has actually played out
+        if (self.cursor >= len(self.pcm)
+                and self.sink.processedUSecs() >= self.total_us):
+            self.stop()
+            self.finished.emit()
+
+    def _emit_levels(self):
+        pos = int(self.sink.processedUSecs() / 1_000_000 * self.rate)
+        lo = max(0, pos - int(self.WINDOW_S * self.rate))
+        window = self.audio[lo:pos]
+        if window.shape[0] < int(0.4 * self.rate):  # too short for a gated read
+            return
+        self.levels.emit(float(keel.integrated_lufs(window, self.rate)),
+                         float(keel.true_peak_db(window, self.rate)))
+
+    def stop(self):
+        self.timer.stop()
+        if self.sink is not None:
+            try:
+                self.sink.stop()
+            except Exception:  # pragma: no cover - defensive teardown
+                pass
+        self.sink = None
+        self.io = None
+
+
 class KeelWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -101,6 +214,11 @@ class KeelWindow(QMainWindow):
         self.out_dir = Path.cwd() / "out"
         self.worker = None
         self.balance_sliders = {}     # label -> (QSlider, QLabel)
+        self.master_wav = None        # last rendered master, for playback
+        self._render_levels = None    # (lufs, tp) of that master, to restore
+        self.player = PlaybackMeter(self)
+        self.player.levels.connect(self._on_live_levels)
+        self.player.finished.connect(self._on_play_finished)
         # live re-render: a fader move (re)starts a single-shot debounce timer;
         # when it settles we re-render, coalescing moves made while one is running.
         self._pending_live = False
@@ -236,6 +354,13 @@ class KeelWindow(QMainWindow):
         self.tp_val = QLabel("–")
         meters.addWidget(self.tp_bar, 1, 1)
         meters.addWidget(self.tp_val, 1, 2)
+        self.play_btn = QPushButton("Play master")
+        self.play_btn.setToolTip(
+            "Play the rendered master and drive the meters live (short-term, "
+            "trailing 3 s). Display-only — does not change the render.")
+        self.play_btn.setEnabled(False)
+        self.play_btn.clicked.connect(self._toggle_play)
+        meters.addWidget(self.play_btn, 2, 0, 1, 3)
         right.addWidget(meters_box)
         right.addStretch(1)
 
@@ -299,6 +424,8 @@ class KeelWindow(QMainWindow):
         self.relabel_btn.setEnabled(True)
 
     def _populate_from_doc(self):
+        self._stop_playback()
+        self._set_meters(None, None)
         stems = self.doc.get("stems", {})
         self.table.setRowCount(0)
         for fn, label in stems.items():
@@ -522,6 +649,10 @@ class KeelWindow(QMainWindow):
                   f"[{mst['path']}]  {mst['lufs']} LUFS  "
                   f"{mst['true_peak_db']} dBTP")
         self._set_meters(mst.get("lufs"), mst.get("true_peak_db"))
+        self.master_wav = res["master_wav"]
+        self._render_levels = (mst.get("lufs"), mst.get("true_peak_db"))
+        if not self.player.playing:
+            self.play_btn.setEnabled(True)
 
     def _render_failed(self, msg):
         self._say(f"ERROR: {msg}")
@@ -544,6 +675,48 @@ class KeelWindow(QMainWindow):
         self.tp_bar.setValue(pct(tp, -12.0, 0.0))
         self.lufs_val.setText("–" if lufs is None else f"{lufs:.2f} LUFS")
         self.tp_val.setText("–" if tp is None else f"{tp:.2f} dBTP")
+
+    # ---------------------------------------------------------------- playback
+    def _toggle_play(self):
+        if self.player.playing:
+            self.player.stop()
+            self._on_play_finished()
+            return
+        if not self.master_wav or not Path(self.master_wav).exists():
+            return
+        if not self.player.available():
+            QMessageBox.information(self, "Keel",
+                                    "No audio output device is available.")
+            return
+        try:
+            self.player.play(self.master_wav)
+        except Exception as e:
+            QMessageBox.warning(self, "Keel", f"Playback failed:\n{e}")
+            return
+        self.play_btn.setText("Stop")
+        self._say(f"Playing {Path(self.master_wav).name} (live meters)")
+
+    def _on_live_levels(self, lufs, tp):
+        # the trailing-window short-term read, pushed onto the same meters
+        self._set_meters(lufs if math.isfinite(lufs) else None,
+                         tp if math.isfinite(tp) else None)
+
+    def _on_play_finished(self):
+        self.play_btn.setText("Play master")
+        if self._render_levels is not None:  # restore the integrated readings
+            self._set_meters(*self._render_levels)
+
+    def _stop_playback(self):
+        """Tear playback down and reset its UI (on a new folder/project load)."""
+        self.player.stop()
+        self.play_btn.setText("Play master")
+        self.play_btn.setEnabled(False)
+        self.master_wav = None
+        self._render_levels = None
+
+    def closeEvent(self, event):
+        self.player.stop()  # don't leave an audio stream running after close
+        super().closeEvent(event)
 
 
 def _selftest():
