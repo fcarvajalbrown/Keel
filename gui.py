@@ -487,6 +487,7 @@ class KeelWindow(QMainWindow):
         works. A label not in the known set (a user's custom one) is preserved."""
         combo = QComboBox()
         combo.setEditable(True)
+        combo.setMinimumWidth(130)   # room for the longest label + the arrow
         combo.addItems(self._label_choices)
         combo.setCurrentText(label)
         return combo
