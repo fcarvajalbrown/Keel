@@ -44,7 +44,8 @@ Status values: `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 ### Product / licensing
 - [ADR-0023](0023-dual-licensing.md) — Dual licensing: AGPL-3.0 + commercial
 - [ADR-0024](0024-distribution-and-pricing.md) — Distribution & pricing: paid GUI (~USD 20) via GitHub Pages *(superseded by ADR-0025)*
-- [ADR-0025](0025-gui-noncommercial-license-and-donations.md) — GUI free (non-commercial) + donations; commercial USD 20/seat
+- [ADR-0025](0025-gui-noncommercial-license-and-donations.md) — GUI free (non-commercial) + donations; commercial USD 20/seat *(superseded by ADR-0028)*
+- [ADR-0028](0028-commercial-license-scope.md) — Commercial license scope: labels, studios, pro client work pay; the GUI is not "paid"
 
 ### Plugin (Phase 5)
 - [ADR-0026](0026-plugin-architecture-juce-shell.md) — Plugin is a JUCE/C++ shell that shells out to the Python engine (hybrid: live meters + offline Apply) *(superseded by ADR-0027)*

@@ -201,15 +201,20 @@ Keel se licencia en dos partes.
   vendas — bajo la PolyForm Noncommercial License más una concesión adicional
   ([`LICENSE-GUI.md`](LICENSE-GUI.md)).
 
-Una **licencia comercial** ([`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md)) —
-**USD 20, pago único, por asiento** — solo se requiere para uso
-**comercial / de redistribución**: ofrecer Keel como producto o servicio de pago,
-usar la GUI para trabajo de clientes en un estudio/agencia, redistribuirla dentro
-de otro producto, o integrar el motor en un producto de código cerrado sin el
-copyleft de la AGPL.
+**No cobramos por la app.** Una **licencia comercial**
+([`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md)) — **USD 20, pago único, por
+asiento** — es una licencia de uso comercial, requerida solo cuando se usa Keel
+para **ganar con material de otras personas o montar un negocio sobre él**:
+**sellos discográficos**, **estudios profesionales de mezcla / mastering** e
+**ingenieros freelance que hacen trabajo de clientes pagado**, ofrecer Keel como
+producto/servicio de pago, redistribuirla dentro de otro producto, o integrar el
+motor en un producto de código cerrado sin el copyleft de la AGPL. Ser
+profesional no activa el cobro — sí lo hacen el trabajo de clientes pagado o
+operar como sello/estudio/negocio.
 
-En una línea: **haz tu propia música con él gratis; paga solo si montas un
-negocio sobre él.**
+En una línea: **haz tu propia música con él gratis, incluso como pro vendiendo tus
+propios discos; paga solo si montas un negocio sobre él o cobras a clientes con
+él.**
 
 ## Autor
 

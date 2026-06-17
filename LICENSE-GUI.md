@@ -31,17 +31,21 @@ licensor (Felipe Carvajal Brown) also permits, free of charge:
   output and charges nothing for it.
 
 A separate **commercial license** ([`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md))
-**is** required for **business and redistribution use** of the GUI, including:
+**is** required to use Keel to **earn from other people's material or to run a
+business on it**, including:
 
+- **record labels**;
+- **professional mixing / mastering studios**, and **freelance mix / master
+  engineers**, using Keel to process **other people's material as a paid service**
+  at commercial scale;
 - offering Keel's functionality as a **paid product or service** (hosted,
   bundled, embedded, or resold);
-- using the GUI inside a **company, studio, or agency to process other people's
-  material as a paid service** at commercial scale;
 - **distributing the GUI** (modified or not) as part of another product.
 
-Everything else that is noncommercial remains free under the PolyForm terms
-below. If you are unsure which side of the line you fall on, ask:
-**fcarvajalbrown@gmail.com**.
+Being a professional does not by itself trigger the fee — doing paid client work
+or operating as a label/studio/business does. Everything else that is
+noncommercial, and any use on **your own** music, remains free. If you are unsure
+which side of the line you fall on, ask: **fcarvajalbrown@gmail.com**.
 
 ---
 

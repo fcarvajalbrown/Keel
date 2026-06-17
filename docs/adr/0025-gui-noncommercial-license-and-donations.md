@@ -1,8 +1,15 @@
 # ADR-0025: GUI is free (non-commercial) + donations; commercial use is USD 20/seat
 
-- Status: Accepted (supersedes ADR-0024)
+- Status: Superseded by [ADR-0028](0028-commercial-license-scope.md) (supersedes ADR-0024)
 - Date: 2026-06-17
 - Deciders: Felipe Carvajal Brown
+
+> **Superseded by [ADR-0028](0028-commercial-license-scope.md).** The hybrid model
+> (AGPL engine, free GUI for own-music/non-commercial, USD 20/seat commercial
+> license) stands; ADR-0028 sharpens *who* pays (record labels, professional
+> mixing/mastering studios and freelance engineers doing paid client work,
+> companies redistributing/reselling) and fixes the framing — the GUI is not the
+> paid product; what is sold is a commercial-use license.
 
 ## Context
 

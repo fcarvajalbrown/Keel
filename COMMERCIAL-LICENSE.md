@@ -1,7 +1,9 @@
 # Keel — commercial license
 
-Keel is free to use for the people it is built for. This commercial license
-exists only for **business and redistribution** use. Here is the whole picture.
+Keel is free to use for the people it is built for: **musicians making their own
+music**. We do **not** charge for the app. This commercial license is a
+**commercial-use license** for the parties who use Keel to earn from **other
+people's** material or to build a business on it. Here is the whole picture.
 
 ## How Keel is licensed
 
@@ -15,20 +17,27 @@ exists only for **business and redistribution** use. Here is the whole picture.
   find it useful, [donations](README.md#support--donate) keep it alive.
 
 You do **not** need to pay anything to mix and master your own songs with Keel,
-hobby or professional, even if you sell the results.
+hobby or professional, even if you sell the results. Being a professional does not
+by itself trigger the fee — doing paid client work or operating as a
+label/studio/business does.
 
 ## Who needs a commercial license
 
-You need a commercial license if you use Keel for **business or redistribution**,
-specifically:
+You need a commercial license if you use Keel to **earn from other people's
+material or to run a business on it**, specifically:
 
+- **record labels**;
+- **professional mixing / mastering studios**, and **freelance mix / master
+  engineers**, using Keel to process **other people's material as a paid service**
+  (paid client work, at commercial scale);
 - offering Keel's functionality as a **paid product or service** (hosted,
   bundled, embedded, or resold);
-- using the GUI inside a **company, studio, or agency to process other people's
-  material as a paid service** at commercial scale;
 - **distributing the GUI** (modified or not) as part of another product; or
 - building Keel's **engine** into a **closed-source** product/service without
   meeting the AGPL's copyleft obligations.
+
+**The test:** are you using Keel on **your own** music (free), or to **earn from
+others' material / run a business on it** (commercial license)?
 
 ## Price
 
