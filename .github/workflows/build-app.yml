@@ -1,8 +1,9 @@
 name: build-app
 
 # Builds the desktop GUI into downloadable artifacts:
-#   * Windows  -> dist/Keel.exe   (onefile)
-#   * macOS    -> dist/Keel.dmg   (.app bundle, Apple Silicon / arm64)
+#   * Windows  -> dist/Keel.exe              (onefile)
+#   * Windows  -> dist/KeelSetup-<ver>.exe   (Inno Setup installer, UX only — unsigned)
+#   * macOS    -> dist/Keel.dmg              (.app bundle, Apple Silicon / arm64)
 #
 # Triggered MANUALLY (Actions tab -> Run workflow) or by a version tag (v*) only
 # -- it deliberately does NOT run on every push, so day-to-day commits never
@@ -57,9 +58,26 @@ jobs:
           ./dist/Keel.app/Contents/MacOS/Keel --selftest
           hdiutil create -volname Keel -srcfolder dist/Keel.app -ov -format UDZO dist/Keel.dmg
 
+      - name: Build installer (Inno Setup, Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ver = (Select-String -Path keel.py -Pattern '__version__\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          Write-Host "Keel version: $ver"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DMyAppVersion=$ver installer\keel.iss
+          Get-ChildItem dist\KeelSetup-*.exe
+
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+
+      - name: Upload installer artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Keel-windows-installer
+          path: dist/KeelSetup-*.exe
           if-no-files-found: error
