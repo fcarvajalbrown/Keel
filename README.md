@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/keel-logo.png" width="380"
+  <img src="assets/keel-cover-linkedin.png" width="720"
        alt="Keel — Automatic Mixing + Mastering for Finished Stems">
 </p>
 
@@ -18,8 +18,10 @@
 > stems in, same master out, every run. No AI guessing, no randomness.
 
 [![status](https://img.shields.io/badge/status-pre--release-orange.svg)](ROADMAP.md)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
-[![commercial license](https://img.shields.io/badge/commercial%20license-available-blueviolet.svg)](COMMERCIAL-LICENSE.md)
+[![engine: AGPL v3](https://img.shields.io/badge/engine-AGPL%20v3-blue.svg)](LICENSE)
+[![GUI: free for non-commercial](https://img.shields.io/badge/GUI-free%20for%20non--commercial-success.svg)](LICENSE-GUI.md)
+[![commercial use: USD 20/seat](https://img.shields.io/badge/commercial%20use-USD%2020%2Fseat-blueviolet.svg)](COMMERCIAL-LICENSE.md)
+[![donate: PayPal](https://img.shields.io/badge/donate-PayPal-00457C.svg)](https://www.paypal.com/donate/?business=fcarvajalbrown%40protonmail.com&item_name=Support%20Keel%20development&currency_code=USD)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](requirements.txt)
 [![loudness](https://img.shields.io/badge/loudness-ITU--R%20BS.1770--4-brightgreen.svg)](#under-the-hood-the-dsp)
 [![render](https://img.shields.io/badge/render-deterministic-success.svg)](#)
@@ -364,19 +366,38 @@ toolkit, licensing, and packaging are the way they are).
 
 ---
 
+## Support / Donate
+
+Keel is free for the people it is built for, and stays alive on donations. If it
+saved you a mix-and-master fee or a monthly subscription, you can chip in:
+
+- **PayPal:** [Donate](https://www.paypal.com/donate/?business=fcarvajalbrown%40protonmail.com&item_name=Support%20Keel%20development&currency_code=USD)
+  (or send to `fcarvajalbrown@protonmail.com`)
+- Or use the **Sponsor** button at the top of the GitHub repo.
+
+Donations are voluntary and fund development; they are not a purchase and grant
+no commercial rights.
+
 ## License
 
-Keel is **dual-licensed**:
+Keel is licensed in two parts.
 
-- **Open source: GNU AGPL-3.0** ([`LICENSE`](LICENSE)). Free to use, study,
-  modify, and share — but if you distribute it or run a modified version as a
-  network service, you must release your source under the AGPL too.
-- **Commercial license: available** ([`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md)).
-  To build on Keel inside a closed-source product or service without the AGPL's
-  copyleft obligations, contact the author.
+- **The engine** (Python library + CLI) is **GNU AGPL-3.0** ([`LICENSE`](LICENSE)) —
+  free and open source. Copyleft: distribute it or run a modified version as a
+  network service and you must release your source under the AGPL too.
+- **The desktop GUI** (the `Keel.exe` / `Keel.app` app) is **free for
+  non-commercial use** and **free for individual musicians making their own
+  music** — even if you sell it — under the PolyForm Noncommercial License plus
+  an additional grant ([`LICENSE-GUI.md`](LICENSE-GUI.md)).
 
-Individuals and open projects use it freely under the AGPL; companies that want it
-closed-source take a commercial license.
+A **commercial license** ([`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md)) —
+**USD 20, one-time, per seat** — is required only for **business / redistribution**
+use: offering Keel as a paid product or service, using the GUI for paid client
+work at a studio/agency, redistributing it inside another product, or building
+the engine into a closed-source product without the AGPL's copyleft.
+
+In one line: **make your own music with it for free; pay only if you run a
+business on it.**
 
 ## Author
 
