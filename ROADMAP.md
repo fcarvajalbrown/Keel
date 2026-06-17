@@ -109,9 +109,14 @@ a tone-shaping suite. See "Non-goals" at the bottom.
       each version tag / manual run and uploads `Keel.exe` + `Keel.dmg` as
       artifacts, each gated by the frozen app's `--selftest`. macOS target is
       Apple Silicon (arm64 — the only macOS arch with a cp314 pedalboard wheel);
-      Intel would need a separate 3.13 job. STILL TODO: code-signing /
-      notarization (Win Authenticode + Apple notarization) for an unsigned-warning
-      -free install, and a proper installer.
+      Intel would need a separate 3.13 job. A Windows installer
+      (`installer/keel.iss`, Inno Setup) wraps the onefile `Keel.exe` —
+      Program Files / per-user install, Start Menu + optional desktop shortcut,
+      and an uninstaller — built in CI and uploaded as `Keel-windows-installer`.
+      STILL TODO: code-signing / notarization (Win Authenticode + Apple
+      notarization) for an unsigned-warning-free install — the installer is UX
+      only and does not by itself remove the SmartScreen "unknown publisher"
+      prompt; that needs signing. A macOS installer (.pkg) is a follow-on.
 - GUI toolkit decision: **PySide6 (Qt)**. Kivy was ruled out — no cp314 wheels,
   fails to install on the project's Python 3.14. PySide6 ships a stable-ABI
   (abi3) wheel that runs on 3.14, looks native, and is **LGPL** — it links into
