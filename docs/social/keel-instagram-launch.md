@@ -1,6 +1,6 @@
 # Keel — kit de lanzamiento para Instagram
 
-Material para publicar el lanzamiento (pre-alpha) en Instagram.
+Material para publicar el lanzamiento (alpha) en Instagram.
 
 ## Recursos
 
@@ -38,7 +38,7 @@ Material para publicar el lanzamiento (pre-alpha) en Instagram.
 > Gratis para músicos. Descárgalo para Windows y macOS desde el link en mi
 > perfil (releases de GitHub).
 >
-> Pre-alpha: se agradece el feedback.
+> Alpha: se agradece el feedback.
 
 ## Hashtags
 

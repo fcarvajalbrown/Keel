@@ -6,11 +6,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.1.0-alpha/KeelSetup-0.1.0.exe">
+  <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.3.0-alpha/KeelSetup-0.3.0.exe">
     <img src="https://img.shields.io/badge/Download%20for%20Windows-Alpha%20installer-2ea44f?style=for-the-badge&logo=windows&logoColor=white"
          alt="Download Keel for Windows — alpha installer">
   </a>
 </p>
+<p align="center"><sub>DAW user? Get the <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.3.0-alpha/Keel-VST3-windows-0.3.0.zip">VST3 plugin (Windows)</a>.</sub></p>
 <p align="center"><sub>Unsigned alpha: Windows may warn — click <b>More info &rarr; Run anyway</b>. macOS &amp; other downloads on the <a href="https://github.com/fcarvajalbrown/Keel/releases/latest">releases page</a>.</sub></p>
 
 > A **deterministic** automix + automaster engine. Give it a folder of

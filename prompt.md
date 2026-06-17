@@ -7,8 +7,14 @@ real-world material; the GUI scaffold + cross-platform builds now exist too.
 
 ## >>> START HERE — immediate next task
 
-**Pre-alpha launch shipped (2026-06-17, all on `main`).** This session, after the
-Phase 4 GUI polish, focused on getting Keel out the door:
+**Latest release: `v0.3.0-alpha` (2026-06-17, all on `main`)** — the first Keel
+**VST3 plugin** (Windows preview) shipped alongside the desktop GUI, versioned in
+lockstep (GUI + plugin share ONE version — see CLAUDE.md "Versioning (STRICT)").
+Release assets: `KeelSetup-0.3.0.exe`, `Keel.exe`, `Keel.dmg` (GUI, built+published
+by CI on the `v*` tag) plus `Keel-VST3-windows-0.3.0.zip` (plugin, built locally
+and attached — the plugin is not in CI yet). READMEs point at the 0.3.0 assets.
+Lineage: `v0.1.0-alpha` (engine + GUI scaffold + CI) -> `v0.2.0-alpha` (GUI restyle)
+-> `v0.3.0-alpha` (plugin). Earlier launch context below (still on `main`):
 - **Release `v0.1.0-alpha`** — a GitHub *prerelease* with `KeelSetup-0.1.0.exe`
   (Windows installer), `Keel.exe` (portable), `Keel.dmg` (macOS arm64). CI
   (`build-app.yml`) now builds AND publishes the prerelease on a `v*` tag (the

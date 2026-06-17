@@ -129,60 +129,47 @@ a tone-shaping suite. See "Non-goals" at the bottom.
       `import keel` is the single entry point every front-end drives. No DSP fork.
 
 ## Phase 5 — VST / plugin
-Architecture decided (**ADR-0027**, supersedes ADR-0026): the plugin runs a
-**live C++ master chain (a faithful preview)** plus a **byte-identical Python
-Finalize** — a third front-end whose live chain is the ONE deliberate DSP fork
-(the CLI + GUI still share the Python core). The `.vst3` the DAW loads is C++ and
-**processes audio live** (tone -> soft-clip -> true-peak limiter, with live
-LUFS/TP meters), so you hear the Keel master in real time and tweak it like Ozone.
-Loudness is **approximate live** (limiter/gain targets ~-14, verify on the meter);
-**exact -14 LUFS / -1 dBTP is applied on Finalize**, which bounces to a temp WAV
-and shells out to the bundled frozen Python engine — byte-identical to `build.py`
-/ `gui.py`, deterministic (no system Python needed). Why split: exact integrated
-LUFS is whole-program, so it is inherently offline; the tone/clip/limit stages are
-real-time-capable and run live. **DSP SYNC RULE:** the C++ live chain and
-`mastering.py` are two disconnected impls of the same master character — any change
-to the Python master math must be mirrored into `plugin/Source/` and re-A/B'd
-(CLAUDE.md). Toolchain confirmed on the dev machine: MSVC 14.50 + cmake 4.2.3 +
-VS Community 2026.
-- [ ] **Master-bus plugin first** (clearest fit); stem balancer as a follow-on.
-      Scope = **master stage only**: inserted on the master bus the signal is one
-      summed stereo mix, and a stereo master cannot re-balance instruments
-      (ADR-0001) — so the plugin masters, it does not mix. Its GUI is **distinct
-      from and much simpler than** the standalone GUI: it drops the file->label
-      table and balance faders, keeping only preset/LUFS/TP + optional
-      reference/glue + live meters + Finalize (ADR-0027). Balancing stays in the
-      standalone tool (run on stems before the DAW) or the DAW's own mixer.
-- [ ] **Live C++ master chain (preview)** — port `mastering.py`'s real-time stages
-      (HPF 28 / low-shelf / air / glue comp -> oversampled tanh soft-clip -> 4x
-      oversampled true-peak limiter) to C++ so the plugin processes audio live.
-      Approximate loudness live; NOT the exact-LUFS normalize (Finalize owns it).
-      Validate as a faithful preview by A/B against the Python reference (won't
-      null exactly — pedalboard limiter). This is the DSP fork the SYNC RULE
-      governs (ADR-0027, amends ADR-0013).
-- [~] **Finalize** = byte-identical master via **shell-out to the frozen Python
-      engine** (offline, whole-program exact -14 / -1 dBTP). Keeps the deterministic
-      "identical across front-ends" guarantee for delivered files; the spike's
-      Apply stub becomes this. Needs a headless `--master-file IN OUT` entry on the
-      engine + the subprocess orchestration. (ADR-0027, was ADR-0026's Apply.)
-- [~] JUCE/C++ shell: DAW integration, UI, live LUFS/TP meters (C++ BS.1770 /
-      true-peak), audio capture, Finalize subprocess. Spike done (`plugin/`): VST3
-      + Standalone build green, **pass-through** (live chain not yet ported) + K-
-      weighted momentary LUFS + 4x true-peak meters + master-only UI, auto-installs
-      to the per-user VST3 folder. Loaded + confirmed in Mixcraft. STILL OPEN: the
-      live C++ chain, real audio capture, and the Finalize subprocess.
-- [x] **Spike:** a JUCE VST3/Standalone that builds on this machine, passes
-      audio, and drives live meters, Finalize stubbed. Done 2026-06-17 (`plugin/`,
-      JUCE 8.0.9 via FetchContent, MSVC 14.50 / VS 2026 / CMake 4.2.3, zero
-      warnings; Standalone launch-tested; VST3 loaded in Mixcraft). NEXT: port the
-      live C++ master chain, then wire Finalize to the frozen engine.
-- [ ] **ARA2** as the production polish — whole-clip access so Finalize needs no
-      manual bounce/export (how Melodyne / SpectraLayers integrate). v1 can ship
-      bounce-then-Finalize; ARA removes the manual step. Review ARA + VST3 SDK
-      license terms before public distribution.
-- [ ] Plugin packaging (bundle the frozen engine; CI builds engine then plugin),
-      presets, and parameter automation. Code-signing / notarization shared with
-      the open Phase 4 packaging item.
+Architecture (**ADR-0029**, supersedes ADR-0027/0026): the plugin is a
+**self-contained real-time C++ master** — a faithful port of `mastering.py`'s
+chain (tone -> static Makeup -> oversampled tanh soft-clip -> 4x oversampled
+true-peak limiter) running live, with live LUFS/TP meters. You hear the Keel
+master and tweak it like Ozone, then **deliver by exporting from the DAW** with it
+active — there is no offline Finalize, no bundled engine, no shell-out (the earlier
+ADR-0027 Finalize model was dropped: the live chain already masters and a DAW
+export bakes it in). Loudness is **approximate** — you set Makeup so the live meter
+sits at target; the true-peak ceiling is enforced live so exports are TP-safe.
+Exact -14 LUFS / -1 dBTP byte-identical delivery stays in the **CLI + GUI** (the
+Python engine). **DSP SYNC RULE:** the C++ chain and `mastering.py` are two
+disconnected impls of the same master character — any change to the Python master
+math must be mirrored into `plugin/Source/` and re-A/B'd (CLAUDE.md). The plugin
+and GUI are **versioned in lockstep** (CLAUDE.md "Versioning (STRICT)"). Toolchain:
+MSVC 14.50 + CMake 4.2.3 + VS Community 2026.
+- [x] **Master-bus plugin** (clearest fit); stem balancer is a possible follow-on.
+      Scope = **master stage only**: on the master bus the signal is one summed
+      stereo mix, and a stereo master cannot re-balance instruments (ADR-0001) — so
+      the plugin masters, it does not mix. Its GUI is **distinct from and simpler
+      than** the standalone: no file->label table / balance faders — just preset /
+      LUFS reference / TP / Makeup + reference/glue toggles + the two live meters.
+- [x] **Live C++ master chain** ported (`plugin/Source/`): tone (HPF 28 /
+      low-shelf / air / glue comp) -> static Makeup -> oversampled soft-clip -> 4x
+      oversampled true-peak limiter. Built from the same `juce::dsp` blocks
+      pedalboard wraps; faithful, not byte-identical (won't null pedalboard's
+      limiter). The DSP fork the SYNC RULE governs (ADR-0029, amends ADR-0013).
+- [x] **Self-contained delivery** (no Finalize): export from the DAW with the
+      plugin active. Manual static Makeup (no intro ramp on bounce); TP enforced
+      live. Exact-loudness delivery lives in the CLI/GUI.
+- [x] JUCE/C++ shell: DAW integration, UI, live LUFS/TP meters (C++ BS.1770 /
+      true-peak), auto-install to the per-user VST3 folder. Build green, zero
+      warnings; loaded + confirmed in Mixcraft.
+- [x] **Visual language matched** to the standalone (`KeelLookAndFeel`): teal
+      palette, Space Grotesk (embedded), hull mark, gradient meters, card panels.
+- [x] **Shipped in `v0.3.0-alpha`** (2026-06-17): Windows `Keel.vst3` attached to
+      the release (`Keel-VST3-windows-0.3.0.zip`), alongside the GUI app.
+- [ ] **Remaining:** by-ear A/B of the live master vs a `build.py` render; a
+      **macOS** plugin build + CI for the VST3/AU (today it is a local Windows
+      build, not in CI); wire the reference/glue toggles into the live chain;
+      code-signing / notarization (shared with Phase 4); optional libebur128 meter;
+      ARA2 as later polish.
 - Licensing (ADR-0026): JUCE under AGPLv3 for the open plugin (engine is already
       AGPL); JUCE Starter (free under 20k/yr incl. donations) covers commercial
       seats until revenue crosses the threshold, then Indie (USD 800 perpetual).

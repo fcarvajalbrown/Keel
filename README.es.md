@@ -6,11 +6,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.1.0-alpha/KeelSetup-0.1.0.exe">
+  <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.3.0-alpha/KeelSetup-0.3.0.exe">
     <img src="https://img.shields.io/badge/Descargar%20para%20Windows-Instalador%20Alpha-2ea44f?style=for-the-badge&logo=windows&logoColor=white"
          alt="Descargar Keel para Windows — instalador alpha">
   </a>
 </p>
+<p align="center"><sub>¿Usas un DAW? Descarga el <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.3.0-alpha/Keel-VST3-windows-0.3.0.zip">plugin VST3 (Windows)</a>.</sub></p>
 <p align="center"><sub>Alpha sin firmar: Windows puede advertir — haz clic en <b>Más información &rarr; Ejecutar de todas formas</b>. macOS y otras descargas en la <a href="https://github.com/fcarvajalbrown/Keel/releases/latest">página de releases</a>.</sub></p>
 
 > Un motor **determinista** de mezcla y masterización automática. Le das una
