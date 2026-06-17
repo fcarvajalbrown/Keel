@@ -26,7 +26,7 @@ OUT = "assets/keel-logo-black.png"
 # black border ends up even on all sides. (x, y, w, h in SVG units.)
 CONTENT_BOX = (6.0, 13.0, 376.0, 108.0)
 LOGO_WIDTH = 1100.0  # rendered content width in px
-MARGIN = 56.0        # thin even black border around the logo, in px
+MARGIN = 70.0        # thin even black border around the logo, in px
 
 
 def main() -> int:
