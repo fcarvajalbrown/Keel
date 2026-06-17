@@ -109,13 +109,31 @@ macOS build**; **1.0 ships signed** (signing is the LAST gate but it does gate t
 fee; nothing before `v1.0.0` does.
 
 **Immediate next milestone: `v0.4.0-beta` — Harden & CI.** Confirm direction via
-the blue option UI first, but the teed-up work is:
-1. Run the `tests/` unittest suite in CI as a release gate (Win + macOS).
+the blue option UI first. Progress so far:
+1. Run the `tests/` unittest suite in CI as a release gate (Win + macOS). TODO.
 2. Build the **plugin in CI** (Windows VST3 first) + auto-attach to the release
-   (today it's built locally and uploaded by hand).
-3. **Edge-case tests:** missing/malformed `keel.json`, corrupt/NaN/silent audio,
-   samplerate-mismatch paths, a `--batch` integration test.
-4. Wire the GUI `--selftest` + a plugin smoke check into CI as gates.
+   (today it's built locally and uploaded by hand). TODO — **next up** (the user
+   picked this; it was paused mid-session to do the instrument work below).
+3. **Edge-case tests — DONE (2026-06-17).** The engine now degrades gracefully:
+   NaN/Inf samples sanitized to silence at load (`mixer._load` /
+   `mastering._internal_master`); a corrupt/unreadable audio file and a malformed
+   hand-edited `keel.json` raise clear user-facing errors (the json is left
+   intact — delete it to re-detect); `build.main` reports a bad job and carries on
+   in `--batch`. New tests cover silent/NaN/corrupt audio, samplerate mismatch,
+   malformed+missing keel.json, and a `--batch` integration run.
+4. Wire the GUI `--selftest` + a plugin smoke check into CI as gates. TODO.
+
+**Also shipped this session (2026-06-17): expanded instrument set + GUI dropdown.**
+The known set now covers **piano, organ/keys, backing vocals, aux percussion** on
+top of vocals/drums/bass/guitar/synth — each its own balance group with a
+research-backed default level (`backing -4`, `piano -4`, `keys -5`, `perc -8` LU
+vs the vocal anchor; vocals stays 0 = the reference). Aux perc (`tamb/shaker/
+conga/...`) now groups **apart from the kit**, and organ/keys **apart from synth**
+(their aliases were moved out of `drums`/`synth`). The GUI's file→label field is
+now an **editable instrument dropdown** sourced from one canonical list
+(`recipes.KNOWN_LABELS`, re-exported via `keel`) so the UI and engine can't drift;
+custom labels are still typeable (delivery-agnostic). Suite **19 → 39**, green.
+No plugin/DSP-master change (labels are mix-stage only), so no DSP SYNC needed.
 
 Then `v0.5.0-beta` (wire the Bus-glue + Reference toggles into the live C++ chain
 -- honour the DSP SYNC RULE; macOS VST3/AU in CI; by-ear A/B) and `v0.6.0-beta`

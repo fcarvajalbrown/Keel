@@ -70,8 +70,9 @@ Condensed history; the *why* for each lives in [`docs/adr/`](docs/adr/).
       callouts for `other`.
 
 ### Standalone GUI (DONE — Phase 4 except signing)
-- [x] PySide6 app: drop-a-folder → editable file→label table → per-label balance
-      faders → preset save/load → reference picker → bus-glue toggle → one-click
+- [x] PySide6 app: drop-a-folder → editable file→instrument dropdown (known set +
+      custom) → per-label balance faders → preset save/load → reference picker →
+      bus-glue toggle → one-click
       mix+master in a worker thread → post-render + live-playback LUFS/TP meters
       → save/load project. Optional debounced "Live preview" re-render on fader
       move. `keel.py` is the shared library all front-ends drive (no DSP fork).
@@ -113,8 +114,19 @@ Make the build trustworthy before adding reach.
       (Python job on Windows + macOS).
 - [ ] Build the **plugin in CI** (Windows VST3 first) and attach the zip to the
       release automatically, instead of building locally and uploading by hand.
-- [ ] **Edge-case tests:** missing/malformed `keel.json`, corrupt / NaN / silent
-      audio, samplerate-mismatch error paths, a `--batch` integration test.
+- [x] **Edge-case tests + graceful degradation:** the engine now sanitizes
+      NaN/Inf samples to silence at load and surfaces clear, user-facing errors
+      for an unreadable/corrupt audio file and a malformed (hand-edited)
+      `keel.json` (kept intact, never auto-overwritten); `--batch` reports a bad
+      job and carries on. Covered by new tests (silent / NaN / corrupt audio,
+      samplerate mismatch, malformed + missing `keel.json`, a `--batch`
+      integration run). Suite **19 → 39**.
+- [x] **Expanded instrument set + GUI dropdown.** The known set now also covers
+      **piano, organ/keys, backing vocals, aux percussion**, each its own balance
+      group with a research-backed default level; aux perc / organ group apart
+      from the kit / synth. The GUI file→label field is an **editable instrument
+      dropdown** sourced from one canonical list (`recipes.KNOWN_LABELS`) so UI +
+      engine can't drift — custom labels still allowed (delivery-agnostic).
 - [ ] Wire the GUI `--selftest` (and a plugin smoke check) into CI as gates.
 - [ ] Release pipeline: one `v*` tag produces GUI + plugin assets together.
 
