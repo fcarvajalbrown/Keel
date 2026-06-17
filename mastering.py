@@ -87,6 +87,11 @@ def _os_limit(sig, rate, ceiling_db, factor=OVERSAMPLE):
 
 def _internal_master(mix_path, out_path, target_lufs, tp_ceiling_db):
     audio, rate = sf.read(str(mix_path), dtype="float32", always_2d=True)
+    # guard --master-only on a foreign/corrupt mix: NaN/Inf samples become
+    # silence so they can't poison the loudness/true-peak math (Keel's own mix
+    # is always clean PCM, but the input here may be anyone's file).
+    if not np.all(np.isfinite(audio)):
+        audio = np.nan_to_num(audio, nan=0.0, posinf=0.0, neginf=0.0)
 
     # tone/glue stage only (no limiting yet): clean sub rumble, gentle tilt, glue
     tone = Pedalboard([

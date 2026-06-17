@@ -138,7 +138,19 @@ def _print_mapping_review(mpath, doc):
 
 
 def load_mapping_doc(path):
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    """Read a keel.json mapping. A hand-edit that breaks the JSON raises a clear,
+    user-facing error (never a raw JSONDecodeError) and the file is left untouched
+    so the user's edits aren't lost — fix the typo, or delete keel.json to let
+    Keel re-detect labels from the filenames."""
+    text = Path(path).read_text(encoding="utf-8")
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            f"{Path(path)} is not valid JSON ({e.msg}, line {e.lineno} "
+            f"col {e.colno}). Fix the typo, or delete the file to let Keel "
+            f"re-detect labels."
+        ) from e
 
 
 def write_mapping_doc(path, doc):
@@ -326,19 +338,33 @@ def main(argv):
             ap.error(f"--stems folder not found: {stems}")
         jobs = [(stems, args.name or stems.name)]
 
-    report = []
+    report, errors = [], 0
     for stems_dir, name in jobs:
-        row = process_one(
-            stems_dir, args.out, name, map_file=args.map_file, scan=args.scan,
-            preset=args.preset, target_lufs=args.lufs, tp_ceiling=args.tp,
-            ref=args.ref, glue=args.glue, do_mix=do_mix, do_master=do_master)
+        # A bad input for one job (malformed keel.json, unreadable/corrupt audio,
+        # a samplerate mismatch) is reported as a clean line and the run carries
+        # on to the next job, rather than aborting the batch with a traceback.
+        try:
+            row = process_one(
+                stems_dir, args.out, name, map_file=args.map_file, scan=args.scan,
+                preset=args.preset, target_lufs=args.lufs, tp_ceiling=args.tp,
+                ref=args.ref, glue=args.glue, do_mix=do_mix, do_master=do_master)
+        except (ValueError, FileNotFoundError) as e:
+            print(f"  [error] {name}: {e}")
+            errors += 1
+            continue
         if row:
             report.append(row)
 
     if report:
         write_report(report, args.out)
     if not args.scan:
-        print(f"\nDone. Outputs in {Path(args.out).resolve()}")
+        if report:
+            print(f"\nDone. Outputs in {Path(args.out).resolve()}")
+        else:
+            print("\nNothing rendered." +
+                  (" See the [error] line(s) above." if errors else ""))
+    if errors and not report:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

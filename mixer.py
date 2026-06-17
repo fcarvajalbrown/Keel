@@ -104,8 +104,25 @@ def group_files(folder, mapping=None):
 
 
 def _load(path):
-    """Load audio as float32 (frames, channels) plus its samplerate."""
-    audio, rate = sf.read(str(path), dtype="float32", always_2d=True)
+    """Load audio as float32 (frames, channels) plus its samplerate.
+
+    Two defences against bad input:
+      * A file libsndfile cannot decode (a non-audio file with a .wav name, a
+        truncated export) raises a clear, user-facing error instead of a raw
+        LibsndfileError traceback.
+      * Non-finite samples (NaN/Inf — from a corrupt take or a bad float-WAV
+        export) are replaced with silence, so they can't poison the loudness /
+        true-peak metrics or leak a `nan` into the rendered bus. The result stays
+        finite and deterministic."""
+    try:
+        audio, rate = sf.read(str(path), dtype="float32", always_2d=True)
+    except sf.LibsndfileError as e:
+        raise ValueError(
+            f"{Path(path).name} is not a readable audio file "
+            f"(corrupt or unsupported format): {e}"
+        ) from e
+    if not np.all(np.isfinite(audio)):
+        audio = np.nan_to_num(audio, nan=0.0, posinf=0.0, neginf=0.0)
     return audio, rate
 
 
