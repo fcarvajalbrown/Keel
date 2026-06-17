@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/keel-cover-linkedin.png" width="720"
+  <img src="assets/keel-logo-black.png" width="540"
        alt="Keel — Automatic Mixing + Mastering for Finished Stems">
 </p>
 
