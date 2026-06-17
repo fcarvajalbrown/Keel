@@ -149,6 +149,23 @@ python build.py --batch "C:\path\to\album" --out out
   plain text if that UI is genuinely unavailable.
 - **No emojis** anywhere — docs, commit messages, code, or chat. Plain text only.
 
+## Versioning (STRICT — every agent, no exceptions)
+
+**Keel is ONE product with ONE version.** The standalone GUI and the VST3 plugin
+are versioned **together** — they always carry the **same version number** and are
+bumped **in lockstep**. There is no separate "GUI version" and "plugin version".
+
+- **Single source of truth:** `keel.py` `__version__`. When you bump it, you MUST
+  also update, in the same commit, every place that restates the version:
+  - `installer/keel.iss` `MyAppVersion`
+  - `plugin/CMakeLists.txt` `project(KeelPlugin VERSION ...)`
+  - any README/docs that name a version or link a versioned release asset.
+- **A release tag `vX.Y.Z` covers both** the GUI and the plugin. Never cut a
+  release that advances one without the other being at the same version.
+- After any version bump or release, **sweep the repo docs** so no file points at a
+  stale version or a stale release-asset URL (e.g. a `releases/download/v0.1.0-...`
+  link). Keeping docs/links current is part of the release, not optional.
+
 ## Commit conventions
 
 - **Conventional Commits.** Format every message as `type(scope): summary`, e.g.
