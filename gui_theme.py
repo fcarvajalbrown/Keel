@@ -186,6 +186,9 @@ QCheckBox::indicator:hover { border-color: $teal_deep; }
 QCheckBox::indicator:checked { background: $teal; border-color: $teal; }
 
 /* ---- sliders (balance faders) ---- */
+/* keep the widget tall enough that the handle sits fully inside its bounds --
+   otherwise the handle pokes outside the slider and can't be grabbed/dragged. */
+QSlider:horizontal { min-height: 22px; }
 QSlider::groove:horizontal { height: 4px; background: $line; border-radius: 2px; }
 QSlider::sub-page:horizontal { background: $teal_deep; border-radius: 2px; }
 QSlider::add-page:horizontal { background: $line; border-radius: 2px; }
