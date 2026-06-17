@@ -190,6 +190,10 @@ VS Community 2026.
       embedded Python interpreter were both rejected (ADR-0026).
 
 ## Phase 6 — Distribution
+- Release process + the canonical release-notes text live in
+  [`docs/RELEASE.md`](docs/RELEASE.md). CI (`build-app.yml`) injects that text
+  into every `v*` tag release automatically (Win exe + installer + macOS dmg,
+  published as a prerelease). Keep the doc and the workflow's `notes.md` in sync.
 - [ ] Naming/trademark check before public launch (Keel cleared initial searches;
       verify in target markets).
 - [ ] Landing page + demo audio (before/after, A/B vs. a reference), hosted as a
