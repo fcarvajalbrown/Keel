@@ -36,6 +36,9 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
+; Keel hull mark for the installer .exe and the Add/Remove Programs entry.
+SetupIconFile=..\assets\keel.ico
+UninstallDisplayIcon={app}\{#MyAppExeName}
 ; Allow per-user install when not running elevated, so no UAC prompt is forced.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
