@@ -13,8 +13,11 @@ A thin window over the SAME engine the CLI drives (`import keel`): the DSP is
 never forked. Workflow:
 
   1. Drop (or open) a folder of finished stems.
-  2. Keel auto-detects a label per file into an editable table; sharing a label
-     groups files (balanced as one).
+  2. Keel auto-detects an instrument label per file; each file's label is an
+     editable dropdown of the known instruments (vocals/backing/drums/perc/bass/
+     guitar/piano/keys/synth + 'other', and you can still type a custom one), so
+     a generically-named stem like "track1.wav" is one click to assign. Files
+     sharing a label are grouped (balanced as one).
   3. Tweak per-label balance faders (relative LU), pick a loudness preset or set
      a custom target/ceiling, optionally a reference master, toggle bus glue.
      With "Live preview" on, a fader move re-renders automatically (debounced).
@@ -220,6 +223,10 @@ class KeelWindow(QMainWindow):
         self.out_dir = Path.cwd() / "out"
         self.worker = None
         self.balance_sliders = {}     # label -> (QSlider, QLabel)
+        # the per-file instrument dropdown's choices, straight from the engine's
+        # known set (so UI + engine never drift) + "other"; the combo stays
+        # editable so a custom label is still allowed (Keel is delivery-agnostic).
+        self._label_choices = list(keel.KNOWN_LABELS) + [keel.OTHER_LABEL]
         self.master_wav = None        # last rendered master, for playback
         self._render_levels = None    # (lufs, tp) of that master, to restore
         self.player = PlaybackMeter(self)
@@ -474,6 +481,25 @@ class KeelWindow(QMainWindow):
         self.save_proj_btn.setEnabled(True)
         self.relabel_btn.setEnabled(True)
 
+    def _make_label_combo(self, label):
+        """An editable instrument dropdown for one file's label. Choices come from
+        the engine's known set (+ 'other'); editable so a custom label still
+        works. A label not in the known set (a user's custom one) is preserved."""
+        combo = QComboBox()
+        combo.setEditable(True)
+        combo.addItems(self._label_choices)
+        combo.setCurrentText(label)
+        return combo
+
+    def _label_at(self, r):
+        """Read one row's chosen label from its dropdown (falling back to a plain
+        cell if a row was ever set without a combo)."""
+        w = self.table.cellWidget(r, 1)
+        if w is not None:
+            return (w.currentText() or build.mixer.OTHER_LABEL).strip()
+        it = self.table.item(r, 1)
+        return ((it.text() if it else "") or build.mixer.OTHER_LABEL).strip()
+
     def _populate_from_doc(self):
         self._stop_playback()
         self._set_meters(None, None)
@@ -485,7 +511,7 @@ class KeelWindow(QMainWindow):
             item_f = QTableWidgetItem(fn)
             item_f.setFlags(item_f.flags() & ~Qt.ItemIsEditable)
             self.table.setItem(r, 0, item_f)
-            self.table.setItem(r, 1, QTableWidgetItem(label))
+            self.table.setCellWidget(r, 1, self._make_label_combo(label))
         self._rebuild_faders(self.doc.get("balance", {}),
                              labels=list(dict.fromkeys(stems.values())))
         m = self.doc.get("master", {})
@@ -538,7 +564,7 @@ class KeelWindow(QMainWindow):
         cur = self._collect_balance()
         for r in range(self.table.rowCount()):
             fn = self.table.item(r, 0).text()
-            lb = (self.table.item(r, 1).text() or build.mixer.OTHER_LABEL).strip()
+            lb = self._label_at(r)
             stems[fn] = lb
             labels.append(lb)
         self.doc["stems"] = stems
@@ -562,7 +588,7 @@ class KeelWindow(QMainWindow):
         stems = {}
         for r in range(self.table.rowCount()):
             fn = self.table.item(r, 0).text()
-            lb = (self.table.item(r, 1).text() or build.mixer.OTHER_LABEL).strip()
+            lb = self._label_at(r)
             stems[fn] = lb
         doc = dict(self.doc or {})
         doc["stems"] = stems
