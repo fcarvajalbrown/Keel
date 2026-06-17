@@ -165,6 +165,15 @@ def render_frame(i, total):
         text(p, "código abierto · sin IA · sin suscripción", H * 0.71,
              30, MUTED, bold=False)
 
+    # thin progress bar along the bottom. Doubles as a story-progress cue AND
+    # makes every frame unique, so Pillow can't merge static "hold" frames
+    # (which gives them long per-frame delays that many video editors ignore,
+    # collapsing the clip to ~6s). Unique frames => all 108 stored => full ~9s.
+    prog = (i + 1) / total
+    p.setPen(Qt.NoPen)
+    p.setBrush(TEAL)
+    p.drawRect(QRectF(0, H - 8, W * prog, 8))
+
     p.end()
 
     ba = QByteArray()            # keep alive: QBuffer holds a pointer to it
