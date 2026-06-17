@@ -152,12 +152,17 @@ cmake 4.2.3 + VS Community 2026.
       Apply), not a C++ re-port. A C++ DSP port is explicitly deferred and would
       only be revisited for a zero-Python-runtime build, validated against the
       Python reference (ADR-0026).
-- [ ] JUCE/C++ shell: DAW integration, UI, real-time pass-through, live LUFS/TP
-      meters (C++ BS.1770 / true-peak, e.g. libebur128 — display-only), audio
-      capture, and the subprocess orchestration for Apply.
-- [ ] **Spike (next session):** a JUCE VST3 that builds on this machine, loads in
-      a DAW, passes audio, and drives live meters, with Apply wired to shell out
-      to the Python engine. (This session: ADR + plan only.)
+- [~] JUCE/C++ shell: DAW integration, UI, real-time pass-through, live LUFS/TP
+      meters (C++ BS.1770 / true-peak — display-only), audio capture, and the
+      subprocess orchestration for Apply. Spike done (`plugin/`): VST3 +
+      Standalone build green, pass-through + K-weighted momentary LUFS + 4x
+      true-peak meters + master-only UI. STILL OPEN: real DAW load test, audio
+      capture, and the Apply subprocess orchestration (libebur128 swap optional).
+- [x] **Spike:** a JUCE VST3/Standalone that builds on this machine, passes
+      audio, and drives live meters, Apply stubbed. Done 2026-06-17 (`plugin/`,
+      JUCE 8.0.9 via FetchContent, MSVC 14.50 / VS 2026 / CMake 4.2.3, zero
+      warnings; Standalone launch-tested). NEXT: load the VST3 in Reaper and
+      wire Apply to shell out to the frozen engine.
 - [ ] **ARA2** as the production polish — whole-clip access so Apply needs no
       manual bounce/export (how Melodyne / SpectraLayers integrate). v1 can ship
       bounce-then-Apply; ARA removes the manual step. Review ARA + VST3 SDK

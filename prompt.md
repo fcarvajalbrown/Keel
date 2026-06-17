@@ -80,13 +80,29 @@ front-end on the one shared core (alongside CLI + GUI), NOT a DSP fork.
   only. Balancing stays in the standalone tool (on stems, pre-DAW) or the DAW's
   mixer. A stem-balancer plugin is a deferred follow-on. (ADR-0026, updated.)
 
-**>>> IMMEDIATE NEXT TASK: the Phase 5 spike** (the user chose docs-only this
-session). Build a minimal JUCE VST3 that compiles on this machine, loads in a DAW
-(Reaper supports ARA later), passes audio through, and drives live LUFS/TP meters,
-with **Apply wired to shell out to the Python engine**. Stage it: get the JUCE +
-CMake + MSVC build green first (that's the main risk), keep the DSP trivial
-(passthrough + meter + shell-out stub), then flesh out Apply. Confirm scope with
-the user via the blue option UI before starting.
+**>>> PHASE 5 SPIKE — BUILD-GREEN STAGE DONE (2026-06-17).** The first stage of
+the spike shipped on `main` (commit pending push): a minimal JUCE 8.0.9 plugin in
+`plugin/` that **builds green on this machine** (VST3 + Standalone, MSVC 14.50 /
+VS Community 2026 / CMake 4.2.3, JUCE via FetchContent, zero warnings from our
+sources). It does real-time **pass-through** + **live display-only meters**
+(BS.1770-4 K-weighted momentary LUFS via JUCE RBJ biquads + 4x-oversampled
+true-peak) behind the **master-only UI** from ADR-0026 (preset / LUFS / TP /
+reference+glue toggles / two meters / Apply). **Apply is a STUB** (info dialog).
+The Standalone was launch-tested (editor constructs, audio device opens, no
+crash). Scope was confirmed with the user up front: FetchContent JUCE, VST3 +
+Standalone, Apply-as-stub-first. Build/iterate via `plugin\build.ps1`; details in
+`plugin/README.md`.
+
+**>>> NEXT STAGE OF THE SPIKE (confirm scope first):**
+1. **Load the VST3 in a DAW** (Reaper) on the master bus — confirm it instantiates,
+   the editor draws, and the live meters move on playback. The build is green but
+   not yet DAW-load-verified.
+2. **Wire Apply for real:** on click, bounce the program audio to a temp WAV, shell
+   out to the **bundled frozen Keel engine** (`dist/Keel.exe` exists, 97 MB; may
+   need a headless `--master-file in.wav out.wav` entry added to gui.py/build.py),
+   read the master back. Byte-identical to `build.py`/`gui.py`; no DSP fork.
+3. Optional later: swap the C++ meter to libebur128; ARA2 to drop the manual
+   bounce. (See ROADMAP Phase 5 — spike item now `[x]`, JUCE-shell item `[~]`.)
 
 Other candidates still open (confirm direction first):
 - **Phase 4 packaging:** code-signing / notarization (needs the publication fee
