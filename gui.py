@@ -318,9 +318,16 @@ class KeelWindow(QMainWindow):
         self.glue_chk = QCheckBox("Bus glue (gentle)")
         mg.addWidget(self.glue_chk, 2, 0, 1, 2)
 
-        mg.addWidget(QLabel("Reference"), 3, 0)
+        ref_lbl = QLabel("Reference")
+        ref_tip = ("Optional. Leave blank to use Keel's default internal master "
+                   "(the current behavior). Pick a mastered WAV/FLAC and Keel "
+                   "matches its tone + loudness via Matchering instead — affects "
+                   "only this render, nothing is forced.")
+        ref_lbl.setToolTip(ref_tip)
+        mg.addWidget(ref_lbl, 3, 0)
         self.ref_edit = QLineEdit()
-        self.ref_edit.setPlaceholderText("optional WAV/FLAC master to match…")
+        self.ref_edit.setPlaceholderText("optional — blank uses Keel's default master")
+        self.ref_edit.setToolTip(ref_tip)
         ref_btn = QPushButton("Browse…")
         ref_btn.clicked.connect(self._choose_reference)
         mg.addWidget(self.ref_edit, 3, 1, 1, 2)
