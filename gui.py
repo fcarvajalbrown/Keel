@@ -34,18 +34,21 @@ import soundfile as sf
 
 try:
     from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
+    from PySide6.QtGui import QFont
     from PySide6.QtWidgets import (
         QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
         QGridLayout, QLabel, QPushButton, QSlider, QComboBox, QDoubleSpinBox,
         QCheckBox, QLineEdit, QFileDialog, QTableWidget, QTableWidgetItem,
-        QProgressBar, QPlainTextEdit, QInputDialog, QMessageBox, QGroupBox,
-        QScrollArea, QHeaderView,
+        QPlainTextEdit, QInputDialog, QMessageBox, QGroupBox,
+        QScrollArea, QHeaderView, QFrame,
     )
 except ImportError as e:  # pragma: no cover - GUI is an optional extra
     raise SystemExit(
         "PySide6 is required for the GUI. Install it with:\n"
         "    .\\setup.ps1 -Gui        (or:  pip install PySide6)"
     ) from e
+
+import gui_theme
 
 try:
     from PySide6.QtMultimedia import QAudioFormat, QAudioSink, QMediaDevices
@@ -209,7 +212,8 @@ class KeelWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Keel — automix + automaster")
-        self.resize(960, 640)
+        self.resize(1080, 780)
+        self.setMinimumSize(940, 640)
         self.setAcceptDrops(True)
         self.stems_dir = None
         self.doc = None
@@ -234,15 +238,43 @@ class KeelWindow(QMainWindow):
     # ---------------------------------------------------------------- UI build
     def _build_ui(self):
         central = QWidget()
+        central.setObjectName("root")
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
+        root.setContentsMargins(20, 18, 20, 16)
+        root.setSpacing(14)
 
-        # top: folder controls
+        # header: hull mark + wordmark + tagline
+        header = QHBoxLayout()
+        header.setSpacing(12)
+        header.addWidget(gui_theme.HullMark(40))
+        title_col = QVBoxLayout()
+        title_col.setSpacing(0)
+        wordmark = QLabel("Keel")
+        wordmark.setObjectName("wordmark")
+        wf = gui_theme.font(22, QFont.Bold)
+        wordmark.setFont(wf)
+        wordmark.setStyleSheet(f"color: {gui_theme.COLORS['teal']};")
+        tagline = QLabel("automatic mix + master")
+        tagline.setObjectName("tagline")
+        tagline.setFont(gui_theme.font(10.5))
+        title_col.addWidget(wordmark)
+        title_col.addWidget(tagline)
+        header.addLayout(title_col)
+        header.addStretch(1)
+        root.addLayout(header)
+
+        divider = QFrame()
+        divider.setObjectName("divider")
+        divider.setFixedHeight(1)
+        root.addWidget(divider)
+
+        # folder controls (drop strip)
         top = QHBoxLayout()
         self.open_btn = QPushButton("Open folder…")
         self.open_btn.clicked.connect(self._choose_folder)
         self.folder_lbl = QLabel("Drop a folder of stems here, or Open folder…")
-        self.folder_lbl.setStyleSheet("color: #888;")
+        self.folder_lbl.setObjectName("folder")
         self.save_proj_btn = QPushButton("Save project")
         self.load_proj_btn = QPushButton("Load project")
         self.save_proj_btn.clicked.connect(self._save_project)
@@ -255,10 +287,11 @@ class KeelWindow(QMainWindow):
         root.addLayout(top)
 
         mid = QHBoxLayout()
+        mid.setSpacing(14)
         root.addLayout(mid, 1)
 
         # left: stems table
-        stems_box = QGroupBox("Stems  (file -> label)")
+        stems_box = QGroupBox("STEMS  ·  FILE -> LABEL")
         sb = QVBoxLayout(stems_box)
         self.table = QTableWidget(0, 2)
         self.table.setHorizontalHeaderLabels(["file", "label"])
@@ -274,7 +307,7 @@ class KeelWindow(QMainWindow):
         mid.addWidget(stems_box, 3)
 
         # middle: balance faders
-        bal_box = QGroupBox("Balance (LU)")
+        bal_box = QGroupBox("BALANCE  ·  LU")
         bb = QVBoxLayout(bal_box)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -289,8 +322,10 @@ class KeelWindow(QMainWindow):
         right = QVBoxLayout()
         mid.addLayout(right, 4)
 
-        master_box = QGroupBox("Master")
+        master_box = QGroupBox("MASTER")
         mg = QGridLayout(master_box)
+        mg.setVerticalSpacing(10)
+        mg.setHorizontalSpacing(8)
         mg.addWidget(QLabel("Preset"), 0, 0)
         self.preset_combo = QComboBox()
         self.preset_combo.currentTextChanged.connect(self._on_preset_changed)
@@ -337,7 +372,8 @@ class KeelWindow(QMainWindow):
         right.addWidget(master_box)
 
         self.render_btn = QPushButton("Render mix + master")
-        self.render_btn.setMinimumHeight(40)
+        self.render_btn.setObjectName("primary")
+        self.render_btn.setMinimumHeight(46)
         self.render_btn.setEnabled(False)
         self.render_btn.clicked.connect(self._render)
         right.addWidget(self.render_btn)
@@ -349,33 +385,32 @@ class KeelWindow(QMainWindow):
             "only — never tone (Keel's locked scope).")
         right.addWidget(self.live_chk)
 
-        meters_box = QGroupBox("Master meters")
-        meters = QGridLayout(meters_box)
-        meters.addWidget(QLabel("LUFS"), 0, 0)
-        self.lufs_bar = QProgressBar()
-        self.lufs_bar.setRange(0, 100)
-        self.lufs_val = QLabel("–")
-        meters.addWidget(self.lufs_bar, 0, 1)
-        meters.addWidget(self.lufs_val, 0, 2)
-        meters.addWidget(QLabel("True peak"), 1, 0)
-        self.tp_bar = QProgressBar()
-        self.tp_bar.setRange(0, 100)
-        self.tp_val = QLabel("–")
-        meters.addWidget(self.tp_bar, 1, 1)
-        meters.addWidget(self.tp_val, 1, 2)
+        meters_box = QGroupBox("METERS")
+        meters = QVBoxLayout(meters_box)
+        meters.setSpacing(10)
+        self.lufs_meter = gui_theme.Meter(
+            "INTEGRATED LOUDNESS", "LUFS", -30.0, 0.0,
+            target=self.target_spin.value())
+        self.tp_meter = gui_theme.Meter(
+            "TRUE PEAK", "dBTP", -12.0, 0.0,
+            danger_above=self.tp_spin.value())
+        meters.addWidget(self.lufs_meter)
+        meters.addWidget(self.tp_meter)
         self.play_btn = QPushButton("Play master")
         self.play_btn.setToolTip(
             "Play the rendered master and drive the meters live (short-term, "
             "trailing 3 s). Display-only — does not change the render.")
         self.play_btn.setEnabled(False)
         self.play_btn.clicked.connect(self._toggle_play)
-        meters.addWidget(self.play_btn, 2, 0, 1, 3)
+        meters.addWidget(self.play_btn)
         right.addWidget(meters_box)
         right.addStretch(1)
 
         self.log = QPlainTextEdit()
+        self.log.setObjectName("log")
         self.log.setReadOnly(True)
-        self.log.setMaximumHeight(120)
+        self.log.setMaximumHeight(96)
+        self.log.setFont(gui_theme.font(10))
         root.addWidget(self.log)
 
     # ---------------------------------------------------------------- drag/drop
@@ -556,6 +591,11 @@ class KeelWindow(QMainWindow):
 
     def _on_master_edited(self, _=None):
         self._sync_preset_combo()
+        # keep the meter ticks aligned with the chosen target / ceiling
+        self.lufs_meter.target = self.target_spin.value()
+        self.tp_meter.danger_above = self.tp_spin.value()
+        self.lufs_meter.update()
+        self.tp_meter.update()
 
     def _save_preset(self):
         name, ok = QInputDialog.getText(self, "Save preset", "Preset name:")
@@ -676,14 +716,8 @@ class KeelWindow(QMainWindow):
             self._start_render(live=True)
 
     def _set_meters(self, lufs, tp):
-        def pct(v, lo, hi):
-            if v is None or not isinstance(v, (int, float)):
-                return 0
-            return int(max(0, min(100, (v - lo) / (hi - lo) * 100)))
-        self.lufs_bar.setValue(pct(lufs, -30.0, 0.0))
-        self.tp_bar.setValue(pct(tp, -12.0, 0.0))
-        self.lufs_val.setText("–" if lufs is None else f"{lufs:.2f} LUFS")
-        self.tp_val.setText("–" if tp is None else f"{tp:.2f} dBTP")
+        self.lufs_meter.set_value(lufs)
+        self.tp_meter.set_value(tp)
 
     # ---------------------------------------------------------------- playback
     def _toggle_play(self):
@@ -728,6 +762,16 @@ class KeelWindow(QMainWindow):
         super().closeEvent(event)
 
 
+def _apply_theme(app):
+    """Load the bundled font and paint the app in Keel's dark teal theme."""
+    family = gui_theme.load_fonts()
+    base = gui_theme.font(10)
+    app.setFont(base)
+    gui_theme.apply_palette(app)
+    app.setStyleSheet(gui_theme.build_stylesheet(family))
+    return family
+
+
 def _selftest():
     """Headless smoke test of the *packaged* app: build the window offscreen and
     confirm the engine is reachable, then exit. Run as `Keel.exe --selftest` in
@@ -735,9 +779,10 @@ def _selftest():
     import os
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     app = QApplication(sys.argv)
+    family = _apply_theme(app)
     KeelWindow()
     print(f"Keel selftest OK — engine {keel.__version__}, "
-          f"presets {sorted(keel.PRESETS)}")
+          f"font '{family}', presets {sorted(keel.PRESETS)}")
     app.quit()
     return 0
 
@@ -746,6 +791,7 @@ def main():
     if "--selftest" in sys.argv[1:]:
         return _selftest()
     app = QApplication(sys.argv)
+    _apply_theme(app)
     win = KeelWindow()
     win.show()
     return app.exec()

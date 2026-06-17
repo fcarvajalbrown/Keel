@@ -8,19 +8,26 @@
 # (blocked in PyInstaller 7) and penalised by macOS security scanning. Windows
 # onefile is fine. Build with:  pyinstaller Keel.spec --noconfirm
 import sys
+from pathlib import Path
 
 IS_MAC = sys.platform == "darwin"
 
 # The engine modules gui.py reaches through `import keel` (which pulls in the
 # rest). Listed explicitly so a frozen build never misses one.
 ENGINE = ["keel", "recipes", "mixer", "mastering", "meters", "build",
-          "userpresets"]
+          "userpresets", "gui_theme"]
+
+# Bundled UI assets: the Space Grotesk font (SIL OFL) + its license. gui_theme
+# resolves these via sys._MEIPASS at runtime, so they must land at assets/fonts.
+DATAS = [(str(p), "assets/fonts")
+         for p in Path("assets/fonts").glob("*.ttf")]
+DATAS += [("assets/fonts/OFL.txt", "assets/fonts")]
 
 a = Analysis(
     ["gui.py"],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=DATAS,
     hiddenimports=ENGINE,
     hookspath=[],
     runtime_hooks=[],
