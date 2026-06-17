@@ -113,7 +113,7 @@ jobs:
           # Single source of truth for the release notes (same text local + CI):
           gh release create "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "Keel ${GITHUB_REF_NAME} (pre-alpha)" \
+            --title "Keel ${GITHUB_REF_NAME} (alpha)" \
             --notes-file docs/release-notes.md \
             --prerelease \
             $files
