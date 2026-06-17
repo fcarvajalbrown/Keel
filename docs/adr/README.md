@@ -47,4 +47,5 @@ Status values: `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 - [ADR-0025](0025-gui-noncommercial-license-and-donations.md) — GUI free (non-commercial) + donations; commercial USD 20/seat
 
 ### Plugin (Phase 5)
-- [ADR-0026](0026-plugin-architecture-juce-shell.md) — Plugin is a JUCE/C++ shell that shells out to the Python engine (hybrid: live meters + offline Apply)
+- [ADR-0026](0026-plugin-architecture-juce-shell.md) — Plugin is a JUCE/C++ shell that shells out to the Python engine (hybrid: live meters + offline Apply) *(superseded by ADR-0027)*
+- [ADR-0027](0027-plugin-live-cpp-chain.md) — Plugin runs a live C++ master chain (preview) + byte-identical Python finalize; DSP sync rule

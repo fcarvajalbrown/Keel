@@ -1,8 +1,16 @@
 # ADR-0026: Phase 5 plugin is a JUCE/C++ shell that shells out to the Python engine
 
-- Status: Accepted
+- Status: Superseded by [ADR-0027](0027-plugin-live-cpp-chain.md)
 - Date: 2026-06-17
 - Deciders: Felipe Carvajal Brown
+
+> **Superseded (same day) by [ADR-0027](0027-plugin-live-cpp-chain.md).** The
+> offline-only model below (no C++ DSP; master only via shell-out on Apply) was
+> rejected after the spike: the user wants a *live*, Ozone-style master heard in
+> real time. ADR-0027 keeps the shell-out, but only for an exact-loudness
+> **Finalize**, and adds a live **C++ master chain (preview)**. The scope
+> decision (master-bus only, simpler GUI than the standalone) and the JUCE /
+> licensing choices below still stand.
 
 ## Context
 

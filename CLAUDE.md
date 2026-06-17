@@ -74,8 +74,25 @@ See `ROADMAP.md` for the phased plan and `README.md` for the user-facing story.
   `--out --name --lufs --tp --ref --mix-only --master-only`. Auto-detects labels
   -> writes/reads `keel.json` -> renders. Writes `out/REPORT.md` QC sheet.
 
-When the GUI/plugin lands, keep the engine importable as a shared library so all
-front-ends drive one core. Don't fork the DSP.
+The **CLI and GUI** drive one shared Python core (`import keel`) — keep them that
+way; don't fork the DSP for them.
+
+**The plugin (Phase 5) is the deliberate exception (ADR-0027).** To get a live,
+Ozone-style master you hear and tweak in real time, its live chain is a **C++
+port** of the real-time master stages (a *faithful preview*, approximate
+loudness). The byte-identical, deterministic master is still produced by the
+Python engine on **Finalize** (the plugin shells out to the bundled frozen
+engine — same output as `build.py`/`gui.py`). So the C++ preview and `mastering.py`
+are now **two disconnected implementations of the same master character.**
+
+> **DSP SYNC RULE (load-bearing).** Whenever you change the master *math* in the
+> Python engine — `mastering.py` (HPF/shelf/air/glue, soft-clip curve, limiter,
+> pre-/exact-normalize), `recipes.py` `DEFAULT_MASTER`/`PRESETS`, the -20 LUFS
+> anchor, or the -14/-1 dBTP targets — you **must mirror the same change into the
+> plugin's C++ live chain** (`plugin/Source/`), or the live preview will drift
+> from the delivered (Finalized) file. They are no longer auto-synced. Treat the
+> Python engine as the reference and re-check the C++ preview against it (null /
+> A-B the same file) after any DSP change. Note it in the commit.
 
 ## Locked DSP decisions (keep unless deliberately changing)
 
@@ -88,6 +105,8 @@ front-ends drive one core. Don't fork the DSP.
   toward target -> oversampled tanh soft-clip (rounds sharpest transients) -> 4x
   oversampled pedalboard limiter (true-peak) -> normalize to exact LUFS -> TP
   safety. Validated: at -14 it barely limits, leaving ~3-4 dB true-peak headroom.
+  **If you change any of this math, also update the plugin's C++ live preview —
+  see the DSP SYNC RULE above (ADR-0027).**
 
 **Research-before-tweak:** before changing the mixing/mastering *approach*
 (loudness target, limiter design, reference-matching), do ~5 web searches on the

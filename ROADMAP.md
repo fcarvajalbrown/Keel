@@ -129,43 +129,56 @@ a tone-shaping suite. See "Non-goals" at the bottom.
       `import keel` is the single entry point every front-end drives. No DSP fork.
 
 ## Phase 5 — VST / plugin
-Architecture decided (ADR-0026): a **thin JUCE/C++ shell that shells out to the
-existing Python Keel engine** — the plugin is a third front-end on the one shared
-core (alongside CLI + GUI), NOT a DSP fork. The `.vst3` the DAW loads is C++
-(UI + real-time pass-through + live meters); on **Apply** it bounces to a temp
-WAV, runs the bundled frozen Keel engine as a child process, and reads the
-mastered audio back — byte-identical to `build.py` / `gui.py` (-14 LUFS, -1 dBTP,
-deterministic). No system Python needed (the frozen engine is bundled).
-In-DAW model: **hybrid** — real-time live meters + an **offline "Apply" master**
-(exact integrated LUFS is whole-program, so the master is inherently offline, like
-HoRNet ZeroLoud / Youlean). Toolchain confirmed on the dev machine: MSVC 14.50 +
-cmake 4.2.3 + VS Community 2026.
+Architecture decided (**ADR-0027**, supersedes ADR-0026): the plugin runs a
+**live C++ master chain (a faithful preview)** plus a **byte-identical Python
+Finalize** — a third front-end whose live chain is the ONE deliberate DSP fork
+(the CLI + GUI still share the Python core). The `.vst3` the DAW loads is C++ and
+**processes audio live** (tone -> soft-clip -> true-peak limiter, with live
+LUFS/TP meters), so you hear the Keel master in real time and tweak it like Ozone.
+Loudness is **approximate live** (limiter/gain targets ~-14, verify on the meter);
+**exact -14 LUFS / -1 dBTP is applied on Finalize**, which bounces to a temp WAV
+and shells out to the bundled frozen Python engine — byte-identical to `build.py`
+/ `gui.py`, deterministic (no system Python needed). Why split: exact integrated
+LUFS is whole-program, so it is inherently offline; the tone/clip/limit stages are
+real-time-capable and run live. **DSP SYNC RULE:** the C++ live chain and
+`mastering.py` are two disconnected impls of the same master character — any change
+to the Python master math must be mirrored into `plugin/Source/` and re-A/B'd
+(CLAUDE.md). Toolchain confirmed on the dev machine: MSVC 14.50 + cmake 4.2.3 +
+VS Community 2026.
 - [ ] **Master-bus plugin first** (clearest fit); stem balancer as a follow-on.
       Scope = **master stage only**: inserted on the master bus the signal is one
       summed stereo mix, and a stereo master cannot re-balance instruments
       (ADR-0001) — so the plugin masters, it does not mix. Its GUI is **distinct
       from and much simpler than** the standalone GUI: it drops the file->label
       table and balance faders, keeping only preset/LUFS/TP + optional
-      reference/glue + live meters + Apply (ADR-0026). Balancing stays in the
+      reference/glue + live meters + Finalize (ADR-0027). Balancing stays in the
       standalone tool (run on stems before the DAW) or the DAW's own mixer.
-- [~] Reuse `mastering.py` DSP: via **shell-out to the frozen engine** (offline
-      Apply), not a C++ re-port. A C++ DSP port is explicitly deferred and would
-      only be revisited for a zero-Python-runtime build, validated against the
-      Python reference (ADR-0026).
-- [~] JUCE/C++ shell: DAW integration, UI, real-time pass-through, live LUFS/TP
-      meters (C++ BS.1770 / true-peak — display-only), audio capture, and the
-      subprocess orchestration for Apply. Spike done (`plugin/`): VST3 +
-      Standalone build green, pass-through + K-weighted momentary LUFS + 4x
-      true-peak meters + master-only UI. STILL OPEN: real DAW load test, audio
-      capture, and the Apply subprocess orchestration (libebur128 swap optional).
+- [ ] **Live C++ master chain (preview)** — port `mastering.py`'s real-time stages
+      (HPF 28 / low-shelf / air / glue comp -> oversampled tanh soft-clip -> 4x
+      oversampled true-peak limiter) to C++ so the plugin processes audio live.
+      Approximate loudness live; NOT the exact-LUFS normalize (Finalize owns it).
+      Validate as a faithful preview by A/B against the Python reference (won't
+      null exactly — pedalboard limiter). This is the DSP fork the SYNC RULE
+      governs (ADR-0027, amends ADR-0013).
+- [~] **Finalize** = byte-identical master via **shell-out to the frozen Python
+      engine** (offline, whole-program exact -14 / -1 dBTP). Keeps the deterministic
+      "identical across front-ends" guarantee for delivered files; the spike's
+      Apply stub becomes this. Needs a headless `--master-file IN OUT` entry on the
+      engine + the subprocess orchestration. (ADR-0027, was ADR-0026's Apply.)
+- [~] JUCE/C++ shell: DAW integration, UI, live LUFS/TP meters (C++ BS.1770 /
+      true-peak), audio capture, Finalize subprocess. Spike done (`plugin/`): VST3
+      + Standalone build green, **pass-through** (live chain not yet ported) + K-
+      weighted momentary LUFS + 4x true-peak meters + master-only UI, auto-installs
+      to the per-user VST3 folder. Loaded + confirmed in Mixcraft. STILL OPEN: the
+      live C++ chain, real audio capture, and the Finalize subprocess.
 - [x] **Spike:** a JUCE VST3/Standalone that builds on this machine, passes
-      audio, and drives live meters, Apply stubbed. Done 2026-06-17 (`plugin/`,
+      audio, and drives live meters, Finalize stubbed. Done 2026-06-17 (`plugin/`,
       JUCE 8.0.9 via FetchContent, MSVC 14.50 / VS 2026 / CMake 4.2.3, zero
-      warnings; Standalone launch-tested). NEXT: load the VST3 in Reaper and
-      wire Apply to shell out to the frozen engine.
-- [ ] **ARA2** as the production polish — whole-clip access so Apply needs no
+      warnings; Standalone launch-tested; VST3 loaded in Mixcraft). NEXT: port the
+      live C++ master chain, then wire Finalize to the frozen engine.
+- [ ] **ARA2** as the production polish — whole-clip access so Finalize needs no
       manual bounce/export (how Melodyne / SpectraLayers integrate). v1 can ship
-      bounce-then-Apply; ARA removes the manual step. Review ARA + VST3 SDK
+      bounce-then-Finalize; ARA removes the manual step. Review ARA + VST3 SDK
       license terms before public distribution.
 - [ ] Plugin packaging (bundle the frozen engine; CI builds engine then plugin),
       presets, and parameter automation. Code-signing / notarization shared with

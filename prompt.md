@@ -44,65 +44,63 @@ Phase 4 GUI polish, focused on getting Keel out the door:
   `out/` audio/video are gitignored (not committed). The asset generators are
   tracked tools; rerunning them costs no Claude tokens.
 
-## Phase 5 plugin — architecture DECIDED (2026-06-17), spike is next
+## Phase 5 plugin — architecture PIVOTED to live (2026-06-17, ADR-0027)
 
-This session locked the Phase 5 plugin architecture with the user (**ADR-0026**,
-ROADMAP Phase 5 updated). The decision, in one line: the plugin is a **thin
-JUCE/C++ shell that shells out to the existing Python Keel engine** — a third
-front-end on the one shared core (alongside CLI + GUI), NOT a DSP fork.
-- **Model = hybrid:** real-time pass-through + live LUFS/TP meters in C++, plus an
-  **offline "Apply" master**. Exact integrated LUFS is whole-program, so the
-  master is inherently offline (like HoRNet ZeroLoud / Youlean) — confirmed by
-  research, do not try to make it a real-time gain rider (that breaks locked -14
-  LUFS, ADR-0003).
-- **Apply mechanism = shell out to Python.** On Apply, the C++ shell bounces to a
-  temp WAV, runs the **bundled frozen Keel engine** as a child process, reads the
-  mastered audio back — byte-identical to `build.py`/`gui.py`. No system Python
-  needed; no DSP re-port. A C++ DSP port is explicitly DEFERRED (only for a future
-  zero-Python-runtime build, and only validated against the Python reference).
-- **Rejected:** VENOM (Python-in-JUCE, GPLv3 kills the commercial license) and an
-  embedded Python interpreter (not RT-safe, 100 MB+). Pedalboard is a host, not a
-  way to ship a plugin.
-- **Tech confirmed present on the dev machine:** MSVC 14.50 + cmake 4.2.3 + VS
-  Community 2026 + git. A JUCE VST3 spike is buildable here.
-- **Licensing:** JUCE under AGPLv3 for the open plugin (engine already AGPL); JUCE
-  Starter free under 20k/yr (incl. donations), then Indie USD 800 perpetual. Same
-  hybrid product model as the GUI (ADR-0025). Review ARA + VST3 SDK terms before
-  public distribution.
-- **ARA2** is the production polish (whole-clip access, no manual bounce on Apply);
-  v1 can ship bounce-then-Apply first.
-- **Scope = master-bus processor only (master stage, no mix stage).** Inserted on
-  the master bus the signal is one summed stereo mix; a stereo master cannot
-  re-balance instruments (ADR-0001), so the plugin masters, it does not mix. Its
-  GUI is **distinct from and much simpler than** the standalone `gui.py`: it drops
-  the file->label table and balance faders, keeping only preset/LUFS/TP + optional
-  reference/glue + live meters + Apply. Same `mastering.py` brain, master half
-  only. Balancing stays in the standalone tool (on stems, pre-DAW) or the DAW's
-  mixer. A stem-balancer plugin is a deferred follow-on. (ADR-0026, updated.)
+The spike's build-green stage shipped, the user loaded it in Mixcraft, and then
+**rejected the offline-only feel** — they want a **live, Ozone-style master** you
+hear and tweak in real time. So the architecture was reworked with the user
+(**ADR-0027 supersedes ADR-0026**, with ~5 cited research sources). One line: the
+plugin runs a **live C++ master chain (a faithful PREVIEW)** + a **byte-identical
+Python Finalize**.
+- **Live (C++):** port `mastering.py`'s real-time stages — tone (HPF 28 /
+  low-shelf / air / glue comp) -> oversampled tanh soft-clip -> 4x oversampled
+  true-peak limiter — into C++ so audio is processed LIVE; you hear the Keel master
+  and tweak it, meters moving. This is a **preview** of the master character.
+- **Loudness:** **approximate live** (limiter/gain targets ~-14, verify on the
+  meter, Ozone-style — research confirms exact integrated LUFS is whole-program so
+  can't be live). **Exact -14 LUFS / -1 dBTP only on Finalize.** Amends ADR-0003
+  for the plugin only; CLI + GUI still guarantee exact -14 always.
+- **Finalize (Python = authoritative):** bounce to temp WAV -> shell out to the
+  **bundled frozen Keel engine** -> read back. **Byte-identical** to `build.py` /
+  `gui.py`, deterministic. Keeps Keel's "identical across front-ends" promise for
+  *delivered* files. (This is ADR-0026's old shell-out mechanism, now only for the
+  final loudness lock, not for everything.)
+- **>>> DSP SYNC RULE (load-bearing, now in CLAUDE.md):** the C++ live chain and
+  `mastering.py` are **two disconnected impls of the same master character.** Any
+  change to the Python master math (`mastering.py`, `recipes.DEFAULT_MASTER` /
+  `PRESETS`, the -20 LUFS anchor, -14/-1 dBTP) **must be mirrored into the C++
+  chain** (`plugin/Source/`) and re-A/B'd against the Python reference, or the
+  preview drifts from the Finalized file. They no longer auto-sync.
+- **Faithful, not byte-identical:** the C++ limiter ≠ pedalboard's, so the preview
+  sounds *close* but won't null exactly — validate by A/B, accept "good enough."
+- **Scope unchanged from ADR-0026:** master-bus only (no mix stage; a stereo
+  master can't re-balance, ADR-0001); GUI simpler than `gui.py` (no file->label
+  table / balance faders — preset/LUFS/TP + reference/glue + meters + Finalize).
+  Licensing unchanged (JUCE AGPLv3 / Starter; review VST3 + ARA SDK terms). ARA2
+  is the later polish (whole-clip Finalize, no manual bounce).
 
-**>>> PHASE 5 SPIKE — BUILD-GREEN STAGE DONE (2026-06-17).** The first stage of
-the spike shipped on `main` (commit pending push): a minimal JUCE 8.0.9 plugin in
-`plugin/` that **builds green on this machine** (VST3 + Standalone, MSVC 14.50 /
-VS Community 2026 / CMake 4.2.3, JUCE via FetchContent, zero warnings from our
-sources). It does real-time **pass-through** + **live display-only meters**
-(BS.1770-4 K-weighted momentary LUFS via JUCE RBJ biquads + 4x-oversampled
-true-peak) behind the **master-only UI** from ADR-0026 (preset / LUFS / TP /
-reference+glue toggles / two meters / Apply). **Apply is a STUB** (info dialog).
-The Standalone was launch-tested (editor constructs, audio device opens, no
-crash). Scope was confirmed with the user up front: FetchContent JUCE, VST3 +
-Standalone, Apply-as-stub-first. Build/iterate via `plugin\build.ps1`; details in
-`plugin/README.md`.
+**>>> SPIKE STATE (shipped on `main`, 2026-06-17).** `plugin/` builds green (VST3
++ Standalone, JUCE 8.0.9 via FetchContent, MSVC 14.50 / VS 2026 / CMake 4.2.3,
+zero warnings), **auto-installs** the VST3 to the per-user folder
+(`%LOCALAPPDATA%\Programs\Common\VST3`, `COPY_PLUGIN_AFTER_BUILD`), and was
+**loaded + confirmed in Mixcraft**. Currently it is still **pass-through** (live
+chain not yet ported) + live K-weighted momentary LUFS + 4x true-peak meters +
+the master-only UI; **Finalize is a STUB** (info dialog). Build/iterate via
+`plugin\build.ps1`; details in `plugin/README.md`.
 
-**>>> NEXT STAGE OF THE SPIKE (confirm scope first):**
-1. **Load the VST3 in a DAW** (Reaper) on the master bus — confirm it instantiates,
-   the editor draws, and the live meters move on playback. The build is green but
-   not yet DAW-load-verified.
-2. **Wire Apply for real:** on click, bounce the program audio to a temp WAV, shell
-   out to the **bundled frozen Keel engine** (`dist/Keel.exe` exists, 97 MB; may
-   need a headless `--master-file in.wav out.wav` entry added to gui.py/build.py),
-   read the master back. Byte-identical to `build.py`/`gui.py`; no DSP fork.
-3. Optional later: swap the C++ meter to libebur128; ARA2 to drop the manual
-   bounce. (See ROADMAP Phase 5 — spike item now `[x]`, JUCE-shell item `[~]`.)
+**>>> NEXT TASK — implement the live model (confirm scope first):**
+1. **Port the live C++ master chain** into `plugin/Source/` (replace the
+   pass-through): tone -> soft-clip -> 4x true-peak limiter, matching
+   `mastering.py` stage-for-stage as closely as JUCE allows (NOT the exact-LUFS
+   normalize — Finalize owns that). A/B against the Python reference on a real
+   file. Mind the DSP SYNC RULE. JUCE `dsp::` has the building blocks (IIR for
+   tone, Oversampling already wired for TP, a limiter or hand-rolled look-ahead).
+2. **Wire Finalize for real:** add a headless `--master-file IN OUT` entry to the
+   engine (build.py masters `out/<name>_mix.wav` only today; it needs a
+   one-file-in/one-file-out path that skips stems/labels), re-freeze it, then have
+   the plugin bounce -> run it -> read back. (`dist/Keel.exe` is the frozen GUI;
+   decide: add the flag there and re-freeze, or freeze `build.py` separately.)
+3. Optional later: libebur128 meter; ARA2 to drop the manual bounce.
 
 Other candidates still open (confirm direction first):
 - **Phase 4 packaging:** code-signing / notarization (needs the publication fee
