@@ -44,70 +44,56 @@ Phase 4 GUI polish, focused on getting Keel out the door:
   `out/` audio/video are gitignored (not committed). The asset generators are
   tracked tools; rerunning them costs no Claude tokens.
 
-## Phase 5 plugin — architecture PIVOTED to live (2026-06-17, ADR-0027)
+## Phase 5 plugin — SELF-CONTAINED real-time master (2026-06-17, ADR-0029)
 
-The spike's build-green stage shipped, the user loaded it in Mixcraft, and then
-**rejected the offline-only feel** — they want a **live, Ozone-style master** you
-hear and tweak in real time. So the architecture was reworked with the user
-(**ADR-0027 supersedes ADR-0026**, with ~5 cited research sources). One line: the
-plugin runs a **live C++ master chain (a faithful PREVIEW)** + a **byte-identical
-Python Finalize**.
-- **Live (C++):** port `mastering.py`'s real-time stages — tone (HPF 28 /
-  low-shelf / air / glue comp) -> oversampled tanh soft-clip -> 4x oversampled
-  true-peak limiter — into C++ so audio is processed LIVE; you hear the Keel master
-  and tweak it, meters moving. This is a **preview** of the master character.
-- **Loudness:** **approximate live** (limiter/gain targets ~-14, verify on the
-  meter, Ozone-style — research confirms exact integrated LUFS is whole-program so
-  can't be live). **Exact -14 LUFS / -1 dBTP only on Finalize.** Amends ADR-0003
-  for the plugin only; CLI + GUI still guarantee exact -14 always.
-- **Finalize (Python = authoritative):** bounce to temp WAV -> shell out to the
-  **bundled frozen Keel engine** -> read back. **Byte-identical** to `build.py` /
-  `gui.py`, deterministic. Keeps Keel's "identical across front-ends" promise for
-  *delivered* files. (This is ADR-0026's old shell-out mechanism, now only for the
-  final loudness lock, not for everything.)
-- **>>> DSP SYNC RULE (load-bearing, now in CLAUDE.md):** the C++ live chain and
+History: ADR-0026 (offline shell-out) -> ADR-0027 (live C++ preview + Python
+**Finalize** for the exact-loudness file) -> **ADR-0029 (current): drop Finalize;
+the plugin is a self-contained real-time master.** The user observed that the live
+chain already masters and a DAW export bakes it in, so the offline Finalize was
+redundant; and for streaming, services re-normalize loudness anyway while the TP
+ceiling — the part that matters — is already enforced live by the limiter.
+- **Live (C++), faithful port of `mastering.py`:** tone (HPF 28 / low-shelf +1\@110
+  / air +1.5\@9k / glue comp -14,1.6:1) -> static **Makeup** gain -> oversampled
+  tanh soft-clip -> 4x oversampled true-peak limiter. You hear the Keel master and
+  tweak it; meters read the OUTPUT. Built from the same `juce::dsp` blocks
+  pedalboard wraps (close, but the C++ limiter won't null pedalboard's).
+- **Loudness = approximate, MANUAL.** A **static** Makeup gain (param `makeup`,
+  -12..+24 dB) drives the chain; the user raises it until the live LUFS meter sits
+  at target. Static (not adaptive) so playback and a DAW bounce are identical — no
+  intro ramp. `lufs`/preset is now just the meter's target reference. TP ceiling
+  enforced live -> exports are TP-safe.
+- **Delivery = DAW export** with the plugin active. **No Finalize, no bundled
+  engine, no shell-out.** Exact -14 LUFS / -1 dBTP byte-identical files remain
+  available only via the **CLI/GUI** (the Python engine) for anyone who needs a
+  guaranteed spec. Amends ADR-0003 + ADR-0013 for the plugin.
+- **>>> DSP SYNC RULE (load-bearing, in CLAUDE.md):** the C++ chain and
   `mastering.py` are **two disconnected impls of the same master character.** Any
   change to the Python master math (`mastering.py`, `recipes.DEFAULT_MASTER` /
-  `PRESETS`, the -20 LUFS anchor, -14/-1 dBTP) **must be mirrored into the C++
-  chain** (`plugin/Source/`) and re-A/B'd against the Python reference, or the
-  preview drifts from the Finalized file. They no longer auto-sync.
-- **Faithful, not byte-identical:** the C++ limiter ≠ pedalboard's, so the preview
-  sounds *close* but won't null exactly — validate by A/B, accept "good enough."
-- **Scope unchanged from ADR-0026:** master-bus only (no mix stage; a stereo
-  master can't re-balance, ADR-0001); GUI simpler than `gui.py` (no file->label
-  table / balance faders — preset/LUFS/TP + reference/glue + meters + Finalize).
-  Licensing unchanged (JUCE AGPLv3 / Starter; review VST3 + ARA SDK terms). ARA2
-  is the later polish (whole-clip Finalize, no manual bounce).
+  `PRESETS`, -20 LUFS anchor, -14/-1 dBTP) **must be mirrored into the C++ chain**
+  (`plugin/Source/`) and re-A/B'd, or the plugin drifts from the CLI/GUI master.
+- **Scope unchanged:** master-bus only (a stereo master can't re-balance, ADR-0001);
+  UI simpler than `gui.py` (no file->label table / balance faders — preset / LUFS
+  ref / TP / Makeup / reference / glue + the two meters). Licensing unchanged (JUCE
+  AGPLv3 / Starter; review VST3 SDK terms).
 
-**>>> SPIKE STATE (on `main`, 2026-06-17).** `plugin/` builds green (VST3 +
-Standalone, JUCE 8.0.9 via FetchContent, MSVC 14.50 / VS 2026 / CMake 4.2.3,
-zero warnings), **auto-installs** the VST3 to the per-user folder
-(`%LOCALAPPDATA%\Programs\Common\VST3`, `COPY_PLUGIN_AFTER_BUILD`), and was
-**loaded + confirmed in Mixcraft**.
+**>>> STATE (on `main`, 2026-06-17).** `plugin/` builds green (VST3 + Standalone,
+JUCE 8.0.9, MSVC 14.50 / VS 2026 / CMake 4.2.3, zero warnings), **auto-installs**
+to `%LOCALAPPDATA%\Programs\Common\VST3`, loaded + confirmed in Mixcraft. The live
+chain is ported and the Finalize stub is **removed** (now self-contained per
+ADR-0029); Makeup knob added. Build/iterate via `plugin\build.ps1`; details in
+`plugin/README.md`.
 
-**>>> LIVE CHAIN PORTED (2026-06-17).** Task 1 below is DONE: `plugin/Source/`
-no longer passes through — it runs the **live C++ master chain** (faithful preview
-per ADR-0027): tone (HPF 28 / low-shelf +1\@110 / air +1.5\@9k / glue comp
--14,1.6:1) -> **Ozone-style auto makeup** (slow K-weighted loudness estimate ->
-heavily-smoothed gain toward the target LUFS, standing in for Python's
-whole-program pre-normalize) -> oversampled tanh soft-clip -> 4x oversampled
-true-peak limiter. LUFS/TP sliders retarget it live; the two meters now read the
-chain OUTPUT. Built from the same `juce::dsp` blocks pedalboard wraps (so it ports
-closely; the limiter won't null pedalboard's). Glue comp is always-on (faithful to
-`mastering.py`); the UI "Bus glue" toggle isn't wired to the live chain yet.
-**Finalize is still a STUB** (info dialog). **PENDING: by-ear A/B** of the preview
-vs a `build.py` render of the same audio (expect close, not identical). Mind the
-DSP SYNC RULE on any master-math change. Build/iterate via `plugin\build.ps1`;
-details in `plugin/README.md`.
-
-**>>> NEXT TASK — wire Finalize (confirm scope first):**
-1. ~~Port the live C++ master chain~~ **DONE** (see LIVE CHAIN PORTED above).
-2. **Wire Finalize for real:** add a headless `--master-file IN OUT` entry to the
-   engine (build.py masters `out/<name>_mix.wav` only today; it needs a
-   one-file-in/one-file-out path that skips stems/labels), re-freeze it, then have
-   the plugin bounce -> run it -> read back. (`dist/Keel.exe` is the frozen GUI;
-   decide: add the flag there and re-freeze, or freeze `build.py` separately.)
-3. Optional later: libebur128 meter; ARA2 to drop the manual bounce.
+**>>> NEXT TASKS:**
+1. **Match the standalone visual language** in the plugin UI (IN PROGRESS this
+   session). The Python GUI theme was refreshed — see `gui_theme.py`: teal palette
+   (`#27D2C0` -> `#0C8C81`), Space Grotesk font (`assets/fonts/`), card panels,
+   the gradient `Meter` (target/ceiling ticks + big readout), the `HullMark` logo.
+   Port that look into `plugin/Source/PluginEditor` (JUCE LookAndFeel + a custom
+   meter component; embed the TTFs via JUCE binary data).
+2. **By-ear A/B** the plugin master vs a `build.py` render of the same audio
+   (expect close, not identical).
+3. Optional later: wire the "Bus glue" / "Reference" toggles into the live chain;
+   libebur128 meter.
 
 Other candidates still open (confirm direction first):
 - **Phase 4 packaging:** code-signing / notarization (needs the publication fee

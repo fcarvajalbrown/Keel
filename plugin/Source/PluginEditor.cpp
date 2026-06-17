@@ -28,7 +28,7 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     titleLabel.setColour (juce::Label::textColourId, juce::Colours::white);
     addAndMakeVisible (titleLabel);
 
-    subtitleLabel.setText ("live master preview (master bus)", juce::dontSendNotification);
+    subtitleLabel.setText ("self-contained master (master bus)", juce::dontSendNotification);
     subtitleLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible (subtitleLabel);
 
@@ -58,6 +58,14 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     addAndMakeVisible (tpSlider);
     tpAttachment = std::make_unique<SliderAttachment> (apvts, "tp", tpSlider);
 
+    // --- Makeup (drive into the clip/limiter) ---
+    makeupLabel.setText ("Makeup (dB)", juce::dontSendNotification);
+    addAndMakeVisible (makeupLabel);
+    makeupSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    makeupSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 64, 20);
+    addAndMakeVisible (makeupSlider);
+    makeupAttachment = std::make_unique<SliderAttachment> (apvts, "makeup", makeupSlider);
+
     // --- Optional toggles ---
     addAndMakeVisible (referenceToggle);
     addAndMakeVisible (glueToggle);
@@ -75,28 +83,16 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     tpMeterLabel.setColour (juce::Label::textColourId, juce::Colours::aqua);
     addAndMakeVisible (tpMeterLabel);
 
-    // --- Apply (stub) ---
-    addAndMakeVisible (applyButton);
-    applyButton.onClick = [this]
-    {
-        juce::AlertWindow::showMessageBoxAsync (
-            juce::MessageBoxIconType::InfoIcon, "Finalize (not wired yet)",
-            "What you hear now is the LIVE C++ master preview (faithful, "
-            "approximate loudness).\n\n"
-            "Finalize is still a stub. The shipped plugin will bounce the program "
-            "audio to a temp WAV, run the bundled frozen Keel engine to master it "
-            "(exact -14 LUFS, -1 dBTP, deterministic -- byte-identical to build.py "
-            "/ gui.py), and read the result back. Same shared core; the DSP is not "
-            "forked. (ADR-0027)");
-    };
+    // --- Export note (no Finalize: this IS the master) ---
+    exportNote.setText ("Self-contained master. Set Makeup so the LUFS meter sits "
+                        "at target, then export from your DAW with this active.",
+                        juce::dontSendNotification);
+    exportNote.setColour (juce::Label::textColourId, juce::Colours::grey);
+    exportNote.setJustificationType (juce::Justification::centred);
+    exportNote.setMinimumHorizontalScale (1.0f);
+    addAndMakeVisible (exportNote);
 
-    applyNote.setText ("Live preview is active. Finalize locks exact loudness (stub).",
-                       juce::dontSendNotification);
-    applyNote.setColour (juce::Label::textColourId, juce::Colours::grey);
-    applyNote.setJustificationType (juce::Justification::centred);
-    addAndMakeVisible (applyNote);
-
-    setSize (420, 360);
+    setSize (420, 400);
     startTimerHz (30);
 }
 
@@ -178,6 +174,11 @@ void KeelAudioProcessorEditor::resized()
     }
     {
         auto a = row (24);
+        makeupLabel.setBounds (a.removeFromLeft (120));
+        makeupSlider.setBounds (a);
+    }
+    {
+        auto a = row (24);
         referenceToggle.setBounds (a.removeFromLeft (160));
         glueToggle.setBounds (a);
     }
@@ -188,6 +189,5 @@ void KeelAudioProcessorEditor::resized()
     tpMeterLabel.setBounds (meters);
 
     r.removeFromTop (8);
-    applyButton.setBounds (r.removeFromTop (32).reduced (40, 0));
-    applyNote.setBounds (r.removeFromTop (20));
+    exportNote.setBounds (r.removeFromTop (40));
 }

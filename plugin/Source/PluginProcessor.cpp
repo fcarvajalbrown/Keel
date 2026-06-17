@@ -30,10 +30,6 @@ namespace
     constexpr float  kCompReleaseMs= 250.0f;
     constexpr float  kLimReleaseMs = 120.0f;  // matches pedalboard Limiter
 
-    constexpr double kMakeupTauSec = 3.0;     // slow loudness window for auto makeup
-    constexpr float  kMakeupMaxDb  = 24.0f;   // clamp makeup so silence can't blow up
-    constexpr double kMakeupFloorMs = 1.0e-9; // below this energy, hold the gain
-
     inline double dbToGain (double db) { return std::pow (10.0, db / 20.0); }
 }
 
@@ -62,6 +58,11 @@ KeelAudioProcessor::makeParameterLayout()
     layout.add (std::make_unique<AudioParameterFloat> (
         ParameterID { "tp", 1 }, "True-Peak Ceiling",
         NormalisableRange<float> (-3.0f, 0.0f, 0.1f), -1.0f));
+
+    // Static drive into the clip/limiter -- you set it by ear against the meter.
+    layout.add (std::make_unique<AudioParameterFloat> (
+        ParameterID { "makeup", 1 }, "Makeup",
+        NormalisableRange<float> (-12.0f, 24.0f, 0.1f), 0.0f));
 
     layout.add (std::make_unique<AudioParameterBool> (
         ParameterID { "reference", 1 }, "Use Reference", false));
@@ -132,10 +133,7 @@ void KeelAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
         hpf[ch].coefficients     = hpfCoef;
         loShelf[ch].coefficients = loCoef;
         hiShelf[ch].coefficients = airCoef;
-        // detector reuses the same K-weighting as the meter (high-shelf + RLB HP)
-        detShelf[ch].coefficients    = shelf;
-        detHighpass[ch].coefficients = hp;
-        for (auto* f : { &hpf[ch], &loShelf[ch], &hiShelf[ch], &detShelf[ch], &detHighpass[ch] })
+        for (auto* f : { &hpf[ch], &loShelf[ch], &hiShelf[ch] })
         {
             f->prepare (monoSpec);
             f->reset();
@@ -161,10 +159,11 @@ void KeelAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     processOversampler->initProcessing (block);
     setLatencySamples ((int) std::round (processOversampler->getLatencyInSamples()));
 
-    // Auto-makeup: start at unity, smooth gain changes over 200 ms to kill zipper.
-    detEmaMeanSq[0] = detEmaMeanSq[1] = 0.0;
-    makeupGain.reset (currentSampleRate, 0.2);
-    makeupGain.setCurrentAndTargetValue (1.0f);
+    // Static makeup: declick knob drags over 30 ms; start AT the set value so a
+    // fresh render has no ramp.
+    makeupGain.reset (currentSampleRate, 0.03);
+    const float makeupDb0 = apvts.getRawParameterValue ("makeup")->load();
+    makeupGain.setCurrentAndTargetValue ((float) dbToGain (makeupDb0));
 
     resetMeters();
 }
@@ -186,8 +185,8 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const int numCh = juce::jmin (buffer.getNumChannels(), 2);
     const int numSamples = buffer.getNumSamples();
 
-    const float targetLufs = apvts.getRawParameterValue ("lufs")->load();
-    const float tpCeilDb    = apvts.getRawParameterValue ("tp")->load();
+    const float tpCeilDb  = apvts.getRawParameterValue ("tp")->load();
+    const float makeupDb  = apvts.getRawParameterValue ("makeup")->load();
 
     // ============================ LIVE MASTER CHAIN ============================
     // A faithful preview of mastering.py (ADR-0027). Audio IS altered here; the
@@ -211,40 +210,12 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         glueComp.process (juce::dsp::ProcessContextReplacing<float> (toneBlock));
     }
 
-    // 2) Auto makeup (Ozone-style): measure a slow K-weighted loudness of the
-    //    post-tone signal and ramp a heavily-smoothed gain toward the target.
-    //    Stands in for mastering.py's whole-program pre-normalize.
+    // 2) Static makeup: drive the post-tone signal into the clip/limiter by the
+    //    user-set amount (declicked). Stands in for mastering.py's pre-normalize;
+    //    static, so playback and a DAW bounce are identical (no intro ramp).
     if (numSamples > 0)
     {
-        double sumSq[2] = { 0.0, 0.0 };
-        for (int ch = 0; ch < numCh; ++ch)
-        {
-            const float* in = buffer.getReadPointer (ch);
-            double acc = 0.0;
-            for (int i = 0; i < numSamples; ++i)
-            {
-                float s = detShelf[ch].processSample (in[i]);
-                s = detHighpass[ch].processSample (s);
-                acc += (double) s * (double) s;
-            }
-            sumSq[ch] = acc;
-        }
-        const double blockDur = numSamples / currentSampleRate;
-        const double alpha = 1.0 - std::exp (-blockDur / kMakeupTauSec);
-        for (int ch = 0; ch < 2; ++ch)
-        {
-            const double meanSq = ch < numCh ? sumSq[ch] / numSamples : 0.0;
-            detEmaMeanSq[ch] += (meanSq - detEmaMeanSq[ch]) * alpha;
-        }
-        const double zSum = detEmaMeanSq[0] + detEmaMeanSq[1];
-        if (zSum > kMakeupFloorMs)
-        {
-            const double loud = -0.691 + 10.0 * std::log10 (zSum);
-            const float gainDb = juce::jlimit (-kMakeupMaxDb, kMakeupMaxDb,
-                                               (float) (targetLufs - loud));
-            makeupGain.setTargetValue ((float) dbToGain (gainDb));
-        }
-
+        makeupGain.setTargetValue ((float) dbToGain (makeupDb));
         for (int i = 0; i < numSamples; ++i)
         {
             const float g = makeupGain.getNextValue();

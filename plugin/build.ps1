@@ -5,7 +5,7 @@
 #   .\build.ps1 -Clean     # wipe the build dir first
 #
 # Requires: CMake >= 3.22, Visual Studio 2026 (MSVC), git, and internet on the
-# first run (CMake FetchContent pulls JUCE 8.0.9). See ADR-0026.
+# first run (CMake FetchContent pulls JUCE 8.0.9). See ADR-0029.
 
 param(
     [switch]$Debug,

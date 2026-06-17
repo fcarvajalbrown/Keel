@@ -1,53 +1,50 @@
 # Keel plugin (Phase 5)
 
 A JUCE/C++ master-bus plugin for Keel — a third front-end alongside the CLI
-(`build.py`) and standalone GUI (`gui.py`). It runs a **live C++ master chain (a
-faithful PREVIEW)** in real time, and delivers the **byte-identical master from
-the Python engine on Finalize**. See
-[ADR-0027](../docs/adr/0027-plugin-live-cpp-chain.md) (supersedes ADR-0026).
+(`build.py`) and standalone GUI (`gui.py`). It is a **self-contained real-time
+master**: it runs Keel's master chain live in C++, and you deliver by exporting
+from your DAW with it active. There is no offline step. See
+[ADR-0029](../docs/adr/0029-plugin-self-contained-master.md) (supersedes ADR-0027).
 
 > **DSP SYNC RULE (load-bearing).** The C++ live chain in `Source/` and
 > `mastering.py` are two **disconnected** implementations of the same master
 > character. Python is the reference; if you change the master math there, mirror
-> it here and re-A/B. See ADR-0027 / CLAUDE.md.
+> it here and re-A/B. See ADR-0029 / CLAUDE.md.
 
 ## What it does
 
 - **Master-bus processor** (stereo in == stereo out), VST3 + Standalone.
-- **Live master chain (real-time, a faithful preview of `mastering.py`):**
+- **Live master chain (real-time, a faithful port of `mastering.py`):**
   tone (HPF 28 / low-shelf +1 dB\@110 / air +1.5 dB\@9k / glue comp -14, 1.6:1)
-  -> Ozone-style auto makeup toward the target -> oversampled tanh soft-clip
-  -> 4x oversampled true-peak limiter. You hear the Keel master and tweak it; the
-  TP ceiling (-1 dBTP) is honored live. Built from the same `juce::dsp` blocks
-  pedalboard wraps, so it ports closely — but the C++ limiter is **not** byte-
-  identical to pedalboard's, so it sounds *close*, validated by A/B not by null.
-- **Loudness is approximate live.** The auto makeup chases a slow K-weighted
-  loudness estimate toward the target (whole-program exact LUFS can't be live).
-  **Exact -14 LUFS / -1 dBTP is locked only on Finalize** (ADR-0027 amends
-  ADR-0003 for the plugin).
+  -> static **Makeup** gain -> oversampled tanh soft-clip -> 4x oversampled
+  true-peak limiter. You hear the Keel master and tweak it; the TP ceiling
+  (-1 dBTP) is honored live, so DAW exports are TP-safe. Built from the same
+  `juce::dsp` blocks pedalboard wraps, so it ports closely — but the C++ limiter is
+  **not** byte-identical to pedalboard's, so it sounds *close*, validated by A/B
+  not by null.
+- **Loudness is approximate, set by hand.** You raise **Makeup** until the live
+  LUFS meter sits at the target. The gain is **static** (not adaptive), so playback
+  and a DAW bounce are identical — no intro ramp. Exact integrated LUFS is
+  whole-program, so it can't be a single-pass live value; for a guaranteed exact
+  -14 LUFS / -1 dBTP file, run the audio through the CLI / GUI (the Python engine).
 - **Live meters (display-only):** a BS.1770-4 K-weighted momentary LUFS meter and
-  a 4x-oversampled true-peak meter, now reading the **chain OUTPUT** (what you
-  hear). The authoritative numbers come from the engine on Finalize.
-- **Master-only UI** (ADR-0027): preset (streaming -14 / loud -10 / broadcast
-  -16) + target LUFS + TP ceiling + reference/glue toggles + the two meters +
-  **Finalize**. Moving the LUFS / TP sliders retargets the live chain instantly.
-  It deliberately drops the standalone GUI's file->label table and balance
-  faders — a stereo master cannot re-balance instruments (ADR-0001).
+  a 4x-oversampled true-peak meter, reading the **chain OUTPUT** (what you hear).
+- **Master-only UI** (ADR-0029): preset (streaming -14 / loud -10 / broadcast
+  -16) + target LUFS (a meter reference) + TP ceiling + **Makeup** + reference/glue
+  toggles + the two meters. The TP / Makeup sliders retune the live chain
+  instantly. It deliberately drops the standalone GUI's file->label table and
+  balance faders — a stereo master cannot re-balance instruments (ADR-0001).
 
 ### Not done yet (next steps)
 
-- **Finalize is a stub.** It pops an info dialog. The shipped version will bounce
-  the program audio to a temp WAV, run the **bundled frozen Keel engine** as a
-  child process to master it (byte-identical to `build.py` / `gui.py`: exact
-  -14 LUFS, -1 dBTP, deterministic), and read the result back. No system Python
-  needed.
-- **By-ear A/B validation** of the live preview vs the Python master is pending
-  (load it on the master bus, compare against a `build.py` render of the same
-  audio); expect "close," not identical.
+- **By-ear A/B validation** of the live master vs a `build.py` render of the same
+  audio is pending (load it on the master bus, compare); expect "close," not
+  identical.
+- **Visual language:** match the standalone GUI's refreshed theme (teal palette,
+  Space Grotesk, gradient meters).
 - The tone-stage glue comp is **always on** in the live chain (faithful to
-  `mastering.py`, where it is part of the tone stage). The UI "Bus glue" toggle is
-  not yet wired to the live chain — it will gate the Finalize path.
-- **ARA2** (whole-clip access, no manual bounce) is the production polish.
+  `mastering.py`, where it is part of the tone stage). The UI "Bus glue" /
+  "Reference" toggles are not yet wired to the live chain.
 - The meters use a self-contained K-weighting (JUCE RBJ biquads), not
   `libebur128` yet — fine for a display meter; swap in later if wanted.
 

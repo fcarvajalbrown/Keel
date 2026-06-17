@@ -1,12 +1,19 @@
 # ADR-0027: Plugin runs a live C++ master chain (preview) + Python finalize
 
-- Status: Accepted
+- Status: Superseded by [ADR-0029](0029-plugin-self-contained-master.md)
 - Date: 2026-06-17
 - Deciders: Felipe Carvajal Brown
 - Supersedes: [ADR-0026](0026-plugin-architecture-juce-shell.md) (the
   offline-only "shell out on Apply, defer the C++ port" model)
 - Amends (plugin context only): [ADR-0003](0003-master-loudness-target.md)
   (exact -14 LUFS), [ADR-0013](0013-keel-py-library-facade.md) (don't fork the DSP)
+
+> **Superseded by [ADR-0029](0029-plugin-self-contained-master.md).** The live
+> C++ master chain stays, but the offline **Finalize** (shell out to the bundled
+> frozen engine for a byte-identical exact-loudness file) is dropped: the live
+> chain already masters, and a DAW export bakes it in. The plugin is now a
+> self-contained real-time master with a static Makeup gain; exact -14/-1
+> delivery lives only in the CLI/GUI. The DSP SYNC RULE below still applies.
 
 ## Context
 

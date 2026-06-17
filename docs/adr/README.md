@@ -49,4 +49,5 @@ Status values: `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 
 ### Plugin (Phase 5)
 - [ADR-0026](0026-plugin-architecture-juce-shell.md) — Plugin is a JUCE/C++ shell that shells out to the Python engine (hybrid: live meters + offline Apply) *(superseded by ADR-0027)*
-- [ADR-0027](0027-plugin-live-cpp-chain.md) — Plugin runs a live C++ master chain (preview) + byte-identical Python finalize; DSP sync rule
+- [ADR-0027](0027-plugin-live-cpp-chain.md) — Plugin runs a live C++ master chain (preview) + byte-identical Python finalize; DSP sync rule *(superseded by ADR-0029)*
+- [ADR-0029](0029-plugin-self-contained-master.md) — Plugin is a self-contained real-time master; drop Finalize; manual Makeup; delivery via DAW export

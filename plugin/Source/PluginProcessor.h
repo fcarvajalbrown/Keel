@@ -1,20 +1,23 @@
-// Keel plugin -- master-bus processor (ADR-0027).
+// Keel plugin -- self-contained master-bus processor (ADR-0029).
 //
-// Runs the LIVE C++ master chain (a faithful PREVIEW of the Python master): tone
-// (HPF 28 / low-shelf / air / glue comp) -> Ozone-style auto makeup toward the
-// target -> oversampled tanh soft-clip -> 4x oversampled true-peak limiter. You
-// hear the Keel master and tweak it in real time; the two meters (BS.1770-4
-// momentary LUFS + 4x true-peak) read the OUTPUT.
+// Runs the Keel master chain LIVE in C++, a faithful port of the Python master:
+// tone (HPF 28 / low-shelf / air / glue comp) -> static user Makeup gain ->
+// oversampled tanh soft-clip -> 4x oversampled true-peak limiter. You hear the
+// master and tweak it in real time; the two meters (BS.1770-4 momentary LUFS +
+// 4x true-peak) read the OUTPUT. Deliver by exporting from the DAW with this
+// active -- there is no separate offline step.
 //
-// Loudness is APPROXIMATE live (the makeup chases a slow loudness estimate toward
-// the target; exact integrated LUFS is whole-program, so it cannot be live). The
-// byte-identical, exact -14 LUFS / -1 dBTP master is produced by the Python engine
-// on Finalize (still a stub here).
+// Loudness is APPROXIMATE (you set Makeup by ear against the live meter; exact
+// integrated LUFS is whole-program, so it cannot be a single-pass real-time
+// value). The true-peak ceiling IS enforced live by the oversampled limiter, so
+// exports are TP-safe. Exact -14 LUFS / -1 dBTP delivery lives only in the CLI /
+// GUI (the Python engine); the plugin trades exactness for a live, self-contained
+// master (ADR-0029, supersedes ADR-0027's Finalize model).
 //
-// >>> DSP SYNC RULE (ADR-0027, load-bearing): this chain and mastering.py are two
+// >>> DSP SYNC RULE (load-bearing): this chain and mastering.py are two
 //     disconnected impls of the same master character. Any change to the Python
 //     master math MUST be mirrored here (and re-A/B'd), or the preview drifts from
-//     the Finalized file.
+//     the CLI/GUI master.
 
 #pragma once
 
@@ -74,11 +77,11 @@ private:
     std::unique_ptr<juce::dsp::Oversampling<float>> processOversampler;
     double oversampleRate { 192000.0 };
 
-    // Ozone-style auto makeup: a slow K-weighted loudness estimate of the post-tone
-    // signal drives a heavily-smoothed makeup gain toward the target LUFS, standing
-    // in for mastering.py's whole-program pre-normalize (which can't run live).
-    juce::dsp::IIR::Filter<float> detShelf[2], detHighpass[2];
-    double detEmaMeanSq[2] { 0.0, 0.0 };
+    // Makeup gain: a STATIC, user-set drive (dB) applied before the clip/limiter,
+    // standing in for mastering.py's whole-program pre-normalize. Static (not
+    // adaptive) so playback and a DAW bounce are identical -- no intro ramp. The
+    // SmoothedValue only declicks the user dragging the knob; on prepare it is set
+    // to the current value, so a fresh render starts already at the set gain.
     juce::SmoothedValue<float> makeupGain;
 
     // BS.1770-4 K-weighting: a high-shelf pre-filter followed by an RLB

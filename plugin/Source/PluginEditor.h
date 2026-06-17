@@ -1,10 +1,11 @@
 // Keel plugin -- editor.
 //
-// Deliberately the SIMPLE, master-only UI (ADR-0027): it drops the standalone
+// Deliberately the SIMPLE, master-only UI (ADR-0029): it drops the standalone
 // GUI's file->label table and balance faders, keeping only the master controls
-// (preset / target LUFS / TP ceiling / reference / glue), the two live meters
-// (reading the live-master OUTPUT), and a Finalize button. Finalize -- the
-// byte-identical Python master -- is a non-functional stub for now.
+// (preset / target LUFS reference / TP ceiling / Makeup / reference / glue) and
+// the two live meters reading the master OUTPUT. There is no Finalize button --
+// the plugin is a self-contained real-time master; you deliver by exporting from
+// the DAW with it active.
 
 #pragma once
 
@@ -32,8 +33,8 @@ private:
     juce::Label    presetLabel;
     juce::ComboBox presetBox;
 
-    juce::Label  lufsLabel, tpLabel;
-    juce::Slider lufsSlider, tpSlider;
+    juce::Label  lufsLabel, tpLabel, makeupLabel;
+    juce::Slider lufsSlider, tpSlider, makeupSlider;
 
     juce::ToggleButton referenceToggle { "Reference" };
     juce::ToggleButton glueToggle      { "Bus glue" };
@@ -43,14 +44,13 @@ private:
     float lufsMeterValue { -100.0f };
     float tpMeterValue   { -100.0f };
 
-    juce::TextButton applyButton { "Finalize" };
-    juce::Label      applyNote;
+    juce::Label exportNote;
 
     using ComboAttachment  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::unique_ptr<ComboAttachment>  presetAttachment;
-    std::unique_ptr<SliderAttachment> lufsAttachment, tpAttachment;
+    std::unique_ptr<SliderAttachment> lufsAttachment, tpAttachment, makeupAttachment;
     std::unique_ptr<ButtonAttachment> referenceAttachment, glueAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KeelAudioProcessorEditor)
