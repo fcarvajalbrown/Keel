@@ -64,4 +64,5 @@ else:
         strip=False,
         upx=False,
         runtime_tmpdir=None,
+        icon="assets/keel.ico",   # Keel hull mark instead of the default icon
     )
