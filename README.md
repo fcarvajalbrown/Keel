@@ -21,10 +21,16 @@
 [![engine: AGPL v3](https://img.shields.io/badge/engine-AGPL%20v3-blue.svg)](LICENSE)
 [![GUI: free for non-commercial](https://img.shields.io/badge/GUI-free%20for%20non--commercial-success.svg)](LICENSE-GUI.md)
 [![commercial use: USD 20/seat](https://img.shields.io/badge/commercial%20use-USD%2020%2Fseat-blueviolet.svg)](COMMERCIAL-LICENSE.md)
-[![donate: PayPal](https://img.shields.io/badge/donate-PayPal-00457C.svg)](https://www.paypal.com/donate/?business=fcarvajalbrown%40protonmail.com&item_name=Support%20Keel%20development&currency_code=USD)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](requirements.txt)
 [![loudness](https://img.shields.io/badge/loudness-ITU--R%20BS.1770--4-brightgreen.svg)](#under-the-hood-the-dsp)
 [![render](https://img.shields.io/badge/render-deterministic-success.svg)](#)
+
+<p align="center">
+  <a href="https://www.paypal.com/donate/?business=fcarvajalbrown%40protonmail.com&item_name=Support%20Keel%20development&currency_code=USD">
+    <img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=paypal&logoColor=black"
+         alt="Buy me a coffee — donate via PayPal">
+  </a>
+</p>
 
 **What it does, in one line:** turn a pile of finished stems into a balanced mix
 and a competitive, peak-safe master with one command — without touching your tone.
