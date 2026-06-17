@@ -1,36 +1,20 @@
 # Releasing Keel
 
-How a Keel release is cut, and the **canonical release-notes text** that every
-release must carry.
+How a Keel release is cut, and the rule for its annotated release notes.
 
-## Release-notes text (canonical)
+## Rule: one notes text, used by every release
 
-Every GitHub release uses the text below. It is the single source of truth; the
-CI workflow injects it automatically (see "How releases are published"), so a
-normal tagged release gets it without any manual step. Keep this file and the
-workflow in sync if you change the wording.
+**Every release — built by CI or locally — MUST carry the same annotated notes
+text, and that text lives in exactly one place: [`release-notes.md`](release-notes.md).**
 
-```markdown
-**Pre-alpha** build of the Keel desktop GUI (deterministic automix + automaster).
+- CI reads it (`gh release create --notes-file docs/release-notes.md`).
+- A manual/local release reads the *same* file (see below).
 
-## Downloads
-- **Windows** — `KeelSetup-<ver>.exe` (recommended installer) or `Keel.exe` (portable).
-- **macOS (Apple Silicon / arm64)** — `Keel.dmg`.
-
-## Heads-up: these builds are unsigned
-They are not yet code-signed, so the OS will warn on first launch:
-- **Windows**: SmartScreen shows "Windows protected your PC" — click
-  **More info -> Run anyway**.
-- **macOS**: Gatekeeper blocks an unidentified developer — **right-click
-  the app -> Open**, then confirm.
-
-Signing/notarization is planned. See `ROADMAP.md` for status and
-`README.md` for what Keel does.
-```
-
-Update this text when the project state changes — e.g. drop "Pre-alpha" when
-leaving alpha, and remove the unsigned heads-up once builds are
-signed/notarized.
+So there is nothing to keep in sync by hand: edit `docs/release-notes.md` and
+both paths pick it up. Update that file when the project state changes — e.g.
+drop the "Pre-alpha" wording on leaving alpha, and remove the unsigned heads-up
+once builds are signed/notarized. (The release *title* — `Keel <tag>
+(pre-alpha)` — is set with `--title`, separate from the notes body.)
 
 ## How releases are published (CI, on a version tag)
 
@@ -39,15 +23,10 @@ signed/notarized.
 1. Builds the Windows portable `Keel.exe`, the Inno installer
    `KeelSetup-<ver>.exe`, and the macOS (arm64) `Keel.dmg`. Each is gated by
    `--selftest` before upload.
-2. Runs the `release` job, which writes the notes text above into `notes.md` and
-   runs `gh release create "<tag>" --title "Keel <tag> (pre-alpha)" --prerelease
-   <assets>`.
+2. Runs the `release` job, which checks out the repo and publishes a prerelease
+   with `--notes-file docs/release-notes.md` and the three artifacts.
 
-So the notes text lives in the `notes.md` heredoc inside that workflow — that is
-the copy CI actually publishes. This file is the human-readable record of it;
-edit both together.
-
-## Cutting a release (checklist)
+## Cutting a release (the normal path)
 
 1. Bump the version in **`keel.py`** (`__version__`) and **`installer/keel.iss`**
    (`MyAppVersion`, kept in sync). The installer filename + version are read from
@@ -56,6 +35,30 @@ edit both together.
 3. Tag and push: `git tag -a vX.Y.Z-alpha -m "..." && git push origin vX.Y.Z-alpha`.
 4. CI builds all three artifacts and publishes the prerelease automatically.
    Verify with `gh release view vX.Y.Z-alpha`.
+
+## Building / releasing locally (Windows)
+
+To rebuild the local artifacts (e.g. to test before tagging):
+
+```powershell
+.\.venv\Scripts\pyinstaller.exe Keel.spec --noconfirm          # dist\Keel.exe
+$ver = (Select-String keel.py -Pattern '__version__\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DMyAppVersion=$ver installer\keel.iss
+# -> dist\KeelSetup-<ver>.exe
+```
+
+If you publish a release **by hand**, use the same notes file so the rule holds
+(macOS `Keel.dmg` only comes from CI):
+
+```powershell
+gh release create vX.Y.Z-alpha --prerelease `
+  --title "Keel vX.Y.Z-alpha (pre-alpha)" `
+  --notes-file docs/release-notes.md `
+  dist\Keel.exe dist\KeelSetup-X.Y.Z.exe
+```
+
+Prefer the tag + CI path when you can — it also builds and attaches the macOS
+`Keel.dmg`. `dist/` is gitignored; local builds are not committed.
 
 ## Version lineage
 
