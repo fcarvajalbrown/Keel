@@ -759,6 +759,12 @@ class KeelWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.player.stop()  # don't leave an audio stream running after close
+        self._debounce.stop()
+        self._pending_live = False
+        if self.worker is not None:
+            # let an in-flight render finish so the QThread isn't destroyed
+            # while running (which aborts the process on teardown)
+            self.worker.wait()
         super().closeEvent(event)
 
 
