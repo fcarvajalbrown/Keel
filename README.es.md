@@ -25,7 +25,6 @@
 
 [![estado](https://img.shields.io/badge/estado-alpha-orange.svg)](ROADMAP.md)
 [![motor: AGPL v3](https://img.shields.io/badge/motor-AGPL%20v3-blue.svg)](LICENSE)
-[![GUI: gratis uso no comercial](https://img.shields.io/badge/GUI-gratis%20uso%20no%20comercial-success.svg)](LICENSE-GUI.md)
 [![uso comercial: USD 20/asiento](https://img.shields.io/badge/uso%20comercial-USD%2020%2Fasiento-blueviolet.svg)](COMMERCIAL-LICENSE.md)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](requirements.txt)
 [![loudness](https://img.shields.io/badge/loudness-ITU--R%20BS.1770--4-brightgreen.svg)](#bajo-el-capó-el-dsp)
