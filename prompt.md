@@ -44,13 +44,47 @@ Phase 4 GUI polish, focused on getting Keel out the door:
   `out/` audio/video are gitignored (not committed). The asset generators are
   tracked tools; rerunning them costs no Claude tokens.
 
-Confirm direction with the user via the blue option UI before the next task —
-candidates, none started:
+## Phase 5 plugin — architecture DECIDED (2026-06-17), spike is next
+
+This session locked the Phase 5 plugin architecture with the user (**ADR-0026**,
+ROADMAP Phase 5 updated). The decision, in one line: the plugin is a **thin
+JUCE/C++ shell that shells out to the existing Python Keel engine** — a third
+front-end on the one shared core (alongside CLI + GUI), NOT a DSP fork.
+- **Model = hybrid:** real-time pass-through + live LUFS/TP meters in C++, plus an
+  **offline "Apply" master**. Exact integrated LUFS is whole-program, so the
+  master is inherently offline (like HoRNet ZeroLoud / Youlean) — confirmed by
+  research, do not try to make it a real-time gain rider (that breaks locked -14
+  LUFS, ADR-0003).
+- **Apply mechanism = shell out to Python.** On Apply, the C++ shell bounces to a
+  temp WAV, runs the **bundled frozen Keel engine** as a child process, reads the
+  mastered audio back — byte-identical to `build.py`/`gui.py`. No system Python
+  needed; no DSP re-port. A C++ DSP port is explicitly DEFERRED (only for a future
+  zero-Python-runtime build, and only validated against the Python reference).
+- **Rejected:** VENOM (Python-in-JUCE, GPLv3 kills the commercial license) and an
+  embedded Python interpreter (not RT-safe, 100 MB+). Pedalboard is a host, not a
+  way to ship a plugin.
+- **Tech confirmed present on the dev machine:** MSVC 14.50 + cmake 4.2.3 + VS
+  Community 2026 + git. A JUCE VST3 spike is buildable here.
+- **Licensing:** JUCE under AGPLv3 for the open plugin (engine already AGPL); JUCE
+  Starter free under 20k/yr (incl. donations), then Indie USD 800 perpetual. Same
+  hybrid product model as the GUI (ADR-0025). Review ARA + VST3 SDK terms before
+  public distribution.
+- **ARA2** is the production polish (whole-clip access, no manual bounce on Apply);
+  v1 can ship bounce-then-Apply first.
+
+**>>> IMMEDIATE NEXT TASK: the Phase 5 spike** (the user chose docs-only this
+session). Build a minimal JUCE VST3 that compiles on this machine, loads in a DAW
+(Reaper supports ARA later), passes audio through, and drives live LUFS/TP meters,
+with **Apply wired to shell out to the Python engine**. Stage it: get the JUCE +
+CMake + MSVC build green first (that's the main risk), keep the DSP trivial
+(passthrough + meter + shell-out stub), then flesh out Apply. Confirm scope with
+the user via the blue option UI before starting.
+
+Other candidates still open (confirm direction first):
 - **Phase 4 packaging:** code-signing / notarization (needs the publication fee
   paid first) + a proper installer beyond the unsigned Inno one.
 - **Phase 6 landing page:** GitHub Pages static site (tagline, demo, donate +
   commercial-checkout links).
-- **Phase 5 VST/plugin:** the next big build.
 - **Loose end:** expand `README.es.md` to full parity if wanted.
 
 ## Before writing any code

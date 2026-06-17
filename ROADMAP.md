@@ -129,12 +129,40 @@ a tone-shaping suite. See "Non-goals" at the bottom.
       `import keel` is the single entry point every front-end drives. No DSP fork.
 
 ## Phase 5 — VST / plugin
-- [ ] Wrap the master chain (and, where it fits, the balance stage) as a VST3 /
-      AU plugin so it runs inside any DAW.
-- [ ] Decide the in-DAW model: master-bus processor first (clearest fit), stem
-      balancer as a follow-on.
-- [ ] Reuse `mastering.py` DSP via a real-time-safe path or an offline render.
-- [ ] Plugin packaging, presets, and parameter automation.
+Architecture decided (ADR-0026): a **thin JUCE/C++ shell that shells out to the
+existing Python Keel engine** — the plugin is a third front-end on the one shared
+core (alongside CLI + GUI), NOT a DSP fork. The `.vst3` the DAW loads is C++
+(UI + real-time pass-through + live meters); on **Apply** it bounces to a temp
+WAV, runs the bundled frozen Keel engine as a child process, and reads the
+mastered audio back — byte-identical to `build.py` / `gui.py` (-14 LUFS, -1 dBTP,
+deterministic). No system Python needed (the frozen engine is bundled).
+In-DAW model: **hybrid** — real-time live meters + an **offline "Apply" master**
+(exact integrated LUFS is whole-program, so the master is inherently offline, like
+HoRNet ZeroLoud / Youlean). Toolchain confirmed on the dev machine: MSVC 14.50 +
+cmake 4.2.3 + VS Community 2026.
+- [ ] **Master-bus plugin first** (clearest fit); stem balancer as a follow-on.
+- [~] Reuse `mastering.py` DSP: via **shell-out to the frozen engine** (offline
+      Apply), not a C++ re-port. A C++ DSP port is explicitly deferred and would
+      only be revisited for a zero-Python-runtime build, validated against the
+      Python reference (ADR-0026).
+- [ ] JUCE/C++ shell: DAW integration, UI, real-time pass-through, live LUFS/TP
+      meters (C++ BS.1770 / true-peak, e.g. libebur128 — display-only), audio
+      capture, and the subprocess orchestration for Apply.
+- [ ] **Spike (next session):** a JUCE VST3 that builds on this machine, loads in
+      a DAW, passes audio, and drives live meters, with Apply wired to shell out
+      to the Python engine. (This session: ADR + plan only.)
+- [ ] **ARA2** as the production polish — whole-clip access so Apply needs no
+      manual bounce/export (how Melodyne / SpectraLayers integrate). v1 can ship
+      bounce-then-Apply; ARA removes the manual step. Review ARA + VST3 SDK
+      license terms before public distribution.
+- [ ] Plugin packaging (bundle the frozen engine; CI builds engine then plugin),
+      presets, and parameter automation. Code-signing / notarization shared with
+      the open Phase 4 packaging item.
+- Licensing (ADR-0026): JUCE under AGPLv3 for the open plugin (engine is already
+      AGPL); JUCE Starter (free under 20k/yr incl. donations) covers commercial
+      seats until revenue crosses the threshold, then Indie (USD 800 perpetual).
+      Same hybrid product model as the GUI (ADR-0025). VENOM (GPLv3) and an
+      embedded Python interpreter were both rejected (ADR-0026).
 
 ## Phase 6 — Distribution
 - [ ] Naming/trademark check before public launch (Keel cleared initial searches;
