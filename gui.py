@@ -769,6 +769,7 @@ def _apply_theme(app):
     app.setFont(base)
     gui_theme.apply_palette(app)
     app.setStyleSheet(gui_theme.build_stylesheet(family))
+    app.setWindowIcon(gui_theme.hull_icon())
     return family
 
 

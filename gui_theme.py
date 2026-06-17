@@ -28,8 +28,8 @@ from string import Template
 
 from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtGui import (
-    QBrush, QColor, QFont, QFontDatabase, QLinearGradient, QPainter,
-    QPainterPath, QPalette, QPen,
+    QBrush, QColor, QFont, QFontDatabase, QIcon, QLinearGradient, QPainter,
+    QPainterPath, QPalette, QPen, QPixmap,
 )
 from PySide6.QtWidgets import QWidget, QSizePolicy
 
@@ -289,6 +289,63 @@ _BARS = [                                              # waveform bars (x,y,w,h)
 _SRC = (8, 18, 104, 102)   # bounding box of the mark in source coords
 
 
+def _paint_hull(p, w, h, margin=2):
+    """Paint the teal hull + waveform mark into a w x h area (origin 0,0)."""
+    p.setRenderHint(QPainter.Antialiasing)
+    mx, my, mw, mh = _SRC
+    avail_w, avail_h = w - 2 * margin, h - 2 * margin
+    s = min(avail_w / mw, avail_h / mh)
+    p.save()
+    p.translate(margin + (avail_w - mw * s) / 2,
+                margin + (avail_h - mh * s) / 2)
+    p.scale(s, s)
+    p.translate(-mx, -my)
+
+    grad = QLinearGradient(0, my, 0, my + mh)
+    grad.setColorAt(0.0, QColor(COLORS["teal"]))
+    grad.setColorAt(1.0, QColor(COLORS["teal_deep"]))
+
+    # closed hull region, used to clip the waveform bars
+    clip = QPainterPath()
+    clip.moveTo(*_HULL[0])
+    clip.lineTo(*_HULL[1])
+    clip.quadTo(_HULL_Q[0], _HULL_Q[1], _HULL[2][0], _HULL[2][1])
+    clip.lineTo(*_HULL[3])
+    clip.closeSubpath()
+
+    p.save()
+    p.setClipPath(clip)
+    p.setPen(Qt.NoPen)
+    p.setBrush(QBrush(grad))
+    for x, y, bw, bh in _BARS:
+        p.drawRoundedRect(QRectF(x, y, bw, bh), 3.5, 3.5)
+    p.restore()
+
+    # open-top hull outline
+    outline = QPainterPath()
+    outline.moveTo(*_HULL[0])
+    outline.lineTo(*_HULL[1])
+    outline.quadTo(_HULL_Q[0], _HULL_Q[1], _HULL[2][0], _HULL[2][1])
+    outline.lineTo(*_HULL[3])
+    pen = QPen(QBrush(grad), 9)
+    pen.setCapStyle(Qt.RoundCap)
+    pen.setJoinStyle(Qt.RoundJoin)
+    p.setPen(pen)
+    p.setBrush(Qt.NoBrush)
+    p.drawPath(outline)
+    p.restore()
+
+
+def hull_icon(px=256):
+    """A QIcon of the hull mark (window / taskbar icon for the running app)."""
+    pm = QPixmap(px, px)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    _paint_hull(p, px, px, margin=max(2, px // 12))
+    p.end()
+    return QIcon(pm)
+
+
 class HullMark(QWidget):
     """Keel's hull + balanced-waveform logo, painted in the teal gradient."""
 
@@ -298,48 +355,7 @@ class HullMark(QWidget):
 
     def paintEvent(self, _):
         p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        mx, my, mw, mh = _SRC
-        margin = 2
-        avail_w, avail_h = self.width() - 2 * margin, self.height() - 2 * margin
-        s = min(avail_w / mw, avail_h / mh)
-        p.translate(margin + (avail_w - mw * s) / 2,
-                    margin + (avail_h - mh * s) / 2)
-        p.scale(s, s)
-        p.translate(-mx, -my)
-
-        grad = QLinearGradient(0, my, 0, my + mh)
-        grad.setColorAt(0.0, QColor(COLORS["teal"]))
-        grad.setColorAt(1.0, QColor(COLORS["teal_deep"]))
-
-        # closed hull region, used to clip the waveform bars
-        clip = QPainterPath()
-        clip.moveTo(*_HULL[0])
-        clip.lineTo(*_HULL[1])
-        clip.quadTo(_HULL_Q[0], _HULL_Q[1], _HULL[2][0], _HULL[2][1])
-        clip.lineTo(*_HULL[3])
-        clip.closeSubpath()
-
-        p.save()
-        p.setClipPath(clip)
-        p.setPen(Qt.NoPen)
-        p.setBrush(QBrush(grad))
-        for x, y, w, h in _BARS:
-            p.drawRoundedRect(QRectF(x, y, w, h), 3.5, 3.5)
-        p.restore()
-
-        # open-top hull outline
-        outline = QPainterPath()
-        outline.moveTo(*_HULL[0])
-        outline.lineTo(*_HULL[1])
-        outline.quadTo(_HULL_Q[0], _HULL_Q[1], _HULL[2][0], _HULL[2][1])
-        outline.lineTo(*_HULL[3])
-        pen = QPen(QBrush(grad), 9)
-        pen.setCapStyle(Qt.RoundCap)
-        pen.setJoinStyle(Qt.RoundJoin)
-        p.setPen(pen)
-        p.setBrush(Qt.NoBrush)
-        p.drawPath(outline)
+        _paint_hull(p, self.width(), self.height())
 
 
 class Meter(QWidget):
