@@ -35,3 +35,5 @@ if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 Write-Host "Done. Artifacts under:" -ForegroundColor Green
 Write-Host "  $buildDir\KeelPlugin_artefacts\$config\VST3\Keel.vst3"
 Write-Host "  $buildDir\KeelPlugin_artefacts\$config\Standalone\Keel.exe"
+Write-Host "VST3 auto-installed (rescan your DAW) to:" -ForegroundColor Green
+Write-Host "  $env:LOCALAPPDATA\Programs\Common\VST3\Keel.vst3"

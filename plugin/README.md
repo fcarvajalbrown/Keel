@@ -61,6 +61,26 @@ no DAW. The VST3 loads in a DAW (Reaper is the ARA target later).
 
 `plugin/build/` is git-ignored.
 
+### Installing into a DAW
+
+`COPY_PLUGIN_AFTER_BUILD` is on, so each build **auto-copies** `Keel.vst3` into
+the per-user VST3 folder (no admin):
+
+- Windows: `%LOCALAPPDATA%\Programs\Common\VST3\Keel.vst3`
+- macOS:   `~/Library/Audio/Plug-Ins/VST3/Keel.vst3`
+
+Then **rescan** in the host (Reaper: Preferences -> Plug-ins -> VST -> Re-scan).
+The plugin shows as **Keel** (Felipe Carvajal Brown), category Mastering/Dynamics.
+
+Some hosts (e.g. Mixcraft) only scan the **system** folder
+`C:\Program Files\Common Files\VST3`, which needs admin. To install there, run an
+elevated copy:
+
+```powershell
+Copy-Item "build\KeelPlugin_artefacts\Release\VST3\Keel.vst3" `
+    "C:\Program Files\Common Files\VST3" -Recurse -Force
+```
+
 ## Licensing
 
 JUCE under its **AGPLv3** option for the open plugin (the engine is already

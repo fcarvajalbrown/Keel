@@ -29,6 +29,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
+# --- Auto-install the built plugin where the DAW will scan it. The JUCE Windows
+#     default is C:/Program Files/Common Files/VST3, which needs admin; point it
+#     at the per-user VST3 folder (the VST3 spec's user location) instead, so
+#     every build drops Keel.vst3 straight into a scanned path with no elevation.
+if (WIN32)
+    set_directory_properties(PROPERTIES
+        JUCE_VST3_COPY_DIR "$ENV{LOCALAPPDATA}/Programs/Common/VST3")
+elseif (APPLE)
+    set_directory_properties(PROPERTIES
+        JUCE_VST3_COPY_DIR "$ENV{HOME}/Library/Audio/Plug-Ins/VST3")
+endif()
+
 # --- The plugin target: master-bus processor, VST3 + Standalone. ---
 juce_add_plugin(KeelPlugin
     PRODUCT_NAME                "Keel"
@@ -42,7 +54,7 @@ juce_add_plugin(KeelPlugin
     NEEDS_MIDI_OUTPUT           FALSE
     IS_MIDI_EFFECT              FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-    COPY_PLUGIN_AFTER_BUILD     FALSE
+    COPY_PLUGIN_AFTER_BUILD     TRUE
     VST3_CATEGORIES             "Mastering" "Dynamics"
     DESCRIPTION                 "Keel master-bus processor (spike)"
 )
