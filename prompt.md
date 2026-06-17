@@ -7,26 +7,51 @@ real-world material; the GUI scaffold + cross-platform builds now exist too.
 
 ## >>> START HERE — immediate next task
 
-**Phase 4 GUI polish is DONE** (shipped 2026-06-17, commits on `main`):
-1. **Real-time playback metering** — `gui.py` now has a "Play master" button
-   that streams the rendered master to the audio device via QtMultimedia
-   QAudioSink (Int16 push mode) and drives the LUFS / true-peak meters live off
-   the actual playback position, measuring a trailing 3 s window with the
-   engine's own `meters.py` math. Throttled (~150 ms) meter recompute; guarded
-   import + `available()` device gate so headless/no-device (incl. `--selftest`)
-   degrades to a disabled button. Display-only — render path stays deterministic.
-2. **Live re-render on fader move** — a default-off "Live preview" checkbox; a
-   fader settling (re)arms a single-shot debounce timer that re-renders the full
-   mix + master via the existing RenderWorker, coalescing moves made mid-render.
-   Faders change level balance only (ADR-0001 scope lock honored).
+**Pre-alpha launch shipped (2026-06-17, all on `main`).** This session, after the
+Phase 4 GUI polish, focused on getting Keel out the door:
+- **Release `v0.1.0-alpha`** — a GitHub *prerelease* with `KeelSetup-0.1.0.exe`
+  (Windows installer), `Keel.exe` (portable), `Keel.dmg` (macOS arm64). CI
+  (`build-app.yml`) now builds AND publishes the prerelease on a `v*` tag (the
+  `release` job downloads artifacts + `gh release create --prerelease`).
+- **Windows installer** — `installer/keel.iss` (Inno Setup) wraps the onefile
+  `Keel.exe`; built in CI, uploaded as `Keel-windows-installer`. Unsigned (UX
+  only; does NOT remove the SmartScreen warning — that still needs signing).
+- **Licensing/funding model changed (ADR-0025, supersedes ADR-0024):** engine
+  stays AGPL-3.0; the **GUI is now free** for non-commercial + individual
+  musicians (PolyForm Noncommercial + extra grant, `LICENSE-GUI.md`), funded by
+  **donations** (PayPal `fcarvajalbrown@protonmail.com`, `.github/FUNDING.yml`).
+  **Commercial license USD 20 one-time per seat** (`COMMERCIAL-LICENSE.md`) only
+  for business/redistribution. GUI per-file headers + installer LicenseFile
+  updated.
+- **README** — black-bg header logo (`scripts/make_readme_header.py`), big direct
+  Windows download button -> the installer asset, centered badges, Buy-me-a-coffee
+  PayPal button, Support + License sections. **`README.es.md`** added (Spanish,
+  core translation) with an English/Español toggle on both. NOTE: README.es is a
+  *condensed* translation — it omits the does/doesn't table, full keel.json
+  schema, presets table, project structure, library/tests/GUI-build sections.
+  Offer to expand it to full parity.
+- **Repo SEO** — 20 researched topics + keyword-front-loaded description + website
+  -> releases page (set via `gh repo edit`).
+- **Instagram launch kit** — `scripts/make_launch_video.py` renders a ~19 s 9:16
+  seamless-loop video (logo reveal -> stems-to-master -> loudness to -14.0 LUFS
+  -> download card -> reversed-loudness outro -> fade to black) as BOTH
+  `assets/keel-launch.mp4` (1080x1920) and `assets/keel-launch.gif` (preview).
+  `scripts/make_launch_audio.py` cuts a length-matched audio bed from
+  `out/song3_master.wav` (the user's OWN material — safe to publish; song1/2 and
+  cambridge are third-party) with a loudness ramp+fade synced to the visual. A
+  muxed `out/keel-launch-final.mp4` (video+audio, post-ready) is generated via
+  imageio-ffmpeg. Spanish caption + hashtags in `docs/social/keel-instagram-launch.md`.
+  `out/` audio/video are gitignored (not committed). The asset generators are
+  tracked tools; rerunning them costs no Claude tokens.
 
-Both validated headlessly (`--selftest` green; playback verified emitting live
-reads against a rendered song3 master). Confirm direction with the user via the
-blue option UI before the next task — candidates, none started:
+Confirm direction with the user via the blue option UI before the next task —
+candidates, none started:
 - **Phase 4 packaging:** code-signing / notarization (needs the publication fee
-  paid first) + a proper installer. The .exe/.app build green but unsigned.
-- **Phase 6 landing page:** GitHub Pages static site (tagline, demo, checkout).
+  paid first) + a proper installer beyond the unsigned Inno one.
+- **Phase 6 landing page:** GitHub Pages static site (tagline, demo, donate +
+  commercial-checkout links).
 - **Phase 5 VST/plugin:** the next big build.
+- **Loose end:** expand `README.es.md` to full parity if wanted.
 
 ## Before writing any code
 
