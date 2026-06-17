@@ -141,6 +141,13 @@ In-DAW model: **hybrid** — real-time live meters + an **offline "Apply" master
 HoRNet ZeroLoud / Youlean). Toolchain confirmed on the dev machine: MSVC 14.50 +
 cmake 4.2.3 + VS Community 2026.
 - [ ] **Master-bus plugin first** (clearest fit); stem balancer as a follow-on.
+      Scope = **master stage only**: inserted on the master bus the signal is one
+      summed stereo mix, and a stereo master cannot re-balance instruments
+      (ADR-0001) — so the plugin masters, it does not mix. Its GUI is **distinct
+      from and much simpler than** the standalone GUI: it drops the file->label
+      table and balance faders, keeping only preset/LUFS/TP + optional
+      reference/glue + live meters + Apply (ADR-0026). Balancing stays in the
+      standalone tool (run on stems before the DAW) or the DAW's own mixer.
 - [~] Reuse `mastering.py` DSP: via **shell-out to the frozen engine** (offline
       Apply), not a C++ re-port. A C++ DSP port is explicitly deferred and would
       only be revisited for a zero-Python-runtime build, validated against the

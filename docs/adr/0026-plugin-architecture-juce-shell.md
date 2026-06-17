@@ -39,6 +39,22 @@ with **live meters** + an **offline "Apply"** that runs the true Keel master.
 
 The plugin is a **thin JUCE/C++ shell**, not a reimplementation of the engine.
 
+- **Scope = master-bus processor only (master stage, no mix stage).** The plugin
+  is inserted on the DAW **master bus**, where the signal is a single summed
+  stereo mix. Keel's mix/balance stage needs the **separate stems** (it balances
+  labeled groups relative to the vocal), and a stereo master **cannot** re-balance
+  instruments (locked scope, CLAUDE.md / ADR-0001). So the plugin does the
+  **master stage only**; balancing stays in the standalone tool (run on the stems
+  before they enter the DAW) or in the DAW's own mixer. A "stem balancer" plugin
+  is a deferred follow-on (it needs cross-track visibility a per-track insert
+  can't provide).
+- **Plugin GUI is distinct from — and much simpler than — the standalone GUI.**
+  The standalone (`gui.py`) works on a folder of stems: file->label table +
+  per-label balance faders + render mix+master. The plugin **drops** the
+  file->label table and balance faders entirely and **keeps only** the master
+  controls: target preset (streaming -14 / loud -10 / broadcast -16) + LUFS/TP
+  fields, optional reference + glue toggle, **live LUFS/TP meters**, and the
+  **Apply** button. Same `mastering.py` brain, just the master half.
 - **Shell (new, C++):** loads in the DAW, draws the UI, runs **real-time
   pass-through** while driving **live LUFS / true-peak meters** (display-only, like
   the GUI's playback meters — ADR not changed), captures the program audio, and

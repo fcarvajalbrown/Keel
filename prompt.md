@@ -71,6 +71,14 @@ front-end on the one shared core (alongside CLI + GUI), NOT a DSP fork.
   public distribution.
 - **ARA2** is the production polish (whole-clip access, no manual bounce on Apply);
   v1 can ship bounce-then-Apply first.
+- **Scope = master-bus processor only (master stage, no mix stage).** Inserted on
+  the master bus the signal is one summed stereo mix; a stereo master cannot
+  re-balance instruments (ADR-0001), so the plugin masters, it does not mix. Its
+  GUI is **distinct from and much simpler than** the standalone `gui.py`: it drops
+  the file->label table and balance faders, keeping only preset/LUFS/TP + optional
+  reference/glue + live meters + Apply. Same `mastering.py` brain, master half
+  only. Balancing stays in the standalone tool (on stems, pre-DAW) or the DAW's
+  mixer. A stem-balancer plugin is a deferred follow-on. (ADR-0026, updated.)
 
 **>>> IMMEDIATE NEXT TASK: the Phase 5 spike** (the user chose docs-only this
 session). Build a minimal JUCE VST3 that compiles on this machine, loads in a DAW
