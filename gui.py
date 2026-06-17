@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 try:
-    from PySide6.QtCore import Qt, QThread, Signal
+    from PySide6.QtCore import Qt, QThread, QTimer, Signal
     from PySide6.QtWidgets import (
         QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
         QGridLayout, QLabel, QPushButton, QSlider, QComboBox, QDoubleSpinBox,
@@ -101,6 +101,13 @@ class KeelWindow(QMainWindow):
         self.out_dir = Path.cwd() / "out"
         self.worker = None
         self.balance_sliders = {}     # label -> (QSlider, QLabel)
+        # live re-render: a fader move (re)starts a single-shot debounce timer;
+        # when it settles we re-render, coalescing moves made while one is running.
+        self._pending_live = False
+        self._debounce = QTimer(self)
+        self._debounce.setSingleShot(True)
+        self._debounce.setInterval(400)
+        self._debounce.timeout.connect(self._fire_live_render)
         self._build_ui()
         self._refresh_presets()
 
@@ -207,6 +214,13 @@ class KeelWindow(QMainWindow):
         self.render_btn.setEnabled(False)
         self.render_btn.clicked.connect(self._render)
         right.addWidget(self.render_btn)
+
+        self.live_chk = QCheckBox("Live preview (re-render on fader move)")
+        self.live_chk.setToolTip(
+            "Re-render mix + master a moment after a fader settles, so the "
+            "meters track the new balance without clicking Render. Balance "
+            "only — never tone (Keel's locked scope).")
+        right.addWidget(self.live_chk)
 
         meters_box = QGroupBox("Master meters")
         meters = QGridLayout(meters_box)
@@ -331,6 +345,7 @@ class KeelWindow(QMainWindow):
             vlbl.setMinimumWidth(44)
             slider.valueChanged.connect(
                 lambda v, lb=vlbl: lb.setText(f"{v / 10:+.1f}"))
+            slider.valueChanged.connect(self._on_fader_moved)
             rl.addWidget(name)
             rl.addWidget(slider, 1)
             rl.addWidget(vlbl)
@@ -466,13 +481,30 @@ class KeelWindow(QMainWindow):
         self._say(f"Loaded project {f}")
 
     # ---------------------------------------------------------------- render
+    def _on_fader_moved(self, _=None):
+        """A balance fader changed: if live preview is on, (re)arm the debounce."""
+        if self.live_chk.isChecked() and self.stems_dir:
+            self._debounce.start()
+
+    def _fire_live_render(self):
+        """Debounce settled — re-render now, or queue one if a render is running."""
+        if not self.live_chk.isChecked() or not self.stems_dir:
+            return
+        if self.worker is not None:
+            self._pending_live = True   # coalesce: re-render once this one finishes
+            return
+        self._start_render(live=True)
+
     def _render(self):
+        self._start_render(live=False)
+
+    def _start_render(self, live=False):
         if not self.stems_dir or self.worker:
             return
         doc = self._collect_doc()
         self.doc = doc
         self.render_btn.setEnabled(False)
-        self.render_btn.setText("Rendering…")
+        self.render_btn.setText("Re-rendering…" if live else "Rendering…")
         self.worker = RenderWorker(
             self.stems_dir, self.out_dir, self.stems_dir.name, doc,
             glue=doc["glue"], ref_path=doc["master"]["reference"])
@@ -499,6 +531,9 @@ class KeelWindow(QMainWindow):
         self.worker = None
         self.render_btn.setText("Render mix + master")
         self.render_btn.setEnabled(True)
+        if self._pending_live and self.live_chk.isChecked():
+            self._pending_live = False
+            self._start_render(live=True)
 
     def _set_meters(self, lufs, tp):
         def pct(v, lo, hi):
