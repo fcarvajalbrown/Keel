@@ -18,7 +18,7 @@ Phase 4 GUI polish, focused on getting Keel out the door:
   only; does NOT remove the SmartScreen warning — that still needs signing).
 - **Licensing/funding model changed (ADR-0025, supersedes ADR-0024):** engine
   stays AGPL-3.0; the **GUI is now free** for non-commercial + individual
-  musicians (PolyForm Noncommercial + extra grant, `LICENSE-GUI.md`), funded by
+  musicians (PolyForm Noncommercial + extra grant, `LICENSE-NONCOMMERCIAL.md`), funded by
   **donations** (PayPal `fcarvajalbrown@protonmail.com`, `.github/FUNDING.yml`).
   **Commercial license USD 20 one-time per seat** (`COMMERCIAL-LICENSE.md`) only
   for business/redistribution. GUI per-file headers + installer LicenseFile
@@ -213,7 +213,7 @@ pushed, 19-test suite green):
 - **Licensing/funding model (ROADMAP Phase 6, ADR-0025).** Hybrid: the **engine
   stays AGPL-3.0**; the **GUI is free** for non-commercial use and for individual
   musicians making/selling their own music (PolyForm Noncommercial + an extra
-  grant, `LICENSE-GUI.md`), funded by **donations** (PayPal + GitHub Sponsor via
+  grant, `LICENSE-NONCOMMERCIAL.md`), funded by **donations** (PayPal + GitHub Sponsor via
   `.github/FUNDING.yml`). A **commercial license** (`COMMERCIAL-LICENSE.md`),
   **USD 20 one-time per seat**, is required only for business/redistribution use.
   Supersedes the old paid-GUI plan (ADR-0024). Still TODO: stand up the donate /
@@ -271,7 +271,7 @@ With this, **Phase 2 is DONE** — every validation item is resolved or dropped.
   project key `C--Projects-Keel`). Memories re-saved under the new key last
   session (`no-claude-coauthor`, `engine-stays-delivery-agnostic`).
 - **License:** done — hybrid (ADR-0025): engine AGPL-3.0 (`LICENSE`); GUI free
-  non-commercial via PolyForm + grant (`LICENSE-GUI.md`, per-file headers on
+  non-commercial via PolyForm + grant (`LICENSE-NONCOMMERCIAL.md`, per-file headers on
   gui.py/userpresets.py); commercial USD 20/seat (`COMMERCIAL-LICENSE.md`);
   donations (README + `.github/FUNDING.yml`). Remaining only if desired: formal
   legal review.

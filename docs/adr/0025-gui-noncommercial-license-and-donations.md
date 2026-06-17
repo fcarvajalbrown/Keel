@@ -34,7 +34,8 @@ A **hybrid** model:
   `build.py`) stays **AGPL-3.0** — unchanged, still open source.
 - **Desktop GUI** (`gui.py`, `userpresets.py`, packaged `Keel.exe` / `Keel.app`)
   is **PolyForm Noncommercial 1.0.0** plus an **additional free-use grant**
-  (`LICENSE-GUI.md`): free for all non-commercial use AND free for individual
+  (`LICENSE-NONCOMMERCIAL.md`, then named `LICENSE-GUI.md`): free for all
+  non-commercial use AND free for individual
   musicians making their own music, **including selling that music**.
 - **Donations** fund development — PayPal link in the README and a GitHub
   Sponsor button (`.github/FUNDING.yml`). Voluntary; grant no commercial rights.
@@ -62,7 +63,7 @@ business on it.**
 
 ## References
 
-- `LICENSE-GUI.md`, `COMMERCIAL-LICENSE.md`, `README.md` (License + Support),
+- `LICENSE-NONCOMMERCIAL.md`, `COMMERCIAL-LICENSE.md`, `README.md` (License + Support),
   `.github/FUNDING.yml`, `ROADMAP.md` Phase 6.
 - PolyForm Noncommercial 1.0.0: <https://polyformproject.org/licenses/noncommercial/1.0.0>
 - Supersedes: [ADR-0024](0024-distribution-and-pricing.md).

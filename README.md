@@ -399,7 +399,7 @@ Keel is licensed in two parts.
 - **The desktop GUI** (the `Keel.exe` / `Keel.app` app) is **free for
   non-commercial use** and **free for individual musicians making their own
   music** — even if you sell it — under the PolyForm Noncommercial License plus
-  an additional grant ([`LICENSE-GUI.md`](LICENSE-GUI.md)).
+  an additional grant ([`LICENSE-NONCOMMERCIAL.md`](LICENSE-NONCOMMERCIAL.md)).
 
 We do **not** charge for the app. A **commercial license**
 ([`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md)) — **USD 20, one-time, per

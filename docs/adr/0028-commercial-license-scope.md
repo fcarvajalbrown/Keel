@@ -68,10 +68,16 @@ grant no commercial rights).
 ## Consequences
 
 - Wording is swept to name the paying parties and drop the "paid GUI" reading
-  across the core licensing surface: `COMMERCIAL-LICENSE.md`, `LICENSE-GUI.md`, and
-  the README (EN + ES) License + Support sections. The redundant "GUI: free for
-  non-commercial" badge is removed (the commercial-use badge already carries the
-  split).
+  across the core licensing surface: `COMMERCIAL-LICENSE.md`,
+  `LICENSE-NONCOMMERCIAL.md`, and the README (EN + ES) License + Support sections.
+  The redundant "GUI: free for non-commercial" badge is removed (the commercial-use
+  badge already carries the split).
+- **`LICENSE-GUI.md` is renamed to `LICENSE-NONCOMMERCIAL.md`.** The old name
+  implied the GUI was the licensed/paid thing; everyone gets the app, and the file
+  is really the non-commercial-use license — the counterpart to
+  `COMMERCIAL-LICENSE.md`. All references updated (READMEs, COMMERCIAL-LICENSE.md,
+  per-file headers in `gui.py` / `gui_theme.py` / `userpresets.py`, installer
+  `LicenseFile`, ADR index).
 - No change to the licenses themselves (AGPL engine; PolyForm + grant GUI; separate
   commercial license) or to the price — this ADR sharpens **scope and framing**,
   not the legal structure.
@@ -85,6 +91,6 @@ grant no commercial rights).
 - Supersedes: [ADR-0025](0025-gui-noncommercial-license-and-donations.md).
 - Related: [ADR-0023](0023-dual-licensing.md),
   [ADR-0024](0024-distribution-and-pricing.md).
-- `COMMERCIAL-LICENSE.md`, `LICENSE-GUI.md`, `README.md` / `README.es.md`
-  (License + Support).
+- `COMMERCIAL-LICENSE.md`, `LICENSE-NONCOMMERCIAL.md` (renamed from
+  `LICENSE-GUI.md`), `README.md` / `README.es.md` (License + Support).
 - PolyForm Noncommercial 1.0.0: <https://polyformproject.org/licenses/noncommercial/1.0.0>

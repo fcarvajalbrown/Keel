@@ -1,4 +1,8 @@
-# Keel desktop GUI — license
+# Keel — non-commercial use license (desktop app)
+
+> This is the **free** side of Keel's licensing. Everyone gets the desktop app;
+> this file is the **non-commercial-use** license for it — the counterpart to
+> [`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md). The app is not the paid product.
 
 Keel is licensed in two parts.
 
@@ -12,9 +16,11 @@ Keel is licensed in two parts.
   **commercial license** ([`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md)) for
   business use.
 
-In short: the GUI is **free for non-commercial use and for individual musicians
-making their own music** (even if they sell it). A paid commercial license is
-required only for **business / redistribution** use.
+In short: the app is **free for non-commercial use and for individual musicians
+making their own music** (even if they sell it). A commercial-use license is
+required only to **earn from other people's material or run a business on it** —
+record labels, professional mixing/mastering studios and freelance engineers doing
+paid client work, and companies offering/redistributing Keel.
 
 `Required Notice: Copyright (C) 2026 Felipe Carvajal Brown (https://github.com/fcarvajalbrown/Keel)`
 

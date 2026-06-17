@@ -13,7 +13,7 @@ people's** material or to build a business on it. Here is the whole picture.
 - **The desktop GUI** (the `Keel.exe` / `Keel.app` app) is **free for
   non-commercial use** and **free for individual musicians making their own
   music** — including selling that music — under the PolyForm Noncommercial
-  License plus an additional grant ([`LICENSE-GUI.md`](LICENSE-GUI.md)). If you
+  License plus an additional grant ([`LICENSE-NONCOMMERCIAL.md`](LICENSE-NONCOMMERCIAL.md)). If you
   find it useful, [donations](README.md#support--donate) keep it alive.
 
 You do **not** need to pay anything to mix and master your own songs with Keel,

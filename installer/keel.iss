@@ -42,7 +42,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 ; The installer ships the GUI app, so it shows the GUI license (PolyForm
 ; Noncommercial + the free-use grant). The engine remains AGPL (..\LICENSE);
 ; business use needs the commercial license (..\COMMERCIAL-LICENSE.md).
-LicenseFile=..\LICENSE-GUI.md
+LicenseFile=..\LICENSE-NONCOMMERCIAL.md
 OutputDir=..\dist
 OutputBaseFilename=KeelSetup-{#MyAppVersion}
 Compression=lzma2/max

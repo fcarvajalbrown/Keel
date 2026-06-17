@@ -3,7 +3,7 @@
 #
 # Part of the Keel GUI: licensed under the PolyForm Noncommercial License 1.0.0
 # plus an additional free-use grant for individual musicians making their own
-# music — see LICENSE-GUI.md. Business/redistribution use needs a commercial
+# music — see LICENSE-NONCOMMERCIAL.md. Business/redistribution use needs a commercial
 # license (COMMERCIAL-LICENSE.md) or contact fcarvajalbrown@gmail.com.
 # (The engine it imports — keel/recipes/mixer/mastering/meters — is AGPL-3.0.)
 """

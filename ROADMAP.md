@@ -197,7 +197,7 @@ VS Community 2026.
 - [x] Licensing / funding model. The engine stays **AGPL-3.0** (free, open). The
       packaged **GUI app is free** for non-commercial use and for individual
       musicians making (and selling) their own music — PolyForm Noncommercial
-      plus an additional grant (`LICENSE-GUI.md`); funded by **donations**
+      plus an additional grant (`LICENSE-NONCOMMERCIAL.md`); funded by **donations**
       (PayPal, GitHub Sponsor button via `.github/FUNDING.yml`). A **commercial
       license** (`COMMERCIAL-LICENSE.md`), **USD 20 one-time per seat**, is
       required only for business / redistribution use (paid product/service,
