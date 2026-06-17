@@ -5,22 +5,29 @@ You are picking up work on **Keel**, a deterministic automix + automaster engine
 **standalone GUI** and a **VST/plugin**. The CLI engine is done and validated on
 real-world material; the GUI scaffold + cross-platform builds now exist too.
 
-## >>> START HERE — immediate next task (agreed with the user 2026-06-16)
+## >>> START HERE — immediate next task
 
-**Phase 4 GUI polish:** two remaining items in `gui.py` —
-1. **Real-time playback metering** — play the rendered master and drive the
-   LUFS / true-peak meters live (today they only update post-render). Use the
-   same `meters.py` math; keep it deterministic for the render path (playback
-   metering is display-only, so that's fine).
-2. **Live re-render on fader move** — when a balance fader changes, re-render
-   (debounced, in the worker thread) so the user hears/sees the new balance
-   without clicking Render each time. Mind the scope lock (ADR-0001): faders
-   change level balance only, never tone.
+**Phase 4 GUI polish is DONE** (shipped 2026-06-17, commits on `main`):
+1. **Real-time playback metering** — `gui.py` now has a "Play master" button
+   that streams the rendered master to the audio device via QtMultimedia
+   QAudioSink (Int16 push mode) and drives the LUFS / true-peak meters live off
+   the actual playback position, measuring a trailing 3 s window with the
+   engine's own `meters.py` math. Throttled (~150 ms) meter recompute; guarded
+   import + `available()` device gate so headless/no-device (incl. `--selftest`)
+   degrades to a disabled button. Display-only — render path stays deterministic.
+2. **Live re-render on fader move** — a default-off "Live preview" checkbox; a
+   fader settling (re)arms a single-shot debounce timer that re-renders the full
+   mix + master via the existing RenderWorker, coalescing moves made mid-render.
+   Faders change level balance only (ADR-0001 scope lock honored).
 
-Confirm with the user first (blue option UI) — they may want to re-pick — but
-this is where we left off. Other live threads if they redirect: code-signing /
-notarization (needs them to pay the publication fee first), the Matchering A/B
-(needs a reference track), and the Phase 6 GitHub Pages landing page.
+Both validated headlessly (`--selftest` green; playback verified emitting live
+reads against a rendered song3 master). Confirm direction with the user via the
+blue option UI before the next task — candidates, none started:
+- **Phase 4 packaging:** code-signing / notarization (needs the publication fee
+  paid first) + a proper installer. The .exe/.app build green but unsigned.
+- **Phase 2 Matchering A/B:** teed up, still needs a reference track (below).
+- **Phase 6 landing page:** GitHub Pages static site (tagline, demo, checkout).
+- **Phase 5 VST/plugin:** the next big build.
 
 ## Before writing any code
 
@@ -31,7 +38,8 @@ notarization (needs them to pay the publication fee first), the Matchering A/B
 2. **Locate the current phase in `ROADMAP.md`.** DONE: Phase 0-1 (engine core +
    song-agnostic standalone), Phase 3 (presets/config). IN PROGRESS: Phase 2
    (validate — only the Matchering A/B + optional tuning remain) and **Phase 4
-   (GUI — scaffold + executables + CI done; polish remaining, see START HERE)**.
+   (GUI — scaffold + executables + CI + polish done; only code-signing /
+   installer remain, see START HERE)**.
    Phases 5-6 (VST, distribution) follow.
 3. **Confirm direction with the user before proceeding.** Ask via the
    **interactive arrow-select option UI (the blue selector), not a plain-text
@@ -97,8 +105,8 @@ pushed, 19-test suite green):
   Kivy (Kivy has no cp314 wheels, won't install on 3.14; PySide6 is abi3 + LGPL,
   fits the commercial build). GUI deps install ONLINE via `setup.ps1 -Gui` /
   `requirements-gui.txt` -- NOT vendored (~150 MB Qt; core engine stays offline).
-  Still open in Phase 4: real-time playback metering, live re-render on fader
-  move.
+  Phase 4 GUI polish (real-time playback metering + live re-render on fader
+  move) shipped 2026-06-17 — see START HERE; only code-signing / installer left.
 - **Executables + CI (Phase 4).** `Keel.spec` (PyInstaller) builds a Windows
   onefile `Keel.exe` and a macOS `Keel.app`; `gui.py --selftest` lets the frozen
   app verify itself headlessly. `.github/workflows/build-app.yml` builds BOTH on

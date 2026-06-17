@@ -85,12 +85,15 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 - [~] Drag-a-folder window: detect stems, show what was matched/missing.
       Scaffold built in `gui.py` (PySide6): drop/open a folder, auto-detect
       labels into an editable file->label table.
-- [~] Live balance faders (relative LU) + LUFS / true-peak meters reading the
-      same `meters.py` math the engine uses. Faders + post-render LUFS/TP meters
-      in place; real-time playback metering is a later polish pass.
-- [~] One-click render to mix + master; reference-match picker; preset save/load.
+- [x] Live balance faders (relative LU) + LUFS / true-peak meters reading the
+      same `meters.py` math the engine uses. Faders, post-render LUFS/TP meters,
+      and real-time playback metering — "Play master" streams the rendered master
+      via QtMultimedia QAudioSink and drives the meters live over a trailing 3 s
+      window (display-only; the render path stays deterministic) — all in place.
+- [x] One-click render to mix + master; reference-match picker; preset save/load.
       Render button (mix+master in a worker thread), reference picker, and
-      save/load of both user presets and the project `keel.json`.
+      save/load of both user presets and the project `keel.json`. A default-off
+      "Live preview" re-renders mix + master (debounced) on each fader move.
 - [~] Package as a desktop app (Windows first, then macOS). `Keel.spec`
       (PyInstaller) builds a Windows onefile `Keel.exe` and a macOS `Keel.app`;
       a GitHub Actions matrix (`.github/workflows/build-app.yml`) builds both on
