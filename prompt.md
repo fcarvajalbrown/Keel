@@ -25,8 +25,6 @@ reads against a rendered song3 master). Confirm direction with the user via the
 blue option UI before the next task — candidates, none started:
 - **Phase 4 packaging:** code-signing / notarization (needs the publication fee
   paid first) + a proper installer. The .exe/.app build green but unsigned.
-- **Phase 2 bus-glue verdict:** the only open Phase 2 item — a song3 A/B is
-  rendered (below); needs the user's ear. Default stays OFF unless they say so.
 - **Phase 6 landing page:** GitHub Pages static site (tagline, demo, checkout).
 - **Phase 5 VST/plugin:** the next big build.
 
@@ -38,7 +36,7 @@ blue option UI before the next task — candidates, none started:
    them — they encode decisions already made.
 2. **Locate the current phase in `ROADMAP.md`.** DONE: Phase 0-1 (engine core +
    song-agnostic standalone), Phase 3 (presets/config). IN PROGRESS: Phase 2
-   (validate — only the optional bus-glue by-ear verdict remains) and **Phase 4
+   (validate — DONE this session) and **Phase 4
    (GUI — scaffold + executables + CI + polish done; only code-signing /
    installer remain, see START HERE)**.
    Phases 5-6 (VST, distribution) follow.
@@ -141,13 +139,12 @@ Closed out the small open validation items (decisions made with the user):
   (ADR-0009) — blank reference = Keel's default internal master; pick a file =
   match it via Matchering, that render only. The GUI now spells this out
   (placeholder + tooltip). No formal internal-vs-reference benchmark will be run.
-- **Bus glue — AWAITING THE USER'S EAR (only open Phase 2 item).** Wired
-  (keel.json `glue` + `--glue` + GUI toggle), OFF by default (ADR-0015). A song3
-  A/B is rendered for the user to judge:
-  `C:\Projects\Keel-testdata\out\song3_{noglue,glue}_master.wav`. Both land at
-  exactly -14.0 LUFS / -4.08 dBTP, so the difference is purely glue's character;
-  its effect on already-mixed-ready stems is subtle. Default stays OFF unless the
-  user's listen says otherwise.
+- **Bus glue — CLOSED, stays OFF.** Wired (keel.json `glue` + `--glue` + GUI
+  toggle), OFF by default (ADR-0015). Song3 A/B rendered (both at -14.0 LUFS /
+  -4.08 dBTP); the user listened and judged the two ~identical, confirming glue
+  is inaudible on already-mixed-ready stems. Kept only as an opt-in escape hatch.
+
+With this, **Phase 2 is DONE** — every validation item is resolved or dropped.
 
 ## How the user likes to work (match this)
 

@@ -45,7 +45,7 @@ a tone-shaping suite. See "Non-goals" at the bottom.
       A label holds 1..N files, balanced as one group. Validated end-to-end
       (single + `--batch` + `--scan`) on synthetic multitracks.
 
-## Phase 2 — Validate on real-world material (IN PROGRESS)
+## Phase 2 — Validate on real-world material (DONE)
 - [x] Run on several real multitracks; confirm the default balance generalizes.
       Validated on three deliveries (Cambridge MT raw rock kit, a synth-heavy
       17-track multitrack, and a 5-stem pre-mixed set) at 44.1 and 48 kHz. Two
@@ -61,12 +61,12 @@ a tone-shaping suite. See "Non-goals" at the bottom.
       across all three real deliveries without adjustment, so they are left
       unchanged by decision (changing them would need fresh research per the
       research-before-tweak rule).
-- [~] Optional gentle **bus glue** (wired: keel.json `glue` + `--glue` + the GUI
-      toggle, OFF by default). A by-ear A/B is rendered for song3 (glue off vs
-      on); both masters land at exactly -14.0 LUFS / -4.08 dBTP, so the only
-      difference is glue's compression character — its effect on already-mixed-
-      ready stems is subtle. Stays OFF by default (ADR-0015); awaiting the user's
-      listening verdict before any change.
+- [x] Optional gentle **bus glue** (wired: keel.json `glue` + `--glue` + the GUI
+      toggle, OFF by default). By-ear A/B rendered for song3 (glue off vs on);
+      both masters land at exactly -14.0 LUFS / -4.08 dBTP and the user judged
+      them ~identical, confirming glue is inaudible on already-mixed-ready stems.
+      Decision: stays OFF by default (ADR-0015), kept only as an opt-in escape
+      hatch. Closed.
 - [x] Dither on export. Closed/not-needed: Keel is 24-bit in and out throughout,
       where dither is unnecessary. Documented future hook: add TPDF dither only
       if a sub-24-bit export path is ever introduced.
