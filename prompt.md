@@ -79,22 +79,29 @@ Python Finalize**.
   Licensing unchanged (JUCE AGPLv3 / Starter; review VST3 + ARA SDK terms). ARA2
   is the later polish (whole-clip Finalize, no manual bounce).
 
-**>>> SPIKE STATE (shipped on `main`, 2026-06-17).** `plugin/` builds green (VST3
-+ Standalone, JUCE 8.0.9 via FetchContent, MSVC 14.50 / VS 2026 / CMake 4.2.3,
+**>>> SPIKE STATE (on `main`, 2026-06-17).** `plugin/` builds green (VST3 +
+Standalone, JUCE 8.0.9 via FetchContent, MSVC 14.50 / VS 2026 / CMake 4.2.3,
 zero warnings), **auto-installs** the VST3 to the per-user folder
 (`%LOCALAPPDATA%\Programs\Common\VST3`, `COPY_PLUGIN_AFTER_BUILD`), and was
-**loaded + confirmed in Mixcraft**. Currently it is still **pass-through** (live
-chain not yet ported) + live K-weighted momentary LUFS + 4x true-peak meters +
-the master-only UI; **Finalize is a STUB** (info dialog). Build/iterate via
-`plugin\build.ps1`; details in `plugin/README.md`.
+**loaded + confirmed in Mixcraft**.
 
-**>>> NEXT TASK — implement the live model (confirm scope first):**
-1. **Port the live C++ master chain** into `plugin/Source/` (replace the
-   pass-through): tone -> soft-clip -> 4x true-peak limiter, matching
-   `mastering.py` stage-for-stage as closely as JUCE allows (NOT the exact-LUFS
-   normalize — Finalize owns that). A/B against the Python reference on a real
-   file. Mind the DSP SYNC RULE. JUCE `dsp::` has the building blocks (IIR for
-   tone, Oversampling already wired for TP, a limiter or hand-rolled look-ahead).
+**>>> LIVE CHAIN PORTED (2026-06-17).** Task 1 below is DONE: `plugin/Source/`
+no longer passes through — it runs the **live C++ master chain** (faithful preview
+per ADR-0027): tone (HPF 28 / low-shelf +1\@110 / air +1.5\@9k / glue comp
+-14,1.6:1) -> **Ozone-style auto makeup** (slow K-weighted loudness estimate ->
+heavily-smoothed gain toward the target LUFS, standing in for Python's
+whole-program pre-normalize) -> oversampled tanh soft-clip -> 4x oversampled
+true-peak limiter. LUFS/TP sliders retarget it live; the two meters now read the
+chain OUTPUT. Built from the same `juce::dsp` blocks pedalboard wraps (so it ports
+closely; the limiter won't null pedalboard's). Glue comp is always-on (faithful to
+`mastering.py`); the UI "Bus glue" toggle isn't wired to the live chain yet.
+**Finalize is still a STUB** (info dialog). **PENDING: by-ear A/B** of the preview
+vs a `build.py` render of the same audio (expect close, not identical). Mind the
+DSP SYNC RULE on any master-math change. Build/iterate via `plugin\build.ps1`;
+details in `plugin/README.md`.
+
+**>>> NEXT TASK — wire Finalize (confirm scope first):**
+1. ~~Port the live C++ master chain~~ **DONE** (see LIVE CHAIN PORTED above).
 2. **Wire Finalize for real:** add a headless `--master-file IN OUT` entry to the
    engine (build.py masters `out/<name>_mix.wav` only today; it needs a
    one-file-in/one-file-out path that skips stems/labels), re-freeze it, then have

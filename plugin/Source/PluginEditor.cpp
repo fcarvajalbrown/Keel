@@ -28,7 +28,7 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     titleLabel.setColour (juce::Label::textColourId, juce::Colours::white);
     addAndMakeVisible (titleLabel);
 
-    subtitleLabel.setText ("master-bus processor (spike)", juce::dontSendNotification);
+    subtitleLabel.setText ("live master preview (master bus)", juce::dontSendNotification);
     subtitleLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible (subtitleLabel);
 
@@ -80,15 +80,17 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     applyButton.onClick = [this]
     {
         juce::AlertWindow::showMessageBoxAsync (
-            juce::MessageBoxIconType::InfoIcon, "Apply (not wired yet)",
-            "In this spike, Apply is a stub.\n\n"
-            "The shipped plugin will bounce the program audio to a temp WAV, run "
-            "the bundled frozen Keel engine to master it (exact -14 LUFS, -1 dBTP, "
-            "deterministic -- byte-identical to build.py / gui.py), and read the "
-            "result back. Same shared core; the DSP is not forked. (ADR-0026)");
+            juce::MessageBoxIconType::InfoIcon, "Finalize (not wired yet)",
+            "What you hear now is the LIVE C++ master preview (faithful, "
+            "approximate loudness).\n\n"
+            "Finalize is still a stub. The shipped plugin will bounce the program "
+            "audio to a temp WAV, run the bundled frozen Keel engine to master it "
+            "(exact -14 LUFS, -1 dBTP, deterministic -- byte-identical to build.py "
+            "/ gui.py), and read the result back. Same shared core; the DSP is not "
+            "forked. (ADR-0027)");
     };
 
-    applyNote.setText ("Apply runs the real master offline (stub in this spike).",
+    applyNote.setText ("Live preview is active. Finalize locks exact loudness (stub).",
                        juce::dontSendNotification);
     applyNote.setColour (juce::Label::textColourId, juce::Colours::grey);
     applyNote.setJustificationType (juce::Justification::centred);
@@ -105,7 +107,7 @@ KeelAudioProcessorEditor::~KeelAudioProcessorEditor()
 
 void KeelAudioProcessorEditor::applyPresetToTargets()
 {
-    const int idx = processor.apvts.getRawParameterValue ("preset")->load();
+    const int idx = (int) processor.apvts.getRawParameterValue ("preset")->load();
     if (idx >= 0 && idx < (int) (sizeof (kPresets) / sizeof (kPresets[0])))
     {
         if (auto* lufs = processor.apvts.getParameter ("lufs"))

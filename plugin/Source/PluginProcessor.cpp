@@ -14,6 +14,27 @@ namespace
     constexpr double kHpQ         = 0.5003270373253953;
 
     constexpr float kSilenceFloor = -100.0f; // dB shown as "no signal"
+
+    // --- LIVE master chain constants -- MIRROR of mastering.py._internal_master.
+    //     DSP SYNC RULE (ADR-0027): if these change in Python, change them here too.
+    constexpr double kHpfHz        = 28.0;    // sub-rumble high-pass
+    constexpr double kLoShelfHz    = 110.0;   // low-shelf
+    constexpr double kLoShelfQ     = 0.7;
+    constexpr double kLoShelfGainDb= 1.0;
+    constexpr double kAirHz        = 9000.0;  // air high-shelf
+    constexpr double kAirQ         = 0.7;
+    constexpr double kAirGainDb    = 1.5;
+    constexpr float  kCompThreshDb = -14.0f;  // glue comp
+    constexpr float  kCompRatio    = 1.6f;
+    constexpr float  kCompAttackMs = 30.0f;
+    constexpr float  kCompReleaseMs= 250.0f;
+    constexpr float  kLimReleaseMs = 120.0f;  // matches pedalboard Limiter
+
+    constexpr double kMakeupTauSec = 3.0;     // slow loudness window for auto makeup
+    constexpr float  kMakeupMaxDb  = 24.0f;   // clamp makeup so silence can't blow up
+    constexpr double kMakeupFloorMs = 1.0e-9; // below this energy, hold the gain
+
+    inline double dbToGain (double db) { return std::pow (10.0, db / 20.0); }
 }
 
 KeelAudioProcessor::KeelAudioProcessor()
@@ -65,10 +86,10 @@ void KeelAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 48000.0;
 
     auto shelf = juce::dsp::IIR::Coefficients<float>::makeHighShelf (
-        currentSampleRate, kShelfFreq, kShelfQ,
+        currentSampleRate, (float) kShelfFreq, (float) kShelfQ,
         (float) std::pow (10.0, kShelfGainDb / 20.0));
     auto hp = juce::dsp::IIR::Coefficients<float>::makeHighPass (
-        currentSampleRate, kHpFreq, kHpQ);
+        currentSampleRate, (float) kHpFreq, (float) kHpQ);
 
     juce::dsp::ProcessSpec spec { currentSampleRate,
                                   (juce::uint32) juce::jmax (1, samplesPerBlock),
@@ -88,9 +109,62 @@ void KeelAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     window.reserve (256);
 
     const auto numCh = (size_t) juce::jmax (1, getTotalNumOutputChannels());
+    const auto block = (size_t) juce::jmax (1, samplesPerBlock);
+
     oversampler = std::make_unique<juce::dsp::Oversampling<float>> (
         numCh, 2, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR);
-    oversampler->initProcessing ((size_t) juce::jmax (1, samplesPerBlock));
+    oversampler->initProcessing (block);
+
+    // --- live master chain (mirror of mastering.py) ---
+    // Tone filters: 1st-order HPF + low-shelf + air high-shelf, per channel.
+    auto hpfCoef = juce::dsp::IIR::Coefficients<float>::makeFirstOrderHighPass (
+        currentSampleRate, (float) kHpfHz);
+    auto loCoef = juce::dsp::IIR::Coefficients<float>::makeLowShelf (
+        currentSampleRate, (float) kLoShelfHz, (float) kLoShelfQ,
+        (float) dbToGain (kLoShelfGainDb));
+    auto airCoef = juce::dsp::IIR::Coefficients<float>::makeHighShelf (
+        currentSampleRate, (float) kAirHz, (float) kAirQ,
+        (float) dbToGain (kAirGainDb));
+
+    juce::dsp::ProcessSpec monoSpec { currentSampleRate, (juce::uint32) block, 1 };
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        hpf[ch].coefficients     = hpfCoef;
+        loShelf[ch].coefficients = loCoef;
+        hiShelf[ch].coefficients = airCoef;
+        // detector reuses the same K-weighting as the meter (high-shelf + RLB HP)
+        detShelf[ch].coefficients    = shelf;
+        detHighpass[ch].coefficients = hp;
+        for (auto* f : { &hpf[ch], &loShelf[ch], &hiShelf[ch], &detShelf[ch], &detHighpass[ch] })
+        {
+            f->prepare (monoSpec);
+            f->reset();
+        }
+    }
+
+    // Glue compressor across the stereo bus (constant params; always on, like Python).
+    juce::dsp::ProcessSpec stereoSpec { currentSampleRate, (juce::uint32) block, 2 };
+    glueComp.prepare (stereoSpec);
+    glueComp.setThreshold (kCompThreshDb);
+    glueComp.setRatio (kCompRatio);
+    glueComp.setAttack (kCompAttackMs);
+    glueComp.setRelease (kCompReleaseMs);
+
+    // True-peak limiter runs in the 4x-oversampled domain (threshold set per block).
+    oversampleRate = currentSampleRate * 4.0;
+    juce::dsp::ProcessSpec osSpec { oversampleRate, (juce::uint32) (block * 4), 2 };
+    limiter.prepare (osSpec);
+    limiter.setRelease (kLimReleaseMs);
+
+    processOversampler = std::make_unique<juce::dsp::Oversampling<float>> (
+        2, 2, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR);
+    processOversampler->initProcessing (block);
+    setLatencySamples ((int) std::round (processOversampler->getLatencyInSamples()));
+
+    // Auto-makeup: start at unity, smooth gain changes over 200 ms to kill zipper.
+    detEmaMeanSq[0] = detEmaMeanSq[1] = 0.0;
+    makeupGain.reset (currentSampleRate, 0.2);
+    makeupGain.setCurrentAndTargetValue (1.0f);
 
     resetMeters();
 }
@@ -109,12 +183,99 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                        juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
-    const int numCh = buffer.getNumChannels();
+    const int numCh = juce::jmin (buffer.getNumChannels(), 2);
     const int numSamples = buffer.getNumSamples();
 
-    // --- This is a PASS-THROUGH: the dry audio is left exactly as it came in.
-    //     Mastering happens offline on Apply (stubbed in this spike). Below we
-    //     only MEASURE; we never write to the buffer. ---
+    const float targetLufs = apvts.getRawParameterValue ("lufs")->load();
+    const float tpCeilDb    = apvts.getRawParameterValue ("tp")->load();
+
+    // ============================ LIVE MASTER CHAIN ============================
+    // A faithful preview of mastering.py (ADR-0027). Audio IS altered here; the
+    // meters below then measure the OUTPUT. Exact loudness is locked on Finalize.
+
+    // 1) Tone: HPF -> low-shelf -> air high-shelf, per channel.
+    for (int ch = 0; ch < numCh; ++ch)
+    {
+        float* x = buffer.getWritePointer (ch);
+        for (int i = 0; i < numSamples; ++i)
+        {
+            float s = hpf[ch].processSample (x[i]);
+            s = loShelf[ch].processSample (s);
+            s = hiShelf[ch].processSample (s);
+            x[i] = s;
+        }
+    }
+    if (numSamples > 0)
+    {
+        juce::dsp::AudioBlock<float> toneBlock (buffer);
+        glueComp.process (juce::dsp::ProcessContextReplacing<float> (toneBlock));
+    }
+
+    // 2) Auto makeup (Ozone-style): measure a slow K-weighted loudness of the
+    //    post-tone signal and ramp a heavily-smoothed gain toward the target.
+    //    Stands in for mastering.py's whole-program pre-normalize.
+    if (numSamples > 0)
+    {
+        double sumSq[2] = { 0.0, 0.0 };
+        for (int ch = 0; ch < numCh; ++ch)
+        {
+            const float* in = buffer.getReadPointer (ch);
+            double acc = 0.0;
+            for (int i = 0; i < numSamples; ++i)
+            {
+                float s = detShelf[ch].processSample (in[i]);
+                s = detHighpass[ch].processSample (s);
+                acc += (double) s * (double) s;
+            }
+            sumSq[ch] = acc;
+        }
+        const double blockDur = numSamples / currentSampleRate;
+        const double alpha = 1.0 - std::exp (-blockDur / kMakeupTauSec);
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            const double meanSq = ch < numCh ? sumSq[ch] / numSamples : 0.0;
+            detEmaMeanSq[ch] += (meanSq - detEmaMeanSq[ch]) * alpha;
+        }
+        const double zSum = detEmaMeanSq[0] + detEmaMeanSq[1];
+        if (zSum > kMakeupFloorMs)
+        {
+            const double loud = -0.691 + 10.0 * std::log10 (zSum);
+            const float gainDb = juce::jlimit (-kMakeupMaxDb, kMakeupMaxDb,
+                                               (float) (targetLufs - loud));
+            makeupGain.setTargetValue ((float) dbToGain (gainDb));
+        }
+
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float g = makeupGain.getNextValue();
+            for (int ch = 0; ch < numCh; ++ch)
+                buffer.getWritePointer (ch)[i] *= g;
+        }
+    }
+
+    // 3) Oversampled tanh soft-clip (a hair above the limiter ceiling so the
+    //    clipper takes the very top) + 4) 4x true-peak limiter to the ceiling.
+    if (processOversampler != nullptr && numSamples > 0)
+    {
+        const double clipCeil = dbToGain (juce::jmin (0.0, (double) tpCeilDb + 1.0));
+        juce::dsp::AudioBlock<float> outBlock (buffer);
+        auto upBlock = processOversampler->processSamplesUp (outBlock);
+
+        for (size_t ch = 0; ch < upBlock.getNumChannels(); ++ch)
+        {
+            float* u = upBlock.getChannelPointer (ch);
+            for (size_t i = 0; i < upBlock.getNumSamples(); ++i)
+                u[i] = (float) (clipCeil * std::tanh (u[i] / clipCeil));
+        }
+
+        limiter.setThreshold (tpCeilDb);
+        limiter.process (juce::dsp::ProcessContextReplacing<float> (upBlock));
+
+        processOversampler->processSamplesDown (outBlock);
+    }
+    // ===========================================================================
+
+    // --- Below we only MEASURE the OUTPUT; we never write to the buffer. ---
 
     // 1) Momentary LUFS over a 400 ms sliding window (K-weighted mean square).
     Block blk { { 0.0, 0.0 }, numSamples };

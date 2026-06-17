@@ -1,9 +1,10 @@
-// Keel plugin spike -- editor.
+// Keel plugin -- editor.
 //
-// Deliberately the SIMPLE, master-only UI (ADR-0026): it drops the standalone
+// Deliberately the SIMPLE, master-only UI (ADR-0027): it drops the standalone
 // GUI's file->label table and balance faders, keeping only the master controls
-// (preset / target LUFS / TP ceiling / reference / glue), the two live meters,
-// and an Apply button. Apply is a non-functional stub in this spike.
+// (preset / target LUFS / TP ceiling / reference / glue), the two live meters
+// (reading the live-master OUTPUT), and a Finalize button. Finalize -- the
+// byte-identical Python master -- is a non-functional stub for now.
 
 #pragma once
 
@@ -42,7 +43,7 @@ private:
     float lufsMeterValue { -100.0f };
     float tpMeterValue   { -100.0f };
 
-    juce::TextButton applyButton { "Apply master" };
+    juce::TextButton applyButton { "Finalize" };
     juce::Label      applyNote;
 
     using ComboAttachment  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;

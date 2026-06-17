@@ -1,10 +1,20 @@
-// Keel plugin spike -- master-bus processor (ADR-0026).
+// Keel plugin -- master-bus processor (ADR-0027).
 //
-// Real-time stereo PASS-THROUGH (the audio is not altered) while driving two
-// display-only meters: a BS.1770-4 K-weighted momentary LUFS meter and a 4x
-// oversampled true-peak meter. The authoritative numbers still come from the
-// Python engine on Apply; these are live guidance, exactly like the GUI's
-// playback meters. Apply itself is a stub in this spike.
+// Runs the LIVE C++ master chain (a faithful PREVIEW of the Python master): tone
+// (HPF 28 / low-shelf / air / glue comp) -> Ozone-style auto makeup toward the
+// target -> oversampled tanh soft-clip -> 4x oversampled true-peak limiter. You
+// hear the Keel master and tweak it in real time; the two meters (BS.1770-4
+// momentary LUFS + 4x true-peak) read the OUTPUT.
+//
+// Loudness is APPROXIMATE live (the makeup chases a slow loudness estimate toward
+// the target; exact integrated LUFS is whole-program, so it cannot be live). The
+// byte-identical, exact -14 LUFS / -1 dBTP master is produced by the Python engine
+// on Finalize (still a stub here).
+//
+// >>> DSP SYNC RULE (ADR-0027, load-bearing): this chain and mastering.py are two
+//     disconnected impls of the same master character. Any change to the Python
+//     master math MUST be mirrored here (and re-A/B'd), or the preview drifts from
+//     the Finalized file.
 
 #pragma once
 
@@ -52,6 +62,24 @@ public:
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout makeParameterLayout();
+
+    // --- LIVE master chain (ADR-0027 preview; mirror of mastering.py) ---
+    // Tone stage: 1st-order HPF + low-shelf + air high-shelf (per channel), then a
+    // gentle glue compressor across the stereo bus. Same blocks pedalboard wraps.
+    juce::dsp::IIR::Filter<float> hpf[2], loShelf[2], hiShelf[2];
+    juce::dsp::Compressor<float>  glueComp;
+    // True-peak limiter, run on the 4x-oversampled signal (intersample peaks become
+    // real samples it can catch), paired with an oversampled tanh soft-clip above.
+    juce::dsp::Limiter<float>     limiter;
+    std::unique_ptr<juce::dsp::Oversampling<float>> processOversampler;
+    double oversampleRate { 192000.0 };
+
+    // Ozone-style auto makeup: a slow K-weighted loudness estimate of the post-tone
+    // signal drives a heavily-smoothed makeup gain toward the target LUFS, standing
+    // in for mastering.py's whole-program pre-normalize (which can't run live).
+    juce::dsp::IIR::Filter<float> detShelf[2], detHighpass[2];
+    double detEmaMeanSq[2] { 0.0, 0.0 };
+    juce::SmoothedValue<float> makeupGain;
 
     // BS.1770-4 K-weighting: a high-shelf pre-filter followed by an RLB
     // high-pass, one of each per channel.
