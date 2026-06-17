@@ -3,6 +3,14 @@
        alt="Keel — Automatic Mixing + Mastering for Finished Stems">
 </p>
 
+<p align="center">
+  <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.1.0-alpha/KeelSetup-0.1.0.exe">
+    <img src="https://img.shields.io/badge/Download%20for%20Windows-Pre--Alpha%20installer-2ea44f?style=for-the-badge&logo=windows&logoColor=white"
+         alt="Download Keel for Windows — pre-alpha installer">
+  </a>
+</p>
+<p align="center"><sub>Unsigned pre-alpha: Windows may warn — click <b>More info &rarr; Run anyway</b>. macOS &amp; other downloads on the <a href="https://github.com/fcarvajalbrown/Keel/releases/latest">releases page</a>.</sub></p>
+
 > A **deterministic** automix + automaster engine. Give it a folder of
 > **finished, FX-printed stems**; it **loudness-balances** them into a stereo
 > **mix** and masters that mix to a clean, **streaming-safe loudness** — built on
