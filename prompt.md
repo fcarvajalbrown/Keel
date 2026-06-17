@@ -25,7 +25,8 @@ reads against a rendered song3 master). Confirm direction with the user via the
 blue option UI before the next task — candidates, none started:
 - **Phase 4 packaging:** code-signing / notarization (needs the publication fee
   paid first) + a proper installer. The .exe/.app build green but unsigned.
-- **Phase 2 Matchering A/B:** teed up, still needs a reference track (below).
+- **Phase 2 bus-glue verdict:** the only open Phase 2 item — a song3 A/B is
+  rendered (below); needs the user's ear. Default stays OFF unless they say so.
 - **Phase 6 landing page:** GitHub Pages static site (tagline, demo, checkout).
 - **Phase 5 VST/plugin:** the next big build.
 
@@ -37,7 +38,7 @@ blue option UI before the next task — candidates, none started:
    them — they encode decisions already made.
 2. **Locate the current phase in `ROADMAP.md`.** DONE: Phase 0-1 (engine core +
    song-agnostic standalone), Phase 3 (presets/config). IN PROGRESS: Phase 2
-   (validate — only the Matchering A/B + optional tuning remain) and **Phase 4
+   (validate — only the optional bus-glue by-ear verdict remains) and **Phase 4
    (GUI — scaffold + executables + CI + polish done; only code-signing /
    installer remain, see START HERE)**.
    Phases 5-6 (VST, distribution) follow.
@@ -127,30 +128,26 @@ pushed, 19-test suite green):
   GUI is the paid product (~USD 20) sold from a GitHub Pages static site under
   COMMERCIAL-LICENSE.md (LGPL PySide6 makes the closed build legal).
 
-## The immediate open task: Matchering reference A/B (Phase 2)
+## Phase 2 tail — wrapped up (2026-06-17)
 
-The user chose to run a **Matchering vs. internal-master A/B on ALL THREE songs**,
-then paused to do it "later." It is set up and ready:
-- `matchering` is already installed in `.venv` (offline). Run build/mastering with
-  `.venv\Scripts\python.exe`.
-- **Still needed from the user:** mastered, full-length **WAV/FLAC reference
-  track(s)** — ideally genre-matched per song (rock for song1, electronic for
-  song2, their genre for song3). One reference reused across all is acceptable but
-  skews the match (matchering copies the reference's tonal balance + loudness; the
-  reference SETS loudness, so the -14 target is ignored on that path).
-- **Plan:** for each song, master its existing `out/songN_mix.wav` through the
-  reference path into a separate file (e.g. `out/songN_ref_master.wav`) so the
-  internal master is kept side by side, then compare LUFS / true-peak / how hard
-  each pushes and **document when internal vs. reference wins** (the open
-  ROADMAP Phase 2 item). Easiest via `mastering.master(...)` directly, or
-  `build.py --master-only --ref <path>` (note: `--master-only` looks for
-  `<out>/<name>_mix.wav`, so reuse `--name songN` or call the module directly to
-  avoid clobbering the internal master).
-
-Other remaining Phase 2 items: **bus glue** is now wired (keel.json `"glue"` +
-`--glue`) but still OFF — the open part is the by-ear evaluate (needs the user);
-and `DEFAULT_BALANCE`/target tuning (so far the defaults generalized without
-tuning — research-before-tweak if you change DSP).
+Closed out the small open validation items (decisions made with the user):
+- **Balance / target tuning — CLOSED, no change.** `DEFAULT_BALANCE` and the
+  -14 LUFS target generalized across all three real deliveries with no tuning;
+  left unchanged by decision (any change needs fresh research-before-tweak).
+- **Dither — CLOSED, not needed.** 24-bit in/out throughout. Documented future
+  hook: add TPDF dither only if a sub-24-bit export path is ever introduced.
+- **Matchering reference A/B — DROPPED** (user is wary of references; tastes
+  differ). The optional reference-master path REMAINS an opt-in GUI/CLI feature
+  (ADR-0009) — blank reference = Keel's default internal master; pick a file =
+  match it via Matchering, that render only. The GUI now spells this out
+  (placeholder + tooltip). No formal internal-vs-reference benchmark will be run.
+- **Bus glue — AWAITING THE USER'S EAR (only open Phase 2 item).** Wired
+  (keel.json `glue` + `--glue` + GUI toggle), OFF by default (ADR-0015). A song3
+  A/B is rendered for the user to judge:
+  `C:\Projects\Keel-testdata\out\song3_{noglue,glue}_master.wav`. Both land at
+  exactly -14.0 LUFS / -4.08 dBTP, so the difference is purely glue's character;
+  its effect on already-mixed-ready stems is subtle. Default stays OFF unless the
+  user's listen says otherwise.
 
 ## How the user likes to work (match this)
 

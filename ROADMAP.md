@@ -56,15 +56,24 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 - [x] Confirm masters are loud enough and clean: all three landed exactly
       -14.0 LUFS, true-peak 3-4 dB under the -1.0 ceiling, no clipping, no NaN,
       including hot already-loud input stems (big negative balance gains).
-- [ ] Tune `DEFAULT_BALANCE` and the default target if real material demands it
-      (research-before-tweak: cite sources before changing the DSP approach).
-      So far the defaults generalized without tuning.
-- [ ] Decide when internal master vs. a Matchering reference wins; document it.
-      (Matchering is now vendored + verified importable on 3.14; needs a
-      reference track to A/B.)
-- [ ] Optional gentle **bus glue** preset (currently off) — evaluate by ear.
-- [ ] Dither on export if/when rendering below 24-bit (currently 24-bit in/out,
-      no dither needed).
+- [x] Tune `DEFAULT_BALANCE` and the default target if real material demands it.
+      Closed: no tuning needed. The defaults and the -14 LUFS target generalized
+      across all three real deliveries without adjustment, so they are left
+      unchanged by decision (changing them would need fresh research per the
+      research-before-tweak rule).
+- [~] Optional gentle **bus glue** (wired: keel.json `glue` + `--glue` + the GUI
+      toggle, OFF by default). A by-ear A/B is rendered for song3 (glue off vs
+      on); both masters land at exactly -14.0 LUFS / -4.08 dBTP, so the only
+      difference is glue's compression character — its effect on already-mixed-
+      ready stems is subtle. Stays OFF by default (ADR-0015); awaiting the user's
+      listening verdict before any change.
+- [x] Dither on export. Closed/not-needed: Keel is 24-bit in and out throughout,
+      where dither is unnecessary. Documented future hook: add TPDF dither only
+      if a sub-24-bit export path is ever introduced.
+      (Dropped: a formal Matchering reference-vs-internal A/B. The optional
+      reference-master path stays an opt-in GUI/CLI feature, ADR-0009; the
+      internal chain is the default and recommended master, so there is no
+      requirement to benchmark a reference the user does not want to match.)
 
 ## Phase 3 — Presets + richer config
 - [x] Per-project overrides (file -> label, balance/pan/spread/master) via
