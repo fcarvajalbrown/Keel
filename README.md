@@ -7,11 +7,11 @@
 
 <p align="center">
   <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.1.0-alpha/KeelSetup-0.1.0.exe">
-    <img src="https://img.shields.io/badge/Download%20for%20Windows-Pre--Alpha%20installer-2ea44f?style=for-the-badge&logo=windows&logoColor=white"
-         alt="Download Keel for Windows — pre-alpha installer">
+    <img src="https://img.shields.io/badge/Download%20for%20Windows-Alpha%20installer-2ea44f?style=for-the-badge&logo=windows&logoColor=white"
+         alt="Download Keel for Windows — alpha installer">
   </a>
 </p>
-<p align="center"><sub>Unsigned pre-alpha: Windows may warn — click <b>More info &rarr; Run anyway</b>. macOS &amp; other downloads on the <a href="https://github.com/fcarvajalbrown/Keel/releases/latest">releases page</a>.</sub></p>
+<p align="center"><sub>Unsigned alpha: Windows may warn — click <b>More info &rarr; Run anyway</b>. macOS &amp; other downloads on the <a href="https://github.com/fcarvajalbrown/Keel/releases/latest">releases page</a>.</sub></p>
 
 > A **deterministic** automix + automaster engine. Give it a folder of
 > **finished, FX-printed stems**; it **loudness-balances** them into a stereo
@@ -21,7 +21,7 @@
 
 <div align="center">
 
-[![status](https://img.shields.io/badge/status-pre--release-orange.svg)](ROADMAP.md)
+[![status](https://img.shields.io/badge/status-alpha-orange.svg)](ROADMAP.md)
 [![engine: AGPL v3](https://img.shields.io/badge/engine-AGPL%20v3-blue.svg)](LICENSE)
 [![GUI: free for non-commercial](https://img.shields.io/badge/GUI-free%20for%20non--commercial-success.svg)](LICENSE-GUI.md)
 [![commercial use: USD 20/seat](https://img.shields.io/badge/commercial%20use-USD%2020%2Fseat-blueviolet.svg)](COMMERCIAL-LICENSE.md)

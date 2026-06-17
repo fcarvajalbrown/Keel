@@ -7,11 +7,11 @@
 
 <p align="center">
   <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.1.0-alpha/KeelSetup-0.1.0.exe">
-    <img src="https://img.shields.io/badge/Descargar%20para%20Windows-Instalador%20Pre--Alpha-2ea44f?style=for-the-badge&logo=windows&logoColor=white"
-         alt="Descargar Keel para Windows — instalador pre-alpha">
+    <img src="https://img.shields.io/badge/Descargar%20para%20Windows-Instalador%20Alpha-2ea44f?style=for-the-badge&logo=windows&logoColor=white"
+         alt="Descargar Keel para Windows — instalador alpha">
   </a>
 </p>
-<p align="center"><sub>Pre-alpha sin firmar: Windows puede advertir — haz clic en <b>Más información &rarr; Ejecutar de todas formas</b>. macOS y otras descargas en la <a href="https://github.com/fcarvajalbrown/Keel/releases/latest">página de releases</a>.</sub></p>
+<p align="center"><sub>Alpha sin firmar: Windows puede advertir — haz clic en <b>Más información &rarr; Ejecutar de todas formas</b>. macOS y otras descargas en la <a href="https://github.com/fcarvajalbrown/Keel/releases/latest">página de releases</a>.</sub></p>
 
 > Un motor **determinista** de mezcla y masterización automática. Le das una
 > carpeta de **stems ya terminados, con sus efectos impresos**; los
@@ -23,7 +23,7 @@
 
 <div align="center">
 
-[![estado](https://img.shields.io/badge/estado-pre--release-orange.svg)](ROADMAP.md)
+[![estado](https://img.shields.io/badge/estado-alpha-orange.svg)](ROADMAP.md)
 [![motor: AGPL v3](https://img.shields.io/badge/motor-AGPL%20v3-blue.svg)](LICENSE)
 [![GUI: gratis uso no comercial](https://img.shields.io/badge/GUI-gratis%20uso%20no%20comercial-success.svg)](LICENSE-GUI.md)
 [![uso comercial: USD 20/asiento](https://img.shields.io/badge/uso%20comercial-USD%2020%2Fasiento-blueviolet.svg)](COMMERCIAL-LICENSE.md)
