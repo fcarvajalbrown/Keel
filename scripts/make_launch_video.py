@@ -1,11 +1,13 @@
 """Render the Keel launch video for Instagram (9:16, Spanish on-screen text).
 
-A ~15 s seamless loop in four scenes:
+A ~19 s seamless loop in five scenes:
   1. logo reveal + tagline ("Gratis. Abierta. Determinista.")
   2. stems -> mezcla + master (labeled chips converge to one master)
   3. the loudness meter counts to -14.0 LUFS as the waveform settles to a bell
-  4. "Descárgalo gratis" end card, then fades back to black = the first frame,
-     so it loops cleanly (replays compound Instagram watch time).
+  4. "Descárgalo gratis" end card
+  5. outro: the loudness graphic in reverse (-14 -> -22, bars un-settle) while
+     the audio fades out, then fades to black = the first frame, so it loops
+     cleanly (replays compound Instagram watch time).
 
 Outputs both:
   * assets/keel-launch.mp4  (1080x1920, H.264) -- for the video editor / Reel
@@ -30,7 +32,7 @@ import imageio.v2 as iio
 
 W, H = 1080, 1920
 FPS = 12
-DUR = 15.0
+DUR = 19.0
 MP4 = "assets/keel-launch.mp4"
 GIF = "assets/keel-launch.gif"
 GIF_SIZE = (720, 1280)
@@ -113,6 +115,21 @@ def draw_bars(p, heights, cx, baseline, unit=105, gap=21, color=TEAL):
         x += unit + gap
 
 
+def draw_loudness(p, e, show_tp):
+    """The balance/loudness graphic at progress e in [0,1]: bars settle from
+    uneven (e=0) to a balanced bell (e=1) and the readout goes -22 -> -14 LUFS.
+    Scene C plays it forward; the outro plays it in reverse (e: 1 -> 0)."""
+    text(p, "Balance + master,", H * 0.085, 84, WHITE)
+    text(p, "en un clic", H * 0.085 + 100, 84, TEAL)
+    lufs = lerp(-22.0, -14.0, e)
+    text(p, f"{lufs:0.1f}", H * 0.30, 225, TEAL)
+    text(p, "LUFS integrados", H * 0.30 + 258, 57, MUTED, False)
+    if show_tp:
+        text(p, "true peak -1.0 dBTP · sin clipping", H * 0.49, 48, MUTED, False)
+    heights = [lerp(s, b, e) for s, b in zip(START, BELL)]
+    draw_bars(p, heights, W / 2, H * 0.86)
+
+
 def draw_chip(p, cx, cy, w, h, label, opacity):
     p.save()
     p.setOpacity(opacity)
@@ -156,21 +173,12 @@ def render_frame(i, total):
         if e > 0.6:
             text(p, "->  una mezcla y un máster", H * 0.70, 60, TEAL)
 
-    # ---- Scene C: balance + loudness (6.5 - 11.5) ----
-    elif t < 11.5:
-        e = ease((t - 6.5) / 5.0)
-        text(p, "Balance + master,", H * 0.085, 84, WHITE)
-        text(p, "en un clic", H * 0.085 + 100, 84, TEAL)
-        lufs = lerp(-22.0, -14.0, e)
-        text(p, f"{lufs:0.1f}", H * 0.30, 225, TEAL)
-        text(p, "LUFS integrados", H * 0.30 + 258, 57, MUTED, False)
-        if t > 8.7:
-            text(p, "true peak -1.0 dBTP · sin clipping", H * 0.49, 48, MUTED, False)
-        heights = [lerp(s, b, e) for s, b in zip(START, BELL)]
-        draw_bars(p, heights, W / 2, H * 0.86)
+    # ---- Scene C: balance + loudness rises -22 -> -14 (6.5 - 11.0) ----
+    elif t < 11.0:
+        draw_loudness(p, ease((t - 6.5) / 4.5), show_tp=(t > 8.7))
 
-    # ---- Scene D: end card + fade to black (11.5 - 15.0) ----
-    else:
+    # ---- Scene D: end card (11.0 - 14.0) ----
+    elif t < 14.0:
         draw_logo(p, W / 2, H * 0.28, 840)
         text(p, "Descárgalo gratis", H * 0.45, 90, WHITE)
         bw, bh = 705, 144
@@ -182,10 +190,16 @@ def render_frame(i, total):
         text(p, "github.com/fcarvajalbrown/Keel", H * 0.66, 51, TEAL_DK)
         text(p, "código abierto · sin IA · sin suscripción", H * 0.71, 45, MUTED, False)
 
+    # ---- Scene E: outro — the loudness graphic in reverse (14.0 - 18.0) ----
+    # mirrors scene C (-14 -> -22, bars un-settle) while the audio fades out,
+    # then it fades to black = the first frame for a seamless loop.
+    else:
+        draw_loudness(p, ease(1.0 - (t - 14.0) / 4.0), show_tp=False)
+
     # fade to black over the tail so the last frame == the first frame (black):
     # a seamless loop, which compounds Instagram replays / watch time.
-    if t >= 14.0:
-        p.setOpacity(max(0.0, min(1.0, (t - 14.0) / 0.8)))
+    if t >= 18.0:
+        p.setOpacity(max(0.0, min(1.0, (t - 18.0) / 0.8)))
         p.fillRect(0, 0, W, H, BLACK)
         p.setOpacity(1.0)
 

@@ -25,9 +25,10 @@ GIF = "assets/keel-launch.gif"
 
 FALLBACK_LEN = 15.0    # clip length (s) if the media can't be read
 START_DB = -8.0        # opening gain: mirrors the -22 LUFS start vs -14 target
-RISE_A, RISE_B = 0.43, 0.76   # ramp window as a fraction of the clip (~scene C, loudness)
+# envelope windows as a fraction of the clip:
+RISE_A, RISE_B = 0.34, 0.58   # rise -8 dB -> 0 dB (~scene C, loudness up)
+FALL_A, FALL_B = 0.74, 0.95   # fade 0 dB -> silence (~scene E, outro loudness down)
 FADE_IN = 0.10         # anti-click fade from silence at the very start (s)
-FADE_OUT = 0.30        # fade out at the end (s)
 HOP = 0.5
 SKIP_HEAD, SKIP_TAIL = 5.0, 3.0
 
@@ -75,18 +76,21 @@ def main():
 
     clip = data[best_start:best_start + win_n].copy()
 
-    # gain envelope: hold at START_DB, ramp to full over [RISE_A, RISE_B], hold full
+    # gain envelope, mirroring the visual: hold at START_DB, rise to full over
+    # [RISE_A, RISE_B], hold full, then fade to silence over [FALL_A, FALL_B].
     f = np.linspace(0.0, 1.0, clip.shape[0])
     start_lin = 10 ** (START_DB / 20.0)
-    ramp = smoothstep((f - RISE_A) / (RISE_B - RISE_A))
-    g = np.where(f < RISE_A, start_lin,
-                 np.where(f < RISE_B, start_lin + (1 - start_lin) * ramp, 1.0))
-    # anti-click fades on top
-    fi, fo = int(FADE_IN * sr), int(FADE_OUT * sr)
+    up = start_lin + (1 - start_lin) * smoothstep((f - RISE_A) / (RISE_B - RISE_A))
+    down = 1.0 - smoothstep((f - FALL_A) / (FALL_B - FALL_A))
+    g = np.ones_like(f)
+    g = np.where(f < RISE_A, start_lin, g)
+    g = np.where((f >= RISE_A) & (f < RISE_B), up, g)
+    g = np.where((f >= FALL_A) & (f < FALL_B), down, g)
+    g = np.where(f >= FALL_B, 0.0, g)
+    # tiny anti-click fade from silence at the very start
+    fi = int(FADE_IN * sr)
     if fi > 0:
         g[:fi] *= np.linspace(0.0, 1.0, fi)
-    if fo > 0:
-        g[-fo:] *= np.linspace(1.0, 0.0, fo)
     clip *= g[:, None]
 
     sf.write(OUT, clip, sr, subtype="PCM_24")

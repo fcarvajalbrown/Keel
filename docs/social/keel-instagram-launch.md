@@ -4,7 +4,7 @@ Material para publicar el lanzamiento (pre-alpha) en Instagram.
 
 ## Recursos
 
-- **Video (para editar):** `assets/keel-launch.mp4` (9:16, 1080x1920, ~15 s,
+- **Video (para editar):** `assets/keel-launch.mp4` (9:16, 1080x1920, ~19 s,
   H.264). Hecho para **loopear sin corte**: termina fundiéndose a negro = el
   primer frame, así Instagram lo repite (los replays suman watch time).
 - **Listo para publicar (con audio):** `out/keel-launch-final.mp4` — el video +
@@ -13,15 +13,16 @@ Material para publicar el lanzamiento (pre-alpha) en Instagram.
   `ffmpeg -y -i assets/keel-launch.mp4 -i out/keel_instagram_audio.wav -c:v copy -c:a aac -b:a 192k -shortest out/keel-launch-final.mp4`
 - **GIF (preview):** `assets/keel-launch.gif` (720x1280) para vista rápida /
   README. En un editor de video usa el MP4 (el GIF tiene rarezas de timing).
-- **Audio:** `out/keel_instagram_audio.wav` (15 s, 44.1 kHz, estéreo) — un
-  extracto del máster de tu propio tema (song3) con un **fade de loudness** que
-  sube de ~-22 a -14 LUFS sincronizado con el contador en pantalla. No se
-  commitea (es audio). Regenéralo con `python scripts/make_launch_audio.py`.
-- **Cuatro escenas (texto en pantalla):** 1) reveal del logo —
+- **Audio:** `out/keel_instagram_audio.wav` (19 s, 44.1 kHz, estéreo) — un
+  extracto del máster de tu propio tema (song3) con una envolvente que sube de
+  ~-22 a -14 LUFS (sincronizada con el contador) y luego **baja con fade-out**
+  en el outro. No se commitea (es audio). `python scripts/make_launch_audio.py`.
+- **Cinco escenas (texto en pantalla):** 1) reveal del logo —
   "Gratis · Abierta · Determinista"; 2) "De tus stems terminados" -> chips
   (drums/bajo/guitarra/voz/synth) -> "una mezcla y un máster"; 3)
   "Balance + master, en un clic" + el contador a -14.0 LUFS + "true peak -1.0
-  dBTP · sin clipping"; 4) "Descárgalo gratis".
+  dBTP · sin clipping"; 4) "Descárgalo gratis"; 5) outro: el mismo gráfico de
+  loudness en reversa (-14 -> -22) con fade-out del audio, y funde a negro.
 - Regenerar el video: `python scripts/make_launch_video.py` (saca MP4 + GIF).
 
 ## Caption (copiar y pegar)
@@ -53,7 +54,7 @@ recomendado son **3-5 hashtags relevantes** (no 30). Rota el set entre posts.
 
 ## Notas para publicar
 
-- **Formato:** 9:16, ~15 s. Engancha en los primeros ~2 s (el reveal del logo);
+- **Formato:** 9:16, ~19 s. Engancha en los primeros ~2 s (el reveal del logo);
   si quieres, agrega un texto-hook al inicio en tu editor.
 - **Loop:** el MP4 ya cierra en negro = primer frame, así que loopea sin corte.
   Déjalo repetir; los replays suman watch time (un Reel corto que se reve varias
