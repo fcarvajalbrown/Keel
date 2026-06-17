@@ -1,4 +1,7 @@
-# Keel — Automatic Mixing + Mastering for Finished Stems (Python)
+<p align="center">
+  <img src="assets/keel-logo.png" width="380"
+       alt="Keel — Automatic Mixing + Mastering for Finished Stems">
+</p>
 
 > A **deterministic** automix + automaster engine. Give it a folder of
 > **finished, FX-printed stems**; it **loudness-balances** them into a stereo
