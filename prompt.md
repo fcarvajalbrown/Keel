@@ -83,17 +83,21 @@ chain is ported and the Finalize stub is **removed** (now self-contained per
 ADR-0029); Makeup knob added. Build/iterate via `plugin\build.ps1`; details in
 `plugin/README.md`.
 
+**>>> VISUAL LANGUAGE MATCHED (2026-06-17).** The plugin UI now wears the
+standalone's look (`plugin/Source/KeelLookAndFeel.{h,cpp}`): the teal palette
+(ported from `gui_theme.COLORS`), Space Grotesk embedded via JUCE binary data
+(`assets/fonts/`, `juce_add_binary_data`), a `KeelLookAndFeel` (teal sliders /
+toggles / combo), the `HullMark` logo and the gradient `Meter` (title + big
+readout + target/ceiling ticks) both ported from `gui_theme.py`, and card panels.
+Build clean, zero warnings. **By-ear + by-eye check is the user's** (load it,
+confirm the look reads right and the master sounds right).
+
 **>>> NEXT TASKS:**
-1. **Match the standalone visual language** in the plugin UI (IN PROGRESS this
-   session). The Python GUI theme was refreshed — see `gui_theme.py`: teal palette
-   (`#27D2C0` -> `#0C8C81`), Space Grotesk font (`assets/fonts/`), card panels,
-   the gradient `Meter` (target/ceiling ticks + big readout), the `HullMark` logo.
-   Port that look into `plugin/Source/PluginEditor` (JUCE LookAndFeel + a custom
-   meter component; embed the TTFs via JUCE binary data).
-2. **By-ear A/B** the plugin master vs a `build.py` render of the same audio
+1. **By-ear A/B** the plugin master vs a `build.py` render of the same audio
    (expect close, not identical).
-3. Optional later: wire the "Bus glue" / "Reference" toggles into the live chain;
-   libebur128 meter.
+2. Optional later: wire the "Bus glue" / "Reference" toggles into the live chain;
+   libebur128 meter; round out remaining LookAndFeel details if the user wants the
+   plugin pixel-matched to `gui.py`.
 
 Other candidates still open (confirm direction first):
 - **Phase 4 packaging:** code-signing / notarization (needs the publication fee

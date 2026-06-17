@@ -34,14 +34,16 @@ from your DAW with it active. There is no offline step. See
   toggles + the two meters. The TP / Makeup sliders retune the live chain
   instantly. It deliberately drops the standalone GUI's file->label table and
   balance faders — a stereo master cannot re-balance instruments (ADR-0001).
+- **Shared visual language** with the standalone GUI
+  (`Source/KeelLookAndFeel.{h,cpp}`): the teal brand palette, Space Grotesk
+  (embedded, SIL OFL), card panels, the hull mark, and the gradient LUFS /
+  true-peak meters — all ported from `gui_theme.py`.
 
 ### Not done yet (next steps)
 
 - **By-ear A/B validation** of the live master vs a `build.py` render of the same
   audio is pending (load it on the master bus, compare); expect "close," not
   identical.
-- **Visual language:** match the standalone GUI's refreshed theme (teal palette,
-  Space Grotesk, gradient meters).
 - The tone-stage glue comp is **always on** in the live chain (faithful to
   `mastering.py`, where it is part of the tone stage). The UI "Bus glue" /
   "Reference" toggles are not yet wired to the live chain.

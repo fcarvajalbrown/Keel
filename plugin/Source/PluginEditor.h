@@ -1,16 +1,17 @@
 // Keel plugin -- editor.
 //
-// Deliberately the SIMPLE, master-only UI (ADR-0029): it drops the standalone
-// GUI's file->label table and balance faders, keeping only the master controls
-// (preset / target LUFS reference / TP ceiling / Makeup / reference / glue) and
-// the two live meters reading the master OUTPUT. There is no Finalize button --
-// the plugin is a self-contained real-time master; you deliver by exporting from
-// the DAW with it active.
+// The SIMPLE, master-only UI (ADR-0029), wearing the standalone GUI's visual
+// language (KeelLookAndFeel: teal palette, Space Grotesk, the hull mark, gradient
+// meters). It drops the standalone's file->label table and balance faders and
+// keeps only the master controls (preset / target-LUFS reference / TP ceiling /
+// Makeup / reference / glue) plus the two live OUTPUT meters. No Finalize button:
+// the plugin is a self-contained real-time master; you deliver by exporting.
 
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
+#include "KeelLookAndFeel.h"
 
 class KeelAudioProcessorEditor : public juce::AudioProcessorEditor,
                                  private juce::Timer
@@ -27,7 +28,9 @@ private:
     void applyPresetToTargets();
 
     KeelAudioProcessor& processor;
+    keel::KeelLookAndFeel look;
 
+    keel::HullMark hullMark;
     juce::Label  titleLabel, subtitleLabel;
 
     juce::Label    presetLabel;
@@ -39,12 +42,11 @@ private:
     juce::ToggleButton referenceToggle { "Reference" };
     juce::ToggleButton glueToggle      { "Bus glue" };
 
-    // Live meters (display-only).
-    juce::Label lufsMeterLabel, tpMeterLabel;
-    float lufsMeterValue { -100.0f };
-    float tpMeterValue   { -100.0f };
-
+    keel::Meter lufsMeter, tpMeter;
     juce::Label exportNote;
+
+    // Card backgrounds: filled in resized(), painted in paint().
+    juce::Rectangle<int> cardTargets, cardDrive, cardMeters;
 
     using ComboAttachment  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;

@@ -1,10 +1,9 @@
-# Keel plugin spike (Phase 5, ADR-0026)
+# Keel plugin (Phase 5, ADR-0029)
 #
-# A thin JUCE/C++ shell: master-bus processor that passes audio through and
-# drives live LUFS / true-peak meters. "Apply" (the offline master that shells
-# out to the frozen Python engine) is a STUB in this spike -- the goal here is to
-# prove the JUCE + CMake + MSVC build is green on this machine, then flesh Apply
-# out in a follow-up. Same shared core as the CLI/GUI; the DSP is NOT forked.
+# A self-contained JUCE/C++ master-bus plugin: it runs Keel's master chain live
+# (a faithful C++ port of mastering.py) and you deliver by exporting from the DAW
+# with it active. No offline step. The C++ chain mirrors the Python master
+# character (DSP SYNC RULE); the CLI/GUI remain the byte-identical reference.
 #
 # Build (from this folder):
 #   cmake -B build -G "Visual Studio 18 2026" -A x64
@@ -56,23 +55,32 @@ juce_add_plugin(KeelPlugin
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     COPY_PLUGIN_AFTER_BUILD     TRUE
     VST3_CATEGORIES             "Mastering" "Dynamics"
-    DESCRIPTION                 "Keel master-bus processor (spike)"
+    DESCRIPTION                 "Keel master-bus processor"
+)
+
+# Bundle the Space Grotesk family (SIL OFL) so the plugin UI matches the
+# standalone GUI's visual language without depending on a system font.
+juce_add_binary_data(KeelData SOURCES
+    ../assets/fonts/SpaceGrotesk-Regular.ttf
+    ../assets/fonts/SpaceGrotesk-Medium.ttf
+    ../assets/fonts/SpaceGrotesk-Bold.ttf
 )
 
 target_sources(KeelPlugin PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/KeelLookAndFeel.cpp
 )
 
 target_compile_definitions(KeelPlugin PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0
 )
 
 target_link_libraries(KeelPlugin
     PRIVATE
+        KeelData
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC
