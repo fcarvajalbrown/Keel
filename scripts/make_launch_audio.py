@@ -20,18 +20,29 @@ import soundfile as sf
 
 IN = sys.argv[1] if len(sys.argv) > 1 else "out/song3_master.wav"
 OUT = sys.argv[2] if len(sys.argv) > 2 else "out/keel_instagram_audio.wav"
+MP4 = "assets/keel-launch.mp4"
 GIF = "assets/keel-launch.gif"
 
-FALLBACK_LEN = 8.64    # clip length (s) if the GIF can't be read
+FALLBACK_LEN = 15.0    # clip length (s) if the media can't be read
 START_DB = -8.0        # opening gain: mirrors the -22 LUFS start vs -14 target
-RISE_A, RISE_B = 0.27, 0.74   # ramp window as a fraction of the clip (~scene B)
+RISE_A, RISE_B = 0.43, 0.76   # ramp window as a fraction of the clip (~scene C, loudness)
 FADE_IN = 0.10         # anti-click fade from silence at the very start (s)
 FADE_OUT = 0.30        # fade out at the end (s)
 HOP = 0.5
 SKIP_HEAD, SKIP_TAIL = 5.0, 3.0
 
 
-def gif_duration():
+def media_duration():
+    # prefer the MP4 (the edit asset, exact length); fall back to the GIF
+    try:
+        import imageio.v2 as iio
+        rd = iio.get_reader(MP4)
+        d = rd.get_meta_data().get("duration")
+        rd.close()
+        if d:
+            return float(d)
+    except Exception:
+        pass
     try:
         from PIL import Image, ImageSequence
         im = Image.open(GIF)
@@ -48,7 +59,7 @@ def smoothstep(x):
 def main():
     data, sr = sf.read(IN, always_2d=True)
     n, dur = data.shape[0], data.shape[0] / sr
-    clip_len = gif_duration() or FALLBACK_LEN
+    clip_len = media_duration() or FALLBACK_LEN
     win = min(clip_len, max(2.0, dur * 0.6))
     win_n = int(win * sr)
 
