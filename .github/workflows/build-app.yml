@@ -9,6 +9,10 @@ name: build-app
 # -- it deliberately does NOT run on every push, so day-to-day commits never
 # spam build failures. Each job self-tests the frozen app before uploading, so a
 # broken bundle fails its own job instead of shipping.
+#
+# On a v* tag, a final `release` job downloads the built artifacts and publishes
+# them as a GitHub *prerelease* (assets: KeelSetup-<ver>.exe, Keel.exe, Keel.dmg).
+# The builds are UNSIGNED — Windows SmartScreen / macOS Gatekeeper will warn.
 on:
   workflow_dispatch:
   push:
@@ -81,3 +85,48 @@ jobs:
           name: Keel-windows-installer
           path: dist/KeelSetup-*.exe
           if-no-files-found: error
+
+  # Publish a GitHub prerelease with the built binaries — only on a v* tag.
+  release:
+    name: publish-release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to create the release
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          files=$(find artifacts -type f)
+          echo "Attaching:"; echo "$files"
+          cat > notes.md <<'EOF'
+          **Pre-alpha** build of the Keel desktop GUI (deterministic automix + automaster).
+
+          ## Downloads
+          - **Windows** — `KeelSetup-<ver>.exe` (recommended installer) or `Keel.exe` (portable).
+          - **macOS (Apple Silicon / arm64)** — `Keel.dmg`.
+
+          ## Heads-up: these builds are unsigned
+          They are not yet code-signed, so the OS will warn on first launch:
+          - **Windows**: SmartScreen shows "Windows protected your PC" — click
+            **More info -> Run anyway**.
+          - **macOS**: Gatekeeper blocks an unidentified developer — **right-click
+            the app -> Open**, then confirm.
+
+          Signing/notarization is planned. See `ROADMAP.md` for status and
+          `README.md` for what Keel does.
+          EOF
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Keel ${GITHUB_REF_NAME} (pre-alpha)" \
+            --notes-file notes.md \
+            --prerelease \
+            $files
