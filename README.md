@@ -1,3 +1,5 @@
+<p align="center"><b>English</b> · <a href="README.es.md">Español</a></p>
+
 <p align="center">
   <img src="assets/keel-logo-black.png" width="540"
        alt="Keel — Automatic Mixing + Mastering for Finished Stems">
