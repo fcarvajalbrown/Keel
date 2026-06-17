@@ -17,6 +17,8 @@
 > **ITU-R BS.1770-4** metering and a **true-peak-limited** master chain. Same
 > stems in, same master out, every run. No AI guessing, no randomness.
 
+<div align="center">
+
 [![status](https://img.shields.io/badge/status-pre--release-orange.svg)](ROADMAP.md)
 [![engine: AGPL v3](https://img.shields.io/badge/engine-AGPL%20v3-blue.svg)](LICENSE)
 [![GUI: free for non-commercial](https://img.shields.io/badge/GUI-free%20for%20non--commercial-success.svg)](LICENSE-GUI.md)
@@ -24,6 +26,8 @@
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](requirements.txt)
 [![loudness](https://img.shields.io/badge/loudness-ITU--R%20BS.1770--4-brightgreen.svg)](#under-the-hood-the-dsp)
 [![render](https://img.shields.io/badge/render-deterministic-success.svg)](#)
+
+</div>
 
 <p align="center">
   <a href="https://www.paypal.com/donate/?business=fcarvajalbrown%40protonmail.com&item_name=Support%20Keel%20development&currency_code=USD">
