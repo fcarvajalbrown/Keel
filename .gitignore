@@ -1,6 +1,12 @@
-# Build artifacts and large audio — keep code + docs, drop the audio.
+# Build artifacts and large audio/video — keep code + docs, drop the media.
 out/*.wav
 out/*.flac
+out/*.mp3
+out/*.m4a
+out/*.aac
+out/*.mp4
+out/*.mov
+out/*.gif
 out/REPORT.md
 references/*.wav
 references/*.flac
