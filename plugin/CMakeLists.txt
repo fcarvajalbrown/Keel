@@ -12,7 +12,7 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-project(KeelPlugin VERSION 0.3.0 LANGUAGES C CXX)   # keep in sync with keel.py __version__ (unified versioning, CLAUDE.md)
+project(KeelPlugin VERSION 0.4.0 LANGUAGES C CXX)   # keep in sync with keel.py __version__ (unified versioning, CLAUDE.md)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

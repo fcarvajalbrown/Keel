@@ -13,15 +13,17 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 
 ---
 
-## Where we are: `v0.3.0-alpha`
+## Where we are: `v0.4.0-beta`
 
 The DSP core is **done and validated**; the CLI, the desktop GUI, and the VST3
 plugin all drive the same engine and all build green. There are no unfinished
 code stubs left — the remaining distance to a stable **1.0** is about
-**trust, parity, reach, and launch**, not unwritten features:
+**parity, reach, and launch**, not unwritten features:
 
-- **Trust** — engine tests and the plugin build aren't in CI yet; edge cases
-  (malformed `keel.json`, bad audio, `--batch`) aren't tested.
+- **Trust — DONE (`v0.4`).** The test suite runs in CI as a release gate on
+  Windows + macOS; the VST3 plugin is built + pluginval-smoke-tested in CI; bad
+  input (malformed `keel.json`, corrupt/NaN/silent audio, `--batch`) degrades
+  gracefully and is covered by tests. One tag now ships GUI + plugin together.
 - **Parity** — the plugin's Reference / Bus-glue toggles exist in the UI but
   aren't wired to the live chain, and there's no macOS plugin build.
 - **Reach** — no landing page, no live donation / commercial-checkout links, no
@@ -35,7 +37,7 @@ then the **`v1.0.0`** stamp. The GUI and the plugin are **versioned in lockstep*
 
 ---
 
-## Shipped so far (through `v0.3.0-alpha`)
+## Shipped so far (through `v0.4.0-beta`)
 
 Condensed history; the *why* for each lives in [`docs/adr/`](docs/adr/).
 
@@ -108,11 +110,11 @@ Four milestones. Each is a real release, revertable in isolation; the betas are
 publishable so changes can be tested in stages. **Code-signing is deliberately
 the very last step** — it gates only the `v1.0.0` stamp, nothing before it.
 
-### `v0.4.0-beta` — Harden & CI (trust every build)
-Make the build trustworthy before adding reach.
-- [ ] Run the `tests/` unittest suite in CI as a **merge/release gate**
+### `v0.4.0-beta` — Harden & CI (trust every build)  ✓ shipped
+Made the build trustworthy before adding reach.
+- [x] Run the `tests/` unittest suite in CI as a **merge/release gate**
       (Python job on Windows + macOS).
-- [ ] Build the **plugin in CI** (Windows VST3 first) and attach the zip to the
+- [x] Build the **plugin in CI** (Windows VST3) and attach the zip to the
       release automatically, instead of building locally and uploading by hand.
 - [x] **Edge-case tests + graceful degradation:** the engine now sanitizes
       NaN/Inf samples to silence at load and surfaces clear, user-facing errors
@@ -127,8 +129,9 @@ Make the build trustworthy before adding reach.
       from the kit / synth. The GUI file→label field is an **editable instrument
       dropdown** sourced from one canonical list (`recipes.KNOWN_LABELS`) so UI +
       engine can't drift — custom labels still allowed (delivery-agnostic).
-- [ ] Wire the GUI `--selftest` (and a plugin smoke check) into CI as gates.
-- [ ] Release pipeline: one `v*` tag produces GUI + plugin assets together.
+- [x] Wire the GUI `--selftest` (and a plugin pluginval smoke check) into CI as
+      gates.
+- [x] Release pipeline: one `v*` tag produces GUI + plugin assets together.
 
 ### `v0.5.0-beta` — Plugin parity + cross-platform
 Bring the plugin level with the GUI's reach.

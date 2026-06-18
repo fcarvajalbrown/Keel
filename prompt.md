@@ -7,14 +7,18 @@ real-world material; the GUI scaffold + cross-platform builds now exist too.
 
 ## >>> START HERE — immediate next task
 
-**Latest release: `v0.3.0-alpha` (2026-06-17, all on `main`)** — the first Keel
-**VST3 plugin** (Windows preview) shipped alongside the desktop GUI, versioned in
-lockstep (GUI + plugin share ONE version — see CLAUDE.md "Versioning (STRICT)").
-Release assets: `KeelSetup-0.3.0.exe`, `Keel.exe`, `Keel.dmg` (GUI, built+published
-by CI on the `v*` tag) plus `Keel-VST3-windows-0.3.0.zip` (plugin, built locally
-and attached — the plugin is not in CI yet). READMEs point at the 0.3.0 assets.
+**Latest release: `v0.4.0-beta` (2026-06-18, all on `main`)** — Harden & CI. The
+test suite is now a CI release gate (Win + macOS), and the **VST3 plugin is built
++ pluginval-smoke-tested in CI**, so ONE `v*` tag builds and attaches GUI + plugin
+together (no more manual plugin build). Also in 0.4: graceful degradation on bad
+input (corrupt audio / malformed keel.json / NaN / silent) + edge-case tests, and
+an expanded instrument set (piano, organ/keys, backing vocals, aux percussion)
+with an editable instrument dropdown in the GUI. Assets: `KeelSetup-0.4.0.exe`,
+`Keel.exe`, `Keel.dmg`, `Keel-VST3-windows-0.4.0.zip` — all built+attached by CI.
 Lineage: `v0.1.0-alpha` (engine + GUI scaffold + CI) -> `v0.2.0-alpha` (GUI restyle)
--> `v0.3.0-alpha` (plugin). Earlier launch context below (still on `main`):
+-> `v0.3.0-alpha` (plugin) -> `v0.4.0-beta` (harden & CI). Earlier 0.3.0 context:
+the plugin then was built locally and attached by hand; that is now automated.
+Earlier launch context below (still on `main`):
 - **Release `v0.1.0-alpha`** — a GitHub *prerelease* with `KeelSetup-0.1.0.exe`
   (Windows installer), `Keel.exe` (portable), `Keel.dmg` (macOS arm64). CI
   (`build-app.yml`) now builds AND publishes the prerelease on a `v*` tag (the

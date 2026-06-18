@@ -15,7 +15,7 @@
 ; Output: dist\KeelSetup-<version>.exe
 
 #ifndef MyAppVersion
-  #define MyAppVersion "0.3.0"   ; keep in sync with keel.py __version__ + plugin/CMakeLists.txt
+  #define MyAppVersion "0.4.0"   ; keep in sync with keel.py __version__ + plugin/CMakeLists.txt
 #endif
 
 #define MyAppName "Keel"

@@ -77,3 +77,8 @@ Prefer the tag + CI path when you can — it also builds and attaches the macOS
 - `v0.3.0-alpha` — first Keel VST3 plugin (self-contained real-time master,
   Windows preview) shipped alongside the app; GUI + plugin now versioned in
   lockstep.
+- `v0.4.0-beta` — Harden & CI: graceful degradation on bad input (corrupt audio /
+  malformed keel.json / NaN / silent) + edge-case tests; expanded instrument set
+  (piano, organ/keys, backing vocals, aux percussion) with an editable instrument
+  dropdown in the GUI; the test suite runs as a CI gate (Win + macOS) and the VST3
+  plugin is built + pluginval-smoke-tested in CI, so one tag ships GUI + plugin.
