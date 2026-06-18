@@ -1,18 +1,21 @@
 name: build-app
 
-# Builds the desktop GUI into downloadable artifacts:
-#   * Windows  -> dist/Keel.exe              (onefile)
-#   * Windows  -> dist/KeelSetup-<ver>.exe   (Inno Setup installer, UX only — unsigned)
-#   * macOS    -> dist/Keel.dmg              (.app bundle, Apple Silicon / arm64)
+# Builds, tests, and (on a tag) releases Keel — GUI + VST3 plugin, in lockstep.
+#
+# Jobs:
+#   * test    -> runs the tests/ unittest suite on Windows + macOS (release gate).
+#   * build   -> desktop GUI: dist/Keel.exe + dist/KeelSetup-<ver>.exe (Windows),
+#                dist/Keel.dmg (macOS arm64). Each self-tests the frozen app.
+#   * plugin  -> Windows VST3: dist/Keel-VST3-windows-<ver>.zip, smoke-validated
+#                with pluginval. (macOS plugin build is a v0.5 item.)
+#   * release -> on a v* tag, publishes a GitHub *prerelease* with ALL the above
+#                assets attached together (GUI + plugin from ONE tag).
 #
 # Triggered MANUALLY (Actions tab -> Run workflow) or by a version tag (v*) only
-# -- it deliberately does NOT run on every push, so day-to-day commits never
-# spam build failures. Each job self-tests the frozen app before uploading, so a
-# broken bundle fails its own job instead of shipping.
-#
-# On a v* tag, a final `release` job downloads the built artifacts and publishes
-# them as a GitHub *prerelease* (assets: KeelSetup-<ver>.exe, Keel.exe, Keel.dmg).
-# The builds are UNSIGNED — Windows SmartScreen / macOS Gatekeeper will warn.
+# -- never on every push, so day-to-day commits don't spam build failures. The
+# build/plugin jobs depend on `test`, so a red test stops the release. The builds
+# are UNSIGNED -- Windows SmartScreen / macOS Gatekeeper will warn (signing is the
+# v1.0.0 gate).
 on:
   workflow_dispatch:
   push:
@@ -22,8 +25,30 @@ permissions:
   contents: read
 
 jobs:
+  # --- Release gate: the engine test suite must pass on both OSes ------------
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install engine dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run the unittest suite
+        run: python -m unittest discover -s tests -v
+
+  # --- Desktop GUI (PyInstaller) --------------------------------------------
   build:
     name: ${{ matrix.label }}
+    needs: test
     strategy:
       fail-fast: false   # one OS failing must not cancel the other
       matrix:
@@ -86,10 +111,53 @@ jobs:
           path: dist/KeelSetup-*.exe
           if-no-files-found: error
 
+  # --- VST3 plugin (JUCE/CMake, Windows) ------------------------------------
+  plugin:
+    name: plugin-windows-vst3
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure + build the plugin (Release)
+        shell: pwsh
+        run: |
+          # No explicit -G: CMake picks the runner's installed Visual Studio.
+          # FetchContent pulls JUCE 8.0.9 on first configure (needs internet).
+          cmake -S plugin -B plugin/build -A x64
+          cmake --build plugin/build --config Release
+
+      - name: Smoke-validate the VST3 (pluginval)
+        shell: pwsh
+        run: |
+          $vst3 = "plugin/build/KeelPlugin_artefacts/Release/VST3/Keel.vst3"
+          if (-not (Test-Path $vst3)) { throw "VST3 not found at $vst3" }
+          Invoke-WebRequest -Uri "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" -OutFile pluginval.zip
+          Expand-Archive pluginval.zip -DestinationPath pluginval -Force
+          & ./pluginval/pluginval.exe --strictness-level 5 --validate-in-process --validate "$vst3"
+          if ($LASTEXITCODE -ne 0) { throw "pluginval failed ($LASTEXITCODE)" }
+
+      - name: Package the VST3 zip
+        shell: pwsh
+        run: |
+          $ver = (Select-String -Path keel.py -Pattern '__version__\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          $vst3 = "plugin/build/KeelPlugin_artefacts/Release/VST3/Keel.vst3"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $zip = "dist/Keel-VST3-windows-$ver.zip"
+          Compress-Archive -Path $vst3 -DestinationPath $zip -Force
+          Get-ChildItem dist\Keel-VST3-windows-*.zip
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Keel-vst3-windows
+          path: dist/Keel-VST3-windows-*.zip
+          if-no-files-found: error
+
   # Publish a GitHub prerelease with the built binaries — only on a v* tag.
   release:
     name: publish-release
-    needs: build
+    needs: [build, plugin]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -113,7 +181,7 @@ jobs:
           # Single source of truth for the release notes (same text local + CI):
           gh release create "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "Keel ${GITHUB_REF_NAME} (alpha)" \
+            --title "Keel ${GITHUB_REF_NAME}" \
             --notes-file docs/release-notes.md \
             --prerelease \
             $files
