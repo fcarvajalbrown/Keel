@@ -134,8 +134,16 @@ jobs:
           if (-not (Test-Path $vst3)) { throw "VST3 not found at $vst3" }
           Invoke-WebRequest -Uri "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" -OutFile pluginval.zip
           Expand-Archive pluginval.zip -DestinationPath pluginval -Force
-          & ./pluginval/pluginval.exe --strictness-level 5 --validate-in-process --validate "$vst3"
-          if ($LASTEXITCODE -ne 0) { throw "pluginval failed ($LASTEXITCODE)" }
+          # pluginval.exe is a GUI-subsystem app, so the call operator doesn't
+          # wait for it (LASTEXITCODE comes back empty). Start-Process -Wait gets
+          # the real exit code. Skip GUI tests (headless runner) and cap runtime.
+          $p = Start-Process -FilePath "pluginval/pluginval.exe" `
+            -ArgumentList @("--strictness-level","5","--validate-in-process",
+                            "--skip-gui-tests","--timeout-ms","300000",
+                            "--validate","$vst3") `
+            -Wait -PassThru -NoNewWindow
+          Write-Host "pluginval exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "pluginval failed ($($p.ExitCode))" }
 
       - name: Package the VST3 zip
         shell: pwsh
