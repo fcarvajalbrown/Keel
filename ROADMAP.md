@@ -106,7 +106,7 @@ Condensed history; the *why* for each lives in [`docs/adr/`](docs/adr/).
 
 ## Road to 1.0
 
-Four milestones. Each is a real release, revertable in isolation; the betas are
+Five milestones. Each is a real release, revertable in isolation; the betas are
 publishable so changes can be tested in stages. **Code-signing is deliberately
 the very last step** — it gates only the `v1.0.0` stamp, nothing before it.
 
@@ -197,11 +197,11 @@ Stand up everything a stranger needs to find, trust, and pay for Keel.
 >   the free individual tier (watermark/length-cap on the unpaid path vs feature
 >   cap)? An explicit call, not a silent one.
 
-### `v0.7.0-beta` — Delivery & metering depth (proposed, 2026-06-22 research)
-A proposed new milestone (engine-side): a cluster of in-scope, deterministic wins
-with no home today. These turn Keel's "loudness/TP-safe" *marketing* into a
-*measured guarantee* the AI-mastering competitors can't honestly make. None touch
-the master tone math, so no DSP SYNC obligation (except the dither seed decision).
+### `v0.7.0-beta` — Delivery & metering depth (approved 2026-06-22)
+An engine-side milestone: a cluster of in-scope, deterministic wins. These turn
+Keel's "loudness/TP-safe" *marketing* into a *measured guarantee* the AI-mastering
+competitors can't honestly make. None touch the master tone math, so no DSP SYNC
+obligation (except the dither seed decision).
 - [ ] **Dither (TPDF, optional noise-shaping)** at sub-32-bit export only. Needs a
       **seeded-PRNG** carve-out so "same stems + recipe = identical output" holds
       (dither is random by definition).
