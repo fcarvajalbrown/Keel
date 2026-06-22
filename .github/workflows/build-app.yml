@@ -102,6 +102,7 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_path }}
           if-no-files-found: error
+          retention-days: 7
 
       - name: Upload installer artifact (Windows)
         if: runner.os == 'Windows'
@@ -110,6 +111,7 @@ jobs:
           name: Keel-windows-installer
           path: dist/KeelSetup-*.exe
           if-no-files-found: error
+          retention-days: 7
 
   # --- VST3 plugin (JUCE/CMake, Windows) ------------------------------------
   plugin:
@@ -161,6 +163,7 @@ jobs:
           name: Keel-vst3-windows
           path: dist/Keel-VST3-windows-*.zip
           if-no-files-found: error
+          retention-days: 7
 
   # Publish a GitHub prerelease with the built binaries — only on a v* tag.
   release:
