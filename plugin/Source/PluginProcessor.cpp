@@ -67,8 +67,11 @@ KeelAudioProcessor::makeParameterLayout()
     layout.add (std::make_unique<AudioParameterBool> (
         ParameterID { "reference", 1 }, "Use Reference", false));
 
+    // Default ON: this gates the master tone-stage glue comp, which mastering.py
+    // ALWAYS applies. Default-on keeps the out-of-box master in sync with the
+    // CLI/GUI (DSP SYNC RULE); turning it OFF is a deliberate plugin-only deviation.
     layout.add (std::make_unique<AudioParameterBool> (
-        ParameterID { "glue", 1 }, "Bus Glue", false));
+        ParameterID { "glue", 1 }, "Bus Glue", true));
 
     return layout;
 }
@@ -140,7 +143,8 @@ void KeelAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
         }
     }
 
-    // Glue compressor across the stereo bus (constant params; always on, like Python).
+    // Glue compressor across the stereo bus (constant params; gated by the "glue"
+    // toggle in processBlock, default ON to match mastering.py's always-on glue).
     juce::dsp::ProcessSpec stereoSpec { currentSampleRate, (juce::uint32) block, 2 };
     glueComp.prepare (stereoSpec);
     glueComp.setThreshold (kCompThreshDb);
@@ -187,6 +191,7 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     const float tpCeilDb  = apvts.getRawParameterValue ("tp")->load();
     const float makeupDb  = apvts.getRawParameterValue ("makeup")->load();
+    const bool  glueOn    = apvts.getRawParameterValue ("glue")->load() > 0.5f;
 
     // ============================ LIVE MASTER CHAIN ============================
     // A faithful preview of mastering.py (ADR-0027). Audio IS altered here; the
@@ -204,7 +209,9 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             x[i] = s;
         }
     }
-    if (numSamples > 0)
+    // Glue comp gated by the toggle. ON by default == mastering.py's always-on
+    // master glue (DSP SYNC RULE); OFF is a deliberate plugin-only deviation.
+    if (glueOn && numSamples > 0)
     {
         juce::dsp::AudioBlock<float> toneBlock (buffer);
         glueComp.process (juce::dsp::ProcessContextReplacing<float> (toneBlock));
