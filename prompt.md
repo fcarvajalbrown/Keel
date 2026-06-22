@@ -7,6 +7,26 @@ real-world material; the GUI scaffold + cross-platform builds now exist too.
 
 ## >>> START HERE — immediate next task
 
+**This session (2026-06-22) — `v0.5` started + roadmap restructured.** Shipped the
+first `v0.5.0-beta` item: the **plugin Bus-glue toggle is now wired** (commit
+`31b736e`) — it gates the master glue comp, default ON so the out-of-box master
+still matches `mastering.py` (DSP SYNC honoured, no Python change), OFF is a
+plugin-only deviation. Then a big planning pass (all in `ROADMAP.md`, ADRs
+`0030-0034`): **approved a new `v0.7.0-beta` "Delivery & metering depth"**
+milestone; resolved the post-1.0 DSP forks (kept stereo-width; dropped ADAA, drive
+macro, linear-phase); moved **ARA2 -> non-goals**; planned **v2.0 reach**
+(Android -> iOS -> web, web is "maybe"; mobile = approximate C++ chain, web =
+server-side Python for exact spec; **no Apple-Intelligence/LLM** — that's a
+separate repo); and made three scope carve-outs (a single **broadband master tilt
+knob** post-1.0; a **plugin-only oversampling selector**; **encoded export**
+MP3/OGG/FLAC/AAC). Read `ROADMAP.md` + ADRs 0030-0034 for the why.
+
+**Remaining `v0.5.0-beta` items (the live next task):** (1) the **Reference
+toggle** — wire it or remove it; the agreed clean resolution is a *reference
+loudness/peak readout* (no live ML match). (2) **macOS plugin build (VST3 + AU)**
+in CI + attach to the release (today CI builds Windows VST3 only). (3) **by-ear
+A/B** sign-off — user task. Confirm direction via the blue option UI first.
+
 **Latest release: `v0.4.0-beta` (2026-06-18, all on `main`)** — Harden & CI. The
 test suite is now a CI release gate (Win + macOS), and the **VST3 plugin is built
 + pluginval-smoke-tested in CI**, so ONE `v*` tag builds and attaches GUI + plugin
@@ -112,12 +132,12 @@ macOS build**; **1.0 ships signed** (signing is the LAST gate but it does gate t
 1.0 stamp); cadence = **staged betas**. Code-signing depends on the publication
 fee; nothing before `v1.0.0` does.
 
-**Immediate next milestone: `v0.4.0-beta` — Harden & CI.** Confirm direction via
-the blue option UI first. Progress so far:
-1. Run the `tests/` unittest suite in CI as a release gate (Win + macOS). TODO.
-2. Build the **plugin in CI** (Windows VST3 first) + auto-attach to the release
-   (today it's built locally and uploaded by hand). TODO — **next up** (the user
-   picked this; it was paused mid-session to do the instrument work below).
+**`v0.4.0-beta` — Harden & CI — SHIPPED (2026-06-18).** (Historical detail; the
+live next task is the remaining `v0.5` items in the START HERE block at the top.)
+All four items below landed:
+1. Run the `tests/` unittest suite in CI as a release gate (Win + macOS). DONE.
+2. Build the **plugin in CI** (Windows VST3) + auto-attach to the release. DONE
+   (pluginval smoke-tested; one `v*` tag ships GUI + plugin together).
 3. **Edge-case tests — DONE (2026-06-17).** The engine now degrades gracefully:
    NaN/Inf samples sanitized to silence at load (`mixer._load` /
    `mastering._internal_master`); a corrupt/unreadable audio file and a malformed
@@ -125,7 +145,7 @@ the blue option UI first. Progress so far:
    intact — delete it to re-detect); `build.main` reports a bad job and carries on
    in `--batch`. New tests cover silent/NaN/corrupt audio, samplerate mismatch,
    malformed+missing keel.json, and a `--batch` integration run.
-4. Wire the GUI `--selftest` + a plugin smoke check into CI as gates. TODO.
+4. Wire the GUI `--selftest` + a plugin smoke check into CI as gates. DONE.
 
 **Also shipped this session (2026-06-17): expanded instrument set + GUI dropdown.**
 The known set now covers **piano, organ/keys, backing vocals, aux percussion** on
