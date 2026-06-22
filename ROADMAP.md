@@ -167,6 +167,10 @@ Bring the plugin level with the GUI's reach.
 >   delivery-by-DAW-export workflow is non-obvious). Do NOT add OpenGL/GPU
 >   rendering — it worsens JUCE VST3 hiDPI scaling; the software renderer is right.
 > - Clean host **automation** plumbing + **accessibility** labels.
+> - **Oversampling-quality selector on the plugin's live chain** (decided
+>   2026-06-22) — the live master is already approximate, so a quality/CPU selector
+>   is safe and useful here. The CLI/GUI stays fixed so byte-identical determinism
+>   holds. No DSP-SYNC issue (reference math unchanged).
 
 ### `v0.6.0-beta` — Go-to-market
 Stand up everything a stranger needs to find, trust, and pay for Keel.
@@ -210,6 +214,12 @@ obligation (except the dither seed decision).
       and assert PASS/FAIL. Read-only/advisory — never auto-reshapes the master.
 - [ ] **Multi-target one-pass export** (-14 Spotify/YT, -16 Apple, -9 club...),
       re-running the chain per target so each file is genuinely at-spec.
+- [ ] **Encoded output formats** (decided 2026-06-22): export not just WAV but
+      **MP3 / OGG / FLAC / AAC** (and others). FLAC stays bit-exact; the lossy
+      formats are deterministic *given the same encoder version* but are NOT part
+      of the byte-identical guarantee (that stays a PCM/WAV promise). Pairs with the
+      post-codec TP re-measure above. Still **no DAW project/session files** — that
+      remains a non-goal.
 - [ ] **True-peak ceiling keyed to loudness** (-14 -> -1, -9 -> -2 dBTP) as an
       overridable default.
 - [ ] **PASS/FAIL compliance stamp** in `out/REPORT.md` + **PLR/PSR** and
@@ -246,6 +256,11 @@ Ordered by value/likelihood (most valuable first):
   preserved" default, so it stays opt-in; it touches the master math, so it carries
   a DSP-SYNC mirror to the plugin — kept post-1.0 to stay clear of the 1.0 DSP
   freeze. [decided 2026-06-22]
+- **Single broadband master tilt knob** (opt-in) — one deterministic
+  brighter/darker control on the master, NOT per-band and NOT M/S (those stay
+  non-goals). The one allowed widening of master tone beyond the existing fixed
+  tilt; touches master math, so it carries a DSP-SYNC mirror and is kept post-1.0
+  past the DSP freeze. [decided 2026-06-22]
 - **macOS `.pkg` installer + Linux frozen binary** — distribution reach; the script
   already runs on Linux, so the binary is low-effort.
 - **Formal legal review of the dual-license texts** — do once commercial traction
@@ -285,17 +300,24 @@ plugin-grade master) and web is the only path that keeps the exact spec.
 - No ML/neural mixing — Keel is deterministic and explainable by design.
 - No per-instrument tone shaping in the mix stage — stems are already treated.
 - No stem separation — Keel receives finished stems, it does not make them.
-- No DAW project writing — outputs are plain WAVs (the plugin masters in-DAW).
+- No **DAW project / session file** writing (`.als`, `.logicx`, ...) — a huge
+  per-DAW maintenance surface for niche benefit; the plugin masters in-DAW. (Richer
+  *audio* export — MP3/OGG/FLAC/AAC + WAV — IS now in scope, see v0.7. Revised
+  2026-06-22.)
 
 Research-confirmed declines (2026-06-22) — competitors do these; Keel deliberately
 does not, because each breaks the deterministic / balance+master-only mandate:
 - No **mid/side EQ** or **multiband compression** on the master — both are
-  tone-shaping; Keel's doctrine is "fix balance in the recipe and re-mix."
+  tone-shaping; Keel's doctrine is "fix balance in the recipe and re-mix." (The one
+  allowed widening is a single broadband master tilt knob, post-1.0 — NOT per-band,
+  NOT M/S. Revised 2026-06-22.)
 - No **genre/AI tonal matching** (Ozone Master Assistant / LANDR) or **adaptive
   "fix-it" / master-rebalance** (Gullfoss / Ozone Master Rebalance) — ML and/or
   a stereo master trying to re-balance instruments (ADR-0001 says it can't).
 - No **user-variable oversampling on the deterministic CLI/GUI path** — it would
-  break "same stems + recipe = identical output" (visible/fixed is fine).
+  break "same stems + recipe = identical output" (visible/fixed is fine). (A
+  quality selector on the plugin's already-approximate live chain IS allowed, see
+  v0.5. Revised 2026-06-22.)
 - No **OpenGL/GPU UI** — it worsens JUCE VST3 hiDPI scaling for no benefit here.
 
 Considered and declined (2026-06-22) — in-scope-shaped but not worth it:
