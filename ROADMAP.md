@@ -239,22 +239,16 @@ Sign, freeze, stamp. This is the only milestone that depends on paying the fee.
 ---
 
 ## Post-1.0 (later polish, not blocking)
+- **Deterministic stereo-width** (opt-in, off by default) — a flat linear M/S
+  side-gain (NOT EQ; fully deterministic), placed *before* the true-peak limiter
+  so the TP guarantee holds. It changes the "printed image preserved" default, so
+  it stays opt-in; it touches the master math, so it carries a DSP-SYNC mirror to
+  the plugin — kept post-1.0 to stay clear of the 1.0 DSP freeze. [decided 2026-06-22]
 - ARA2 support for the plugin (seamless host integration).
 - Intel-mac builds (the author is on Apple Silicon; arm64 is the current target).
 - A macOS `.pkg` installer; a Linux frozen binary (the script already runs there).
 - AAX (Pro Tools) plugin format.
 - Formal legal review of the dual-license texts.
-
-### Forks worth a deliberate decision (2026-06-22 research)
-In-scope-ish but each changes a promise or carries real cost — decide explicitly:
-- **Deterministic stereo-width** (linear M/S gain, no EQ): in-scope and
-  deterministic, but breaks the "printed image preserved" default — must be
-  opt-in and sit *before* the true-peak limiter or it invalidates the TP guarantee.
-- **ADAA soft-clip:** cleaner aliasing at lower CPU, but changing the clip math
-  triggers a full DSP-SYNC re-validation across `mastering.py` + the C++ chain for
-  a small payoff at -14 (where the clipper barely engages).
-- **Loudness "drive/intensity" macro** (loudness/limiting only, no tonal moves);
-  **linear-phase** option on the existing fixed tone filters.
 
 ## `v2.0` — Reach beyond desktop (mobile + web; large, post-1.0)
 The biggest expansion by far. Determinism splits the paths:
@@ -285,3 +279,15 @@ does not, because each breaks the deterministic / balance+master-only mandate:
 - No **user-variable oversampling on the deterministic CLI/GUI path** — it would
   break "same stems + recipe = identical output" (visible/fixed is fine).
 - No **OpenGL/GPU UI** — it worsens JUCE VST3 hiDPI scaling for no benefit here.
+
+Considered and declined (2026-06-22) — in-scope-shaped but not worth it:
+- No **ADAA soft-clip** — cleaner aliasing at lower CPU, but rewriting the clip
+  math forces a full DSP-SYNC re-validation across `mastering.py` + the C++ chain
+  for a marginal payoff at -14 (the clipper barely engages there), and it fights
+  the 1.0 DSP freeze.
+- No **loudness "drive/intensity" macro** — redundant: the plugin already exposes
+  Makeup (the by-ear drive) and the CLI/GUI has target-LUFS + presets, so a macro
+  adds UI without new capability and risks implying a tonal change.
+- No **linear-phase option** on the fixed tone filters — small audible benefit at
+  Keel's gentle settings, but it adds pre-ringing + latency (bad for the live
+  plugin) and is another master-math change under the DSP SYNC RULE.
