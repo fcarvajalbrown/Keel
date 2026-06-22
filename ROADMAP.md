@@ -135,8 +135,11 @@ Made the build trustworthy before adding reach.
 
 ### `v0.5.0-beta` — Plugin parity + cross-platform
 Bring the plugin level with the GUI's reach.
-- [ ] **Wire the Bus-glue toggle** into the live C++ chain (today glue is
-      always-on); honour the DSP SYNC RULE (mirror against `mastering.py`, re-A/B).
+- [x] **Wire the Bus-glue toggle** into the live C++ chain (was always-on). The
+      toggle gates the master glue comp; default ON keeps the out-of-box master in
+      sync with `mastering.py` (DSP SYNC RULE honoured — no Python change needed,
+      default-on preserves parity), OFF is a labelled plugin-only deviation. By-ear
+      A/B (below) is the remaining sign-off.
 - [ ] **Wire the Reference toggle** into the live chain — or, if a live reference
       match is out of scope for the plugin, remove the control and document why.
 - [ ] **macOS plugin build (VST3 + AU)** in CI, attached to the release.
