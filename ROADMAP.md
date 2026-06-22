@@ -239,16 +239,22 @@ Sign, freeze, stamp. This is the only milestone that depends on paying the fee.
 ---
 
 ## Post-1.0 (later polish, not blocking)
-- **Deterministic stereo-width** (opt-in, off by default) — a flat linear M/S
-  side-gain (NOT EQ; fully deterministic), placed *before* the true-peak limiter
-  so the TP guarantee holds. It changes the "printed image preserved" default, so
-  it stays opt-in; it touches the master math, so it carries a DSP-SYNC mirror to
-  the plugin — kept post-1.0 to stay clear of the 1.0 DSP freeze. [decided 2026-06-22]
-- ARA2 support for the plugin (seamless host integration).
-- Intel-mac builds (the author is on Apple Silicon; arm64 is the current target).
-- A macOS `.pkg` installer; a Linux frozen binary (the script already runs there).
-- AAX (Pro Tools) plugin format.
-- Formal legal review of the dual-license texts.
+Ordered by value/likelihood (most valuable first):
+- **Deterministic stereo-width** (opt-in, off by default) — the one real *feature*
+  here: a flat linear M/S side-gain (NOT EQ; fully deterministic), placed *before*
+  the true-peak limiter so the TP guarantee holds. It changes the "printed image
+  preserved" default, so it stays opt-in; it touches the master math, so it carries
+  a DSP-SYNC mirror to the plugin — kept post-1.0 to stay clear of the 1.0 DSP
+  freeze. [decided 2026-06-22]
+- **macOS `.pkg` installer + Linux frozen binary** — distribution reach; the script
+  already runs on Linux, so the binary is low-effort.
+- **Formal legal review of the dual-license texts** — do once commercial traction
+  warrants the spend.
+- **Intel-mac builds** — demand-gated; the author is on Apple Silicon and arm64 is
+  the current target, so build this only if Intel-mac users actually appear.
+- **AAX (Pro Tools) plugin format** — niche audience, high overhead (Avid developer
+  registration + PACE signing); lowest priority unless a Pro Tools audience is
+  confirmed.
 
 ## `v2.0` — Reach beyond desktop (mobile + web; large, post-1.0)
 The biggest expansion by far. Determinism splits the paths:
@@ -291,3 +297,8 @@ Considered and declined (2026-06-22) — in-scope-shaped but not worth it:
 - No **linear-phase option** on the fixed tone filters — small audible benefit at
   Keel's gentle settings, but it adds pre-ringing + latency (bad for the live
   plugin) and is another master-math change under the DSP SYNC RULE.
+- No **ARA2** for the plugin — ARA2 exists for plugins that need random access to
+  the whole host timeline (Melodyne-style pitch/time editing, spectral repair).
+  Keel is a real-time master-bus processor that delivers via live DAW export, so
+  ARA2 buys it nothing for large added complexity. (Moved here from post-1.0,
+  2026-06-22.)
