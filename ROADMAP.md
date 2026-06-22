@@ -257,15 +257,27 @@ Ordered by value/likelihood (most valuable first):
   confirmed.
 
 ## `v2.0` — Reach beyond desktop (mobile + web; large, post-1.0)
-The biggest expansion by far. Determinism splits the paths:
-- **Web** — run the **existing Python engine server-side** (upload stems -> mix +
-  master, the LANDR model). Preserves the exact guaranteed-spec master and reuses
-  the real engine; cost is hosting + running a service. (A client-side WASM port
-  would only give the *approximate* C++ chain, not the exact engine.)
-- **iOS** — a JUCE **AUv3** extension runs the plugin's C++ chain in
-  GarageBand/Cubasis/AUM. Approximate (plugin-grade), not exact.
-- **Android** — no universal plugin host; a standalone JUCE app. Python doesn't
-  run well on mobile, so mobile == the C++ chain or a thin client to the web service.
+The biggest expansion by far. Intended sequence (decided 2026-06-22):
+**Android -> iOS -> web**, where mobile reuses the plugin's C++ chain (approximate,
+plugin-grade master) and web is the only path that keeps the exact spec.
+
+1. **Android** (first) — no universal plugin-host standard, so a **standalone JUCE
+   app** (Oboe for audio). Python doesn't run on mobile, so this runs the **C++
+   master chain** (approximate, like the plugin), not the exact engine. Most build
+   effort of the three; weakest host integration (no DAW plugin model).
+2. **iOS** (second) — a JUCE **AUv3** extension running the same **C++ plugin
+   chain** inside iOS DAWs (GarageBand / Cubasis / AUM); reuses the existing plugin
+   code. Approximate, not exact.
+   - **NOT** Apple Intelligence / on-device LLM. That would be **ML**, Keel's
+     hardest non-goal (deterministic, no neural nets) — an LLM-driven mastering
+     tool is a **separate product in its own repo**, not Keel. Keep Keel's iOS
+     build a faithful port of the deterministic chain.
+3. **Web** (last, **MAYBE** — least committed) — if pursued, run the **existing
+   Python engine server-side** (upload stems -> mix + master, the LANDR model).
+   This is the only surface that preserves the **exact guaranteed-spec master**
+   because it reuses the real engine; cost is hosting + running a service +
+   handling user stem uploads/privacy. (A client-side WASM port would give only the
+   *approximate* C++ chain, so it was rejected for the web path.)
 
 ---
 
