@@ -147,6 +147,27 @@ Bring the plugin level with the GUI's reach.
       same audio (expect close, not identical) — user task.
 - [ ] Optional: libebur128-backed meter for tighter parity with `pyloudnorm`.
 
+> **Candidates (2026-06-22 research sweep, not committed).** The plugin's by-ear
+> Makeup gain is steered by a *momentary* LUFS meter, but streaming normalizes on
+> *integrated* LUFS — so users aim at the wrong number. These are mostly
+> correctness/credibility fixes, all in-scope + deterministic (meter/packaging
+> only, no DSP-master change):
+> - **Integrated + short-term LUFS, LRA, loudness-history graph** in the plugin
+>   (fixes the Makeup-by-ear target gap).
+> - **Gain-reduction history + true-peak peak-hold** (makes the "barely limits at
+>   -14" claim visible/auditable).
+> - **Loudness-matched bypass / A-B** (proves *character*, not just level — Keel
+>   deliberately raises loudness).
+> - **Reference loudness/peak readout** — one clean resolution of the Reference
+>   toggle fork above: show the reference's LUFS/TP next to the master, no live
+>   ML/spectral match (that stays the offline Matchering path).
+> - **AU plugin format** (+ optional CLAP) — AU is mandatory for Logic/Mac,
+>   near-zero DSP work; pairs with the macOS build item.
+> - **hiDPI resize, undo/redo, user presets, tooltips/first-run note** (the
+>   delivery-by-DAW-export workflow is non-obvious). Do NOT add OpenGL/GPU
+>   rendering — it worsens JUCE VST3 hiDPI scaling; the software renderer is right.
+> - Clean host **automation** plumbing + **accessibility** labels.
+
 ### `v0.6.0-beta` — Go-to-market
 Stand up everything a stranger needs to find, trust, and pay for Keel.
 - [ ] **Landing page** on GitHub Pages (tagline, before/after demo, download
@@ -158,6 +179,43 @@ Stand up everything a stranger needs to find, trust, and pay for Keel.
 - [ ] **`README.es` full parity** (does/doesn't table, full `keel.json` schema,
       presets table, project structure, library/tests/GUI-build sections).
 - [ ] Before/after demo audio from the user's **own** material (publish-safe).
+
+> **Candidates (2026-06-22 research sweep, not committed).** Sharpen the existing
+> items with what indie audio devs actually find works:
+> - **Before/after A-B audio player** is the single highest-leverage conversion
+>   asset (and the artifact reviewers reuse) — must be honestly level-matched.
+> - For checkout, prefer a **Merchant-of-Record** (Lemon Squeezy / Paddle, ~5% +
+>   50c/sale) over raw Stripe: a solo dev can't track global VAT; the MoR remits
+>   it. Use **simple license keys, not iLok** (iLok repels the free-tier audience
+>   at a USD 20 price).
+> - **KVR Audio listing + freeware-curator pitches** (Bedroom Producers Blog,
+>   Plugins4Free) — free, durable discovery; Keel's free-for-individuals angle is
+>   exactly what they cover.
+> - **Docs + a "first master in 60s" tutorial**; targeted reviewer seeding (give a
+>   few mixing/mastering YouTubers a seat + clean demo project — don't mass-post).
+> - **Free-vs-paid differentiation decision:** what does the USD 20 seat add over
+>   the free individual tier (watermark/length-cap on the unpaid path vs feature
+>   cap)? An explicit call, not a silent one.
+
+### `v0.7.0-beta` — Delivery & metering depth (proposed, 2026-06-22 research)
+A proposed new milestone (engine-side): a cluster of in-scope, deterministic wins
+with no home today. These turn Keel's "loudness/TP-safe" *marketing* into a
+*measured guarantee* the AI-mastering competitors can't honestly make. None touch
+the master tone math, so no DSP SYNC obligation (except the dither seed decision).
+- [ ] **Dither (TPDF, optional noise-shaping)** at sub-32-bit export only. Needs a
+      **seeded-PRNG** carve-out so "same stems + recipe = identical output" holds
+      (dither is random by definition).
+- [ ] **Post-codec true-peak re-measure + TP-verify gate:** encode the master to
+      AAC/MP3, re-measure true-peak (lossy transcode inflates intersample peaks),
+      and assert PASS/FAIL. Read-only/advisory — never auto-reshapes the master.
+- [ ] **Multi-target one-pass export** (-14 Spotify/YT, -16 Apple, -9 club...),
+      re-running the chain per target so each file is genuinely at-spec.
+- [ ] **True-peak ceiling keyed to loudness** (-14 -> -1, -9 -> -2 dBTP) as an
+      overridable default.
+- [ ] **PASS/FAIL compliance stamp** in `out/REPORT.md` + **PLR/PSR** and
+      **phase-correlation** meters (arithmetic on values Keel already computes).
+- [ ] **Album loudness-consistency mode** for `--batch`; recipe-replayable
+      Matchering (store a reference's extracted target as a deterministic recipe).
 
 ### `v1.0.0` — Stable (signing is the last gate)
 Sign, freeze, stamp. This is the only milestone that depends on paying the fee.
@@ -171,6 +229,13 @@ Sign, freeze, stamp. This is the only milestone that depends on paying the fee.
       (part of every release per CLAUDE.md "Versioning (STRICT)").
 - [ ] Tag **`v1.0.0`** covering the GUI + plugin **in lockstep**.
 
+> **Signing note (2026-06-22 research).** For Windows, prefer **Azure Trusted
+> Signing (~USD 10/mo, near-instant SmartScreen reputation)** over an EV cert —
+> Microsoft removed EV's first-download bypass in 2024, so an EV cert costs ~20-30x
+> for no advantage. Caveat: confirm a Chile-based individual can enroll (as of
+> 2025 it wanted a US/CA billing identity); if not, an OV cert is the fallback.
+> Apple notarization is USD 99/yr and only worth it once a Mac build ships.
+
 ---
 
 ## Post-1.0 (later polish, not blocking)
@@ -180,6 +245,28 @@ Sign, freeze, stamp. This is the only milestone that depends on paying the fee.
 - AAX (Pro Tools) plugin format.
 - Formal legal review of the dual-license texts.
 
+### Forks worth a deliberate decision (2026-06-22 research)
+In-scope-ish but each changes a promise or carries real cost — decide explicitly:
+- **Deterministic stereo-width** (linear M/S gain, no EQ): in-scope and
+  deterministic, but breaks the "printed image preserved" default — must be
+  opt-in and sit *before* the true-peak limiter or it invalidates the TP guarantee.
+- **ADAA soft-clip:** cleaner aliasing at lower CPU, but changing the clip math
+  triggers a full DSP-SYNC re-validation across `mastering.py` + the C++ chain for
+  a small payoff at -14 (where the clipper barely engages).
+- **Loudness "drive/intensity" macro** (loudness/limiting only, no tonal moves);
+  **linear-phase** option on the existing fixed tone filters.
+
+## `v2.0` — Reach beyond desktop (mobile + web; large, post-1.0)
+The biggest expansion by far. Determinism splits the paths:
+- **Web** — run the **existing Python engine server-side** (upload stems -> mix +
+  master, the LANDR model). Preserves the exact guaranteed-spec master and reuses
+  the real engine; cost is hosting + running a service. (A client-side WASM port
+  would only give the *approximate* C++ chain, not the exact engine.)
+- **iOS** — a JUCE **AUv3** extension runs the plugin's C++ chain in
+  GarageBand/Cubasis/AUM. Approximate (plugin-grade), not exact.
+- **Android** — no universal plugin host; a standalone JUCE app. Python doesn't
+  run well on mobile, so mobile == the C++ chain or a thin client to the web service.
+
 ---
 
 ## Explicit non-goals (keep scope tight)
@@ -187,3 +274,14 @@ Sign, freeze, stamp. This is the only milestone that depends on paying the fee.
 - No per-instrument tone shaping in the mix stage — stems are already treated.
 - No stem separation — Keel receives finished stems, it does not make them.
 - No DAW project writing — outputs are plain WAVs (the plugin masters in-DAW).
+
+Research-confirmed declines (2026-06-22) — competitors do these; Keel deliberately
+does not, because each breaks the deterministic / balance+master-only mandate:
+- No **mid/side EQ** or **multiband compression** on the master — both are
+  tone-shaping; Keel's doctrine is "fix balance in the recipe and re-mix."
+- No **genre/AI tonal matching** (Ozone Master Assistant / LANDR) or **adaptive
+  "fix-it" / master-rebalance** (Gullfoss / Ozone Master Rebalance) — ML and/or
+  a stereo master trying to re-balance instruments (ADR-0001 says it can't).
+- No **user-variable oversampling on the deterministic CLI/GUI path** — it would
+  break "same stems + recipe = identical output" (visible/fixed is fine).
+- No **OpenGL/GPU UI** — it worsens JUCE VST3 hiDPI scaling for no benefit here.
