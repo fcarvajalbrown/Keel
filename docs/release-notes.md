@@ -1,36 +1,41 @@
 **Beta** release of Keel (deterministic automix + automaster) — the desktop GUI
-and the **Keel VST3 plugin** for your DAW, now hardened and built together by CI.
+and the **Keel plugin**, now on **Windows and macOS**, built together by CI. This
+release closes the plugin's parity gap: a macOS plugin (VST3 + AU), a wired
+Bus-glue control, and a reference loudness/peak readout.
 
 ## Downloads
 - **Windows app** — `KeelSetup-<ver>.exe` (recommended installer) or `Keel.exe` (portable).
+- **macOS app (Apple Silicon / arm64)** — `Keel.dmg`.
 - **Windows plugin** — `Keel-VST3-windows-<ver>.zip` — unzip `Keel.vst3` into your
   VST3 folder (`%LOCALAPPDATA%\Programs\Common\VST3` or
   `C:\Program Files\Common Files\VST3`), then rescan in your DAW.
-- **macOS (Apple Silicon / arm64)** — `Keel.dmg` (app). The plugin is Windows-only
-  for now (a macOS plugin build is the next milestone).
+- **macOS plugin (Apple Silicon / arm64)** — `Keel-plugins-macos-<ver>.zip` —
+  contains `Keel.vst3` and `Keel.component` (AU). Drop them into
+  `~/Library/Audio/Plug-Ins/VST3` and `~/Library/Audio/Plug-Ins/Components`, then
+  rescan (Logic Pro / GarageBand use the AU).
 
 ## New in this release
-- **More instruments + a real instrument dropdown.** The known set now also covers
-  **piano, organ/keys, backing vocals, and aux percussion** on top of
-  vocals/drums/bass/guitar/synth — each balanced as its own group at a sensible
-  default level. In the app, each file's label is now an **editable instrument
-  dropdown**: a generically-named stem like `track1.wav` is one click to assign as
-  guitar, piano, etc. (custom labels still allowed). Aux percussion and organ/keys
-  now group apart from the drum kit and the synth.
-- **Tougher on bad input.** Corrupt/unreadable audio and a malformed (hand-edited)
-  `keel.json` now produce a clear message instead of a crash, the `keel.json` is
-  never silently overwritten, NaN/Inf samples are handled cleanly, and a `--batch`
-  run reports a bad folder and carries on.
-- **Trustworthy builds.** The test suite now runs on Windows + macOS as a release
-  gate, and the **plugin is built and smoke-validated in CI** — a single release
-  now ships the app and the plugin together, automatically.
+- **macOS plugin — VST3 + Audio Unit.** The plugin now builds for macOS alongside
+  Windows, including an **AU** for Logic Pro and GarageBand. The same self-contained
+  live master chain runs on every platform; both formats are built and
+  smoke-validated (pluginval) in CI, so one release ships the Windows and macOS
+  plugins together with the apps.
+- **Reference loudness/peak readout.** Load a track you admire and the plugin
+  measures its **integrated LUFS + true-peak** — offline, once, on a background
+  thread — and shows them next to the live master meters, so you can aim the Makeup
+  gain at a real target. It's measured with libebur128 (canonical ITU-R BS.1770),
+  so the numbers line up with the CLI/GUI. This is a passive readout, **not** a live
+  match — the spectral/reference match stays the offline path in the CLI/GUI.
+- **Bus-glue toggle, wired.** The plugin's Bus-glue control now actually gates the
+  master glue compressor (default **on**, so the out-of-box master still matches the
+  CLI/GUI); turning it off is a labelled, plugin-only deviation.
 
 ## Heads-up: these builds are unsigned
 They are not yet code-signed, so the OS will warn on first launch:
 - **Windows**: SmartScreen shows "Windows protected your PC" — click
   **More info -> Run anyway**.
 - **macOS**: Gatekeeper blocks an unidentified developer — **right-click
-  the app -> Open**, then confirm.
+  the app (or plugin) -> Open**, then confirm.
 
 Signing/notarization is the v1.0.0 gate. See `ROADMAP.md` for status and
 `README.md` for what Keel does.

@@ -82,3 +82,9 @@ Prefer the tag + CI path when you can — it also builds and attaches the macOS
   (piano, organ/keys, backing vocals, aux percussion) with an editable instrument
   dropdown in the GUI; the test suite runs as a CI gate (Win + macOS) and the VST3
   plugin is built + pluginval-smoke-tested in CI, so one tag ships GUI + plugin.
+- `v0.5.0-beta` — Plugin parity + macOS plugin: the plugin now builds for macOS
+  (VST3 + AU for Logic / GarageBand) alongside Windows, both pluginval-validated in
+  CI; the Bus-glue toggle is wired to the master glue comp (default on); the dead
+  Reference toggle becomes a passive reference loudness/peak readout measured with
+  libebur128 (canonical BS.1770, matches the CLI/GUI numbers). CI also auto-prunes
+  old prerelease assets (keeps the newest two) to stay under storage quota.

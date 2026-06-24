@@ -13,7 +13,7 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 
 ---
 
-## Where we are: `v0.4.0-beta`
+## Where we are: `v0.5.0-beta`
 
 The DSP core is **done and validated**; the CLI, the desktop GUI, and the VST3
 plugin all drive the same engine and all build green. There are no unfinished
@@ -135,7 +135,7 @@ Made the build trustworthy before adding reach.
       gates.
 - [x] Release pipeline: one `v*` tag produces GUI + plugin assets together.
 
-### `v0.5.0-beta` — Plugin parity + cross-platform
+### `v0.5.0-beta` — Plugin parity + cross-platform  ✓ shipped
 Bring the plugin level with the GUI's reach.
 - [x] **Wire the Bus-glue toggle** into the live C++ chain (was always-on). The
       toggle gates the master glue comp; default ON keeps the out-of-box master in

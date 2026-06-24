@@ -60,28 +60,31 @@ Two things shipped:
   per block) so the **live chain + DSP are untouched (no DSP SYNC)**. Verified
   green on Windows + macOS CI (run `28074729271`).
 
-**Remaining `v0.5.0-beta` items (the live next task):** only the **by-ear A/B**
-sign-off is left — a **user task**: load the plugin in a DAW and A/B its live master
-against a `build.py` render of the same audio (expect close, not identical), to
-confirm the C++ chain still matches the Python master character. Everything else in
-v0.5 is shipped + CI-verified; the plugin **parity gap is closed in code**. Once you
-sign off by ear, the next step is to **cut `v0.5.0-beta`** (bump `keel.py`
-`__version__` + `installer/keel.iss` + `plugin/CMakeLists.txt` in lockstep, refresh
-`docs/release-notes.md`, tag `v0.5.0-beta`). Confirm direction via the blue option
-UI first.
+**`v0.5.0-beta` is being CUT (this session).** The by-ear A/B was signed off by the
+user ("everything good"), so all v0.5 work is done + CI-verified and the plugin
+**parity gap is closed**. Version bumped to **0.5.0** in lockstep (`keel.py`,
+`installer/keel.iss`, `plugin/CMakeLists.txt`) + README download links swept (now
+surface the macOS plugin too); `docs/release-notes.md` rewritten for v0.5.0-beta;
+`docs/RELEASE.md` lineage + this ROADMAP advanced. Tag **`v0.5.0-beta`** pushed →
+CI builds + attaches the Win/macOS GUI + plugins and auto-prunes old assets. **NEXT
+agent: confirm the release published green (all assets attached) and pick the next
+milestone via the blue option UI** — the natural next track is `v0.6`/`v0.7`
+(landing page + metering depth) or signing (v1.0 gate). See `ROADMAP.md`.
 
-**Latest release: `v0.4.0-beta` (2026-06-18, all on `main`)** — Harden & CI. The
-test suite is now a CI release gate (Win + macOS), and the **VST3 plugin is built
-+ pluginval-smoke-tested in CI**, so ONE `v*` tag builds and attaches GUI + plugin
-together (no more manual plugin build). Also in 0.4: graceful degradation on bad
-input (corrupt audio / malformed keel.json / NaN / silent) + edge-case tests, and
-an expanded instrument set (piano, organ/keys, backing vocals, aux percussion)
-with an editable instrument dropdown in the GUI. Assets: `KeelSetup-0.4.0.exe`,
-`Keel.exe`, `Keel.dmg`, `Keel-VST3-windows-0.4.0.zip` — all built+attached by CI.
+**Latest release: `v0.5.0-beta` (2026-06-24, being cut this session)** — Plugin
+parity + cross-platform. The plugin now builds for **macOS (VST3 + AU)** alongside
+Windows (both pluginval-validated in CI); the **Bus-glue toggle is wired** (default
+on); the dead Reference toggle is a **passive loudness/peak readout** measured with
+**libebur128**; and CI **auto-prunes** old prerelease assets (newest two). Assets:
+`KeelSetup-0.5.0.exe`, `Keel.exe`, `Keel.dmg`, `Keel-VST3-windows-0.5.0.zip`,
+`Keel-plugins-macos-0.5.0.zip` — all built + attached by CI on the tag.
 Lineage: `v0.1.0-alpha` (engine + GUI scaffold + CI) -> `v0.2.0-alpha` (GUI restyle)
--> `v0.3.0-alpha` (plugin) -> `v0.4.0-beta` (harden & CI). Earlier 0.3.0 context:
-the plugin then was built locally and attached by hand; that is now automated.
-Earlier launch context below (still on `main`):
+-> `v0.3.0-alpha` (plugin) -> `v0.4.0-beta` (harden & CI) -> `v0.5.0-beta` (plugin
+parity + macOS plugin). Prior `v0.4.0-beta` (2026-06-18): the test suite became a CI
+release gate (Win + macOS) and the plugin was first built + pluginval-tested in CI,
+so one tag ships GUI + plugin; plus graceful degradation on bad input and an
+expanded instrument set with an editable dropdown. Earlier launch context below
+(still on `main`):
 - **Release `v0.1.0-alpha`** — a GitHub *prerelease* with `KeelSetup-0.1.0.exe`
   (Windows installer), `Keel.exe` (portable), `Keel.dmg` (macOS arm64). CI
   (`build-app.yml`) now builds AND publishes the prerelease on a `v*` tag (the
