@@ -24,8 +24,10 @@ code stubs left — the remaining distance to a stable **1.0** is about
   Windows + macOS; the VST3 plugin is built + pluginval-smoke-tested in CI; bad
   input (malformed `keel.json`, corrupt/NaN/silent audio, `--batch`) degrades
   gracefully and is covered by tests. One tag now ships GUI + plugin together.
-- **Parity** — the plugin's Reference / Bus-glue toggles exist in the UI but
-  aren't wired to the live chain, and there's no macOS plugin build.
+- **Parity** — closed in code: the plugin's Bus-glue toggle is wired (ADR-0030)
+  and the dead Reference toggle is now a passive loudness/peak readout (ADR-0035);
+  the macOS plugin build (VST3 + AU) is wired into CI. Remaining: a first green
+  Mac CI run and a by-ear A/B sign-off.
 - **Reach** — no landing page, no live donation / commercial-checkout links, no
   trademark check, `README.es` is condensed not full.
 - **Launch** — the installers and the plugin are **unsigned** (SmartScreen /
@@ -147,7 +149,12 @@ Bring the plugin level with the GUI's reach.
       once, offline, on a background thread → its **integrated LUFS + true-peak**
       show next to the live meters. No DSP-master change (metering/UI only, no DSP
       SYNC). The spectral match stays the offline Matchering path in the CLI/GUI.
-- [ ] **macOS plugin build (VST3 + AU)** in CI, attached to the release.
+- [x] **macOS plugin build (VST3 + AU)** in CI, attached to the release. The
+      `plugin` job is now a windows/macos matrix; macOS builds VST3 + AU (Xcode
+      generator), pluginval-smoke-tests both, and packages
+      `Keel-plugins-macos-<ver>.zip` for the release. AU is a macOS-only JUCE
+      wrapper over the same processor — no DSP change. *Wired + locally validated
+      (CMake configures, YAML parses); awaiting first green run on a Mac runner.*
 - [ ] **By-ear A/B** sign-off: plugin live master vs a `build.py` render of the
       same audio (expect close, not identical) — user task.
 - [ ] Optional: libebur128-backed meter for tighter parity with `pyloudnorm`.

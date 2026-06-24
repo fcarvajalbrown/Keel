@@ -32,9 +32,27 @@ SYNC** needed. VST3 rebuilt green (zero warnings) + auto-installed; **by-ear/by-
 check is the user's.** See `plugin/Source/PluginProcessor.cpp`
 (`measureReferenceStats`/`loadReference`) + `PluginEditor.cpp`.
 
-**Remaining `v0.5.0-beta` items (the live next task):** (1) **macOS plugin build
-(VST3 + AU)** in CI + attach to the release (today CI builds Windows VST3 only) —
-AU is near-zero DSP work and pairs with the macOS build. (2) **by-ear A/B**
+**This session (2026-06-23, part 2) — storage hygiene + macOS plugin build.**
+Two things shipped:
+- **Release-asset pruning (commit `7c9c533`).** GitHub storage was filling up:
+  four prereleases each carried ~300 MB of binaries (~1.2 GB total; Actions
+  artifacts/caches were already 0). Stripped the assets off the two oldest
+  prereleases now (~600 MB freed) **and** added an auto-prune step to the `release`
+  job — after publishing, it keeps downloadable assets on only the **newest two**
+  prereleases and strips the rest, **keeping each release's notes + git tag** (only
+  the heavy binaries go). So this self-cleans on every future tag.
+- **macOS plugin build (VST3 + AU) (commit `1435851`).** The CI `plugin` job is now
+  a windows/macos matrix. macOS configures with the **Xcode generator**, builds
+  **VST3 + AU** (AU is a macOS-only JUCE wrapper added in `plugin/CMakeLists.txt` —
+  same processor, **no DSP change, no DSP SYNC**), pluginval-smoke-tests both
+  (the AU via its installed `.component`), and packages
+  `Keel-plugins-macos-<ver>.zip` which the release job attaches. *Validated
+  locally (CMake configures on Windows, YAML parses) but **NOT yet run on a real
+  Mac runner** — the first green `macos-latest` run is the proof still owed.*
+
+**Remaining `v0.5.0-beta` items (the live next task):** (1) **Verify the macOS
+plugin build** on a real Mac runner (a `workflow_dispatch` run, or just let the
+next `v*` tag prove it — note macOS runner minutes bill ~10x). (2) **by-ear A/B**
 sign-off — user task. (3) optional libebur128 meter for tighter parity. Confirm
 direction via the blue option UI first.
 
