@@ -196,3 +196,30 @@ jobs:
             --notes-file docs/release-notes.md \
             --prerelease \
             $files
+
+      # Storage hygiene: each prerelease carries ~300 MB of binaries, which adds
+      # up fast against the storage quota. Keep the downloadable assets on only the
+      # newest 2 prereleases (the one just published + the previous, for rollback);
+      # strip the heavy binaries from older ones. Release entries, notes, and git
+      # tags are KEPT -- only the assets are removed, so changelog/version history
+      # and old links survive (they just resolve to a notes page, not a download).
+      - name: Prune old prerelease assets (keep newest 2)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          KEEP=2
+          mapfile -t tags < <(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
+                   --json tagName,isPrerelease,createdAt \
+                   -q 'map(select(.isPrerelease)) | sort_by(.createdAt) | reverse | .[].tagName')
+          i=0
+          for t in "${tags[@]}"; do
+            i=$((i+1))
+            if [ "$i" -le "$KEEP" ]; then echo "keep  $t"; continue; fi
+            assets=$(gh release view "$t" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name')
+            if [ -z "$assets" ]; then echo "clean $t (no assets)"; continue; fi
+            while IFS= read -r a; do
+              echo "strip $t :: $a"
+              gh release delete-asset "$t" "$a" --repo "$GITHUB_REPOSITORY" --yes
+            done <<< "$assets"
+          done
