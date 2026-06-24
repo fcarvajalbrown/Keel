@@ -158,7 +158,13 @@ Bring the plugin level with the GUI's reach.
       pluginval-passed).
 - [ ] **By-ear A/B** sign-off: plugin live master vs a `build.py` render of the
       same audio (expect close, not identical) — user task.
-- [ ] Optional: libebur128-backed meter for tighter parity with `pyloudnorm`.
+- [x] **libebur128-backed reference meter** for tighter `pyloudnorm` parity. The
+      offline reference readout (ADR-0035) now measures integrated LUFS + true-peak
+      with libebur128 (canonical ITU-R BS.1770) instead of a JUCE-RBJ K-weighting,
+      so it tracks `meters.py`/pyloudnorm to ~0.1 LU. libebur128 (MIT) is fetched
+      online like JUCE, built static, pinned `v1.2.6`; it runs on the reference
+      worker thread only (integrated mode allocates per block), so the live chain
+      and DSP are untouched (no DSP SYNC). Verified green on Windows + macOS CI.
 
 > **Candidates (2026-06-22 research sweep, not committed).** The plugin's by-ear
 > Makeup gain is steered by a *momentary* LUFS meter, but streaming normalizes on

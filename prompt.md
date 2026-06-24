@@ -51,13 +51,23 @@ Two things shipped:
   `28073942433`: `plugin-macos` built VST3 + AU and passed pluginval; the GUI
   build was correctly skipped). A new `only: all|plugin` dispatch input drives that
   cheap plugin-only smoke (gates the heavy GUI build off when `only=plugin`).
+- **libebur128 reference meter (commit `991f7b5`).** The offline reference readout
+  (ADR-0035) now measures integrated LUFS + true-peak with **libebur128**
+  (canonical ITU-R BS.1770) instead of the hand-rolled JUCE-RBJ K-weighting, so it
+  tracks `meters.py`/pyloudnorm to ~0.1 LU. libebur128 (MIT) is fetched online like
+  JUCE, built **static** (no DLL), pinned `v1.2.6` with a CMake-4.x policy-floor
+  fix; it runs on the **reference worker thread only** (integrated mode allocates
+  per block) so the **live chain + DSP are untouched (no DSP SYNC)**. Verified
+  green on Windows + macOS CI (run `28074729271`).
 
-**Remaining `v0.5.0-beta` items (the live next task):** (1) **by-ear A/B**
-sign-off — user task: plugin live master vs a `build.py` render of the same audio
-(expect close, not identical). (2) optional libebur128-backed meter for tighter
-`pyloudnorm` parity. With the macOS plugin build verified, the plugin **parity gap
-is closed in code** — what's left before cutting `v0.5.0-beta` is the by-ear
-sign-off (yours) and, optionally, the meter. Confirm direction via the blue option
+**Remaining `v0.5.0-beta` items (the live next task):** only the **by-ear A/B**
+sign-off is left — a **user task**: load the plugin in a DAW and A/B its live master
+against a `build.py` render of the same audio (expect close, not identical), to
+confirm the C++ chain still matches the Python master character. Everything else in
+v0.5 is shipped + CI-verified; the plugin **parity gap is closed in code**. Once you
+sign off by ear, the next step is to **cut `v0.5.0-beta`** (bump `keel.py`
+`__version__` + `installer/keel.iss` + `plugin/CMakeLists.txt` in lockstep, refresh
+`docs/release-notes.md`, tag `v0.5.0-beta`). Confirm direction via the blue option
 UI first.
 
 **Latest release: `v0.4.0-beta` (2026-06-18, all on `main`)** — Harden & CI. The
