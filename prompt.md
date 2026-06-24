@@ -46,15 +46,19 @@ Two things shipped:
   **VST3 + AU** (AU is a macOS-only JUCE wrapper added in `plugin/CMakeLists.txt` —
   same processor, **no DSP change, no DSP SYNC**), pluginval-smoke-tests both
   (the AU via its installed `.component`), and packages
-  `Keel-plugins-macos-<ver>.zip` which the release job attaches. *Validated
-  locally (CMake configures on Windows, YAML parses) but **NOT yet run on a real
-  Mac runner** — the first green `macos-latest` run is the proof still owed.*
+  `Keel-plugins-macos-<ver>.zip` which the release job attaches. **Verified green
+  on a real `macos-latest` runner** via a plugin-only `workflow_dispatch` (run
+  `28073942433`: `plugin-macos` built VST3 + AU and passed pluginval; the GUI
+  build was correctly skipped). A new `only: all|plugin` dispatch input drives that
+  cheap plugin-only smoke (gates the heavy GUI build off when `only=plugin`).
 
-**Remaining `v0.5.0-beta` items (the live next task):** (1) **Verify the macOS
-plugin build** on a real Mac runner (a `workflow_dispatch` run, or just let the
-next `v*` tag prove it — note macOS runner minutes bill ~10x). (2) **by-ear A/B**
-sign-off — user task. (3) optional libebur128 meter for tighter parity. Confirm
-direction via the blue option UI first.
+**Remaining `v0.5.0-beta` items (the live next task):** (1) **by-ear A/B**
+sign-off — user task: plugin live master vs a `build.py` render of the same audio
+(expect close, not identical). (2) optional libebur128-backed meter for tighter
+`pyloudnorm` parity. With the macOS plugin build verified, the plugin **parity gap
+is closed in code** — what's left before cutting `v0.5.0-beta` is the by-ear
+sign-off (yours) and, optionally, the meter. Confirm direction via the blue option
+UI first.
 
 **Latest release: `v0.4.0-beta` (2026-06-18, all on `main`)** — Harden & CI. The
 test suite is now a CI release gate (Win + macOS), and the **VST3 plugin is built

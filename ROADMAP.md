@@ -153,8 +153,9 @@ Bring the plugin level with the GUI's reach.
       `plugin` job is now a windows/macos matrix; macOS builds VST3 + AU (Xcode
       generator), pluginval-smoke-tests both, and packages
       `Keel-plugins-macos-<ver>.zip` for the release. AU is a macOS-only JUCE
-      wrapper over the same processor — no DSP change. *Wired + locally validated
-      (CMake configures, YAML parses); awaiting first green run on a Mac runner.*
+      wrapper over the same processor — no DSP change. **Verified green on a real
+      `macos-latest` runner** (plugin-only `workflow_dispatch`: VST3 + AU built and
+      pluginval-passed).
 - [ ] **By-ear A/B** sign-off: plugin live master vs a `build.py` render of the
       same audio (expect close, not identical) — user task.
 - [ ] Optional: libebur128-backed meter for tighter parity with `pyloudnorm`.
