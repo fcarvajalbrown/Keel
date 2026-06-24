@@ -21,11 +21,22 @@ separate repo); and made three scope carve-outs (a single **broadband master til
 knob** post-1.0; a **plugin-only oversampling selector**; **encoded export**
 MP3/OGG/FLAC/AAC). Read `ROADMAP.md` + ADRs 0030-0034 for the why.
 
-**Remaining `v0.5.0-beta` items (the live next task):** (1) the **Reference
-toggle** — wire it or remove it; the agreed clean resolution is a *reference
-loudness/peak readout* (no live ML match). (2) **macOS plugin build (VST3 + AU)**
-in CI + attach to the release (today CI builds Windows VST3 only). (3) **by-ear
-A/B** sign-off — user task. Confirm direction via the blue option UI first.
+**This session (2026-06-23) — Reference control resolved (ADR-0035).** The dead
+plugin `reference` toggle is replaced with a **passive reference readout**: load a
+file → it is measured once, offline, on a background thread → its **integrated
+LUFS (BS.1770-4 gated) + true-peak (4x oversampled)** show next to the live meters.
+No live ML/spectral match (that stays the offline Matchering path, ADR-0009); the
+`reference` *param* is gone, the file path persists in the APVTS state tree and is
+re-measured on project load. Metering/UI only — **no DSP-master change, no DSP
+SYNC** needed. VST3 rebuilt green (zero warnings) + auto-installed; **by-ear/by-eye
+check is the user's.** See `plugin/Source/PluginProcessor.cpp`
+(`measureReferenceStats`/`loadReference`) + `PluginEditor.cpp`.
+
+**Remaining `v0.5.0-beta` items (the live next task):** (1) **macOS plugin build
+(VST3 + AU)** in CI + attach to the release (today CI builds Windows VST3 only) —
+AU is near-zero DSP work and pairs with the macOS build. (2) **by-ear A/B**
+sign-off — user task. (3) optional libebur128 meter for tighter parity. Confirm
+direction via the blue option UI first.
 
 **Latest release: `v0.4.0-beta` (2026-06-18, all on `main`)** — Harden & CI. The
 test suite is now a CI release gate (Win + macOS), and the **VST3 plugin is built
@@ -163,10 +174,10 @@ Then `v0.5.0-beta` (wire the Bus-glue + Reference toggles into the live C++ chai
 -- honour the DSP SYNC RULE; macOS VST3/AU in CI; by-ear A/B) and `v0.6.0-beta`
 (landing page, donation + commercial checkout, trademark, `README.es` parity).
 
-**OPEN CALL for `v0.5`:** the plugin's **Reference toggle** -- wiring a live
-reference match into the real-time C++ chain is a real chunk of work (Matchering
-is offline/Python). The roadmap lets you either wire it OR remove the control;
-that's an ADR-worthy decision when you reach `v0.5`.
+**RESOLVED (2026-06-23, ADR-0035):** the plugin's **Reference toggle** open call is
+closed — it became a passive reference loudness/peak readout (load a file → offline
+integrated-LUFS + true-peak readout next to the live meters), not a live match. A
+live spectral match stays the offline Matchering path (ADR-0009).
 
 ## Before writing any code
 
