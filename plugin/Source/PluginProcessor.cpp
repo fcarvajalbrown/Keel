@@ -1,7 +1,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <juce_audio_formats/juce_audio_formats.h>  // AudioFormatManager/Reader (reference readout)
+#include <ebur128.h>                                // canonical BS.1770 (reference readout)
 #include <cmath>
+#include <vector>
 
 namespace
 {
@@ -34,10 +36,13 @@ namespace
     inline double dbToGain (double db) { return std::pow (10.0, db / 20.0); }
 
     // --- Offline reference measurement (ADR-0035) -----------------------------
-    // Integrated LUFS (BS.1770-4, full gating) + 4x-oversampled true-peak of a
-    // whole buffer. Static, not real-time: this matches what meters.py reports for
-    // the same file (pyloudnorm is also BS.1770-4 integrated). Returns
-    // { integratedLufs, dBTP }, each kSilenceFloor when there is nothing to show.
+    // Integrated LUFS + true-peak of a whole buffer via libebur128 (canonical
+    // ITU-R BS.1770), so the readout matches what meters.py / pyloudnorm report
+    // for the same file (both target BS.1770-4) more tightly than a hand-rolled
+    // K-weighting did. Static, NOT real-time: libebur128's integrated mode
+    // allocates per 100 ms block, which is fine on this reference worker thread
+    // but must never touch the live chain. Returns { integratedLufs, dBTP }, each
+    // kSilenceFloor when there is nothing to show.
     std::pair<float, float> measureReferenceStats (const juce::AudioBuffer<float>& buf,
                                                    double sr)
     {
@@ -46,92 +51,51 @@ namespace
         if (numCh <= 0 || n <= 0 || sr <= 0.0)
             return { kSilenceFloor, kSilenceFloor };
 
-        // K-weight a copy (same prefilters as the live momentary meter).
-        juce::AudioBuffer<float> k (numCh, n);
-        auto shelf = juce::dsp::IIR::Coefficients<float>::makeHighShelf (
-            sr, (float) kShelfFreq, (float) kShelfQ,
-            (float) std::pow (10.0, kShelfGainDb / 20.0));
-        auto hp = juce::dsp::IIR::Coefficients<float>::makeHighPass (
-            sr, (float) kHpFreq, (float) kHpQ);
-        for (int ch = 0; ch < numCh; ++ch)
-        {
-            juce::dsp::IIR::Filter<float> f1, f2;
-            f1.coefficients = shelf;
-            f2.coefficients = hp;
-            const juce::dsp::ProcessSpec spec { sr, (juce::uint32) juce::jmax (1, n), 1 };
-            f1.prepare (spec); f2.prepare (spec);
-            f1.reset();        f2.reset();
-            const float* src = buf.getReadPointer (ch);
-            float* dst = k.getWritePointer (ch);
-            for (int i = 0; i < n; ++i)
-                dst[i] = f2.processSample (f1.processSample (src[i]));
-        }
+        ebur128_state* st = ebur128_init ((unsigned) numCh,
+                                          (unsigned long) std::lround (sr),
+                                          EBUR128_MODE_I | EBUR128_MODE_TRUE_PEAK);
+        if (st == nullptr)
+            return { kSilenceFloor, kSilenceFloor };
 
-        // Integrated loudness over 400 ms blocks at a 100 ms hop (75% overlap),
-        // with the absolute (-70 LUFS) then relative (-10 LU) gates.
-        const int blockLen = juce::jmax (1, (int) std::round (sr * 0.4));
-        const int hop      = juce::jmax (1, (int) std::round (sr * 0.1));
-        std::vector<double> blockZ, blockL;
-        for (int start = 0; start + blockLen <= n; start += hop)
+        // libebur128 wants interleaved frames; JUCE buffers are planar. Interleave
+        // in chunks so the temp buffer stays small even for a whole song.
+        constexpr int kChunk = 1 << 15;   // 32k frames
+        std::vector<float> inter ((size_t) kChunk * (size_t) numCh);
+        for (int start = 0; start < n; start += kChunk)
         {
-            double z = 0.0;
+            const int frames = juce::jmin (kChunk, n - start);
             for (int ch = 0; ch < numCh; ++ch)
             {
-                const float* x = k.getReadPointer (ch);
-                double s = 0.0;
-                for (int i = 0; i < blockLen; ++i)
-                    s += (double) x[start + i] * (double) x[start + i];
-                z += s / blockLen;            // channel weight G = 1.0 for L/R
+                const float* x = buf.getReadPointer (ch);
+                for (int i = 0; i < frames; ++i)
+                    inter[(size_t) i * (size_t) numCh + (size_t) ch] = x[start + i];
             }
-            blockZ.push_back (z);
-            blockL.push_back (z > 1.0e-12 ? -0.691 + 10.0 * std::log10 (z) : -1000.0);
+            if (ebur128_add_frames_float (st, inter.data(), (size_t) frames)
+                != EBUR128_SUCCESS)
+            {
+                ebur128_destroy (&st);
+                return { kSilenceFloor, kSilenceFloor };
+            }
         }
 
         float integrated = kSilenceFloor;
-        if (! blockZ.empty())
-        {
-            double sumAbs = 0.0; int cntAbs = 0;
-            for (size_t i = 0; i < blockZ.size(); ++i)
-                if (blockL[i] >= -70.0) { sumAbs += blockZ[i]; ++cntAbs; }
+        double lufs = 0.0;
+        if (ebur128_loudness_global (st, &lufs) == EBUR128_SUCCESS
+            && std::isfinite (lufs))
+            integrated = (float) lufs;
 
-            if (cntAbs > 0)
-            {
-                const double relThresh =
-                    -0.691 + 10.0 * std::log10 (sumAbs / cntAbs) - 10.0;
-                double sumRel = 0.0; int cntRel = 0;
-                for (size_t i = 0; i < blockZ.size(); ++i)
-                    if (blockL[i] >= -70.0 && blockL[i] >= relThresh)
-                        { sumRel += blockZ[i]; ++cntRel; }
-
-                if (cntRel > 0)
-                {
-                    const double meanRel = sumRel / cntRel;
-                    integrated = meanRel > 1.0e-12
-                        ? (float) (-0.691 + 10.0 * std::log10 (meanRel))
-                        : kSilenceFloor;
-                }
-            }
-        }
-
-        // True peak: 4x oversample the whole buffer, take the inter-sample max.
         float tp = kSilenceFloor;
+        double peakLin = 0.0;
+        for (int ch = 0; ch < numCh; ++ch)
         {
-            juce::AudioBuffer<float> tpBuf (numCh, n);
-            for (int ch = 0; ch < numCh; ++ch)
-                tpBuf.copyFrom (ch, 0, buf, ch, 0, n);
-            juce::dsp::Oversampling<float> os (
-                (size_t) numCh, 2,
-                juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR);
-            os.initProcessing ((size_t) n);
-            juce::dsp::AudioBlock<float> blk (tpBuf);
-            auto up = os.processSamplesUp (blk);
-            float peak = 0.0f;
-            for (size_t ch = 0; ch < up.getNumChannels(); ++ch)
-                for (size_t i = 0; i < up.getNumSamples(); ++i)
-                    peak = juce::jmax (peak, std::abs (up.getSample ((int) ch, (int) i)));
-            tp = peak > 1.0e-9f ? juce::Decibels::gainToDecibels (peak) : kSilenceFloor;
+            double p = 0.0;   // libebur128 true-peak is linear amplitude (1.0 = 0 dBTP)
+            if (ebur128_true_peak (st, (unsigned) ch, &p) == EBUR128_SUCCESS)
+                peakLin = juce::jmax (peakLin, p);
         }
+        if (peakLin > 1.0e-9)
+            tp = (float) (20.0 * std::log10 (peakLin));
 
+        ebur128_destroy (&st);
         return { integrated, tp };
     }
 }

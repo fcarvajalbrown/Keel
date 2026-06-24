@@ -28,6 +28,26 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
+# --- libebur128 (MIT) via FetchContent: canonical ITU-R BS.1770 loudness for the
+#     OFFLINE reference readout (ADR-0035), so the plugin's measured LUFS / true-
+#     peak match meters.py / pyloudnorm tightly (both target BS.1770-4). Pulled
+#     online like JUCE (ADR-0020) and built STATIC (no extra DLL to ship). Used on
+#     the reference worker thread ONLY -- its integrated mode allocates per block,
+#     which is fine off the audio thread but must never run in the live chain. ---
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)   # static libebur128
+# libebur128 v1.2.6 still declares cmake_minimum_required(2.8.12), which CMake 4.x
+# rejects; raise the effective policy floor for the subproject (ignored by the
+# older CMake on which the declaration is already valid). Scoped to this fetch.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+FetchContent_Declare(
+    ebur128
+    GIT_REPOSITORY https://github.com/jiixyj/libebur128.git
+    GIT_TAG        v1.2.6
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(ebur128)
+unset(CMAKE_POLICY_VERSION_MINIMUM)
+
 # --- Auto-install the built plugin where the DAW will scan it. The JUCE Windows
 #     default is C:/Program Files/Common Files/VST3, which needs admin; point it
 #     at the per-user VST3 folder (the VST3 spec's user location) instead, so
@@ -92,8 +112,13 @@ target_link_libraries(KeelPlugin
         KeelData
         juce::juce_audio_utils
         juce::juce_dsp
+        ebur128
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
+
+# libebur128 doesn't export an include dir for in-tree consumers; point at the
+# header (ebur128.h lives in the ebur128/ subdir of the fetched source).
+target_include_directories(KeelPlugin PRIVATE ${ebur128_SOURCE_DIR}/ebur128)
