@@ -19,6 +19,12 @@ name: build-app
 # v1.0.0 gate).
 on:
   workflow_dispatch:
+    inputs:
+      only:
+        description: "Jobs to run on a manual dispatch (plugin = skip the heavy GUI build, for a cheap plugin smoke)"
+        type: choice
+        default: all
+        options: [all, plugin]
   push:
     tags: ["v*"]
 
@@ -50,6 +56,9 @@ jobs:
   build:
     name: ${{ matrix.label }}
     needs: test
+    # Skip the heavy GUI/PyInstaller build on a "plugin"-only manual dispatch.
+    # On a tag push `inputs.only` is null, so this is true and the GUI still builds.
+    if: ${{ inputs.only != 'plugin' }}
     strategy:
       fail-fast: false   # one OS failing must not cancel the other
       matrix:
