@@ -56,7 +56,7 @@ from mastering import master
 # --- metering ------------------------------------------------------------
 from meters import integrated_lufs, true_peak_db
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     # data / recipes

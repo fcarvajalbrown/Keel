@@ -6,12 +6,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.4.0-beta/KeelSetup-0.4.0.exe">
+  <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.5.0-beta/KeelSetup-0.5.0.exe">
     <img src="https://img.shields.io/badge/Descargar%20para%20Windows-Instalador%20Beta-2ea44f?style=for-the-badge&logo=windows&logoColor=white"
          alt="Descargar Keel para Windows — instalador beta">
   </a>
 </p>
-<p align="center"><sub>¿Usas un DAW? Descarga el <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.4.0-beta/Keel-VST3-windows-0.4.0.zip">plugin VST3 (Windows)</a>.</sub></p>
+<p align="center"><sub>¿Usas un DAW? Descarga el <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.5.0-beta/Keel-VST3-windows-0.5.0.zip">plugin VST3 (Windows)</a> o el <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.5.0-beta/Keel-plugins-macos-0.5.0.zip">plugin VST3 + AU (macOS)</a>.</sub></p>
 <p align="center"><sub>Beta sin firmar: Windows puede advertir — haz clic en <b>Más información &rarr; Ejecutar de todas formas</b>. macOS y otras descargas en la <a href="https://github.com/fcarvajalbrown/Keel/releases/latest">página de releases</a>.</sub></p>
 
 > Un motor **determinista** de mezcla y masterización automática. Le das una
