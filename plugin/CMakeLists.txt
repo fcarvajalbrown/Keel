@@ -40,14 +40,23 @@ elseif (APPLE)
         JUCE_VST3_COPY_DIR "$ENV{HOME}/Library/Audio/Plug-Ins/VST3")
 endif()
 
-# --- The plugin target: master-bus processor, VST3 + Standalone. ---
+# --- Plugin formats. AU is macOS-only (Logic / GarageBand); it's the same C++
+#     processor behind a different JUCE wrapper, so it adds the Apple format for
+#     near-zero extra work and NO DSP change. VST3 + Standalone build everywhere.
+if (APPLE)
+    set(KEEL_PLUGIN_FORMATS VST3 AU Standalone)
+else()
+    set(KEEL_PLUGIN_FORMATS VST3 Standalone)
+endif()
+
+# --- The plugin target: master-bus processor. ---
 juce_add_plugin(KeelPlugin
     PRODUCT_NAME                "Keel"
     COMPANY_NAME                "Felipe Carvajal Brown"
     BUNDLE_ID                   com.felipecarvajalbrown.keel
     PLUGIN_MANUFACTURER_CODE    Fcbn
     PLUGIN_CODE                 Keel
-    FORMATS                     VST3 Standalone
+    FORMATS                     ${KEEL_PLUGIN_FORMATS}
     IS_SYNTH                    FALSE
     NEEDS_MIDI_INPUT            FALSE
     NEEDS_MIDI_OUTPUT           FALSE

@@ -6,8 +6,9 @@ name: build-app
 #   * test    -> runs the tests/ unittest suite on Windows + macOS (release gate).
 #   * build   -> desktop GUI: dist/Keel.exe + dist/KeelSetup-<ver>.exe (Windows),
 #                dist/Keel.dmg (macOS arm64). Each self-tests the frozen app.
-#   * plugin  -> Windows VST3: dist/Keel-VST3-windows-<ver>.zip, smoke-validated
-#                with pluginval. (macOS plugin build is a v0.5 item.)
+#   * plugin  -> Windows VST3: dist/Keel-VST3-windows-<ver>.zip; macOS VST3 + AU:
+#                dist/Keel-plugins-macos-<ver>.zip. Both smoke-validated with
+#                pluginval.
 #   * release -> on a v* tag, publishes a GitHub *prerelease* with ALL the above
 #                assets attached together (GUI + plugin from ONE tag).
 #
@@ -113,23 +114,43 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # --- VST3 plugin (JUCE/CMake, Windows) ------------------------------------
+  # --- Plugin (JUCE/CMake): Windows VST3 + macOS VST3 & AU ------------------
   plugin:
-    name: plugin-windows-vst3
+    name: plugin-${{ matrix.label }}
     needs: test
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false   # one OS failing must not cancel the other
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows
+          - os: macos-latest        # Apple Silicon (arm64); builds VST3 + AU
+            label: macos
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
 
-      - name: Configure + build the plugin (Release)
+      # FetchContent pulls JUCE 8.0.9 on first configure (needs internet).
+      - name: Configure + build the plugin (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           # No explicit -G: CMake picks the runner's installed Visual Studio.
-          # FetchContent pulls JUCE 8.0.9 on first configure (needs internet).
           cmake -S plugin -B plugin/build -A x64
           cmake --build plugin/build --config Release
 
-      - name: Smoke-validate the VST3 (pluginval)
+      - name: Configure + build the plugin (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Xcode generator gives JUCE the multi-config layout it expects
+          # (artefacts land under .../Release/...). AU is added by CMakeLists
+          # on APPLE; COPY_PLUGIN_AFTER_BUILD installs VST3 + AU into the
+          # per-user plug-in folders so pluginval can find them.
+          cmake -S plugin -B plugin/build -G Xcode
+          cmake --build plugin/build --config Release
+
+      - name: Smoke-validate the VST3 (pluginval, Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $vst3 = "plugin/build/KeelPlugin_artefacts/Release/VST3/Keel.vst3"
@@ -147,7 +168,29 @@ jobs:
           Write-Host "pluginval exit code: $($p.ExitCode)"
           if ($p.ExitCode -ne 0) { throw "pluginval failed ($($p.ExitCode))" }
 
-      - name: Package the VST3 zip
+      - name: Smoke-validate the VST3 + AU (pluginval, macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          vst3="plugin/build/KeelPlugin_artefacts/Release/VST3/Keel.vst3"
+          au="plugin/build/KeelPlugin_artefacts/Release/AU/Keel.component"
+          for b in "$vst3" "$au"; do
+            if [ ! -d "$b" ]; then echo "missing bundle: $b" >&2; exit 1; fi
+          done
+          curl -sSL -o pluginval.zip \
+            "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip"
+          unzip -q pluginval.zip -d pluginval
+          PV="pluginval/pluginval.app/Contents/MacOS/pluginval"
+          # COPY_PLUGIN_AFTER_BUILD installed the AU into ~/Library/.../Components;
+          # validate the installed component (AU is resolved by id, not path).
+          for b in "$vst3" "$HOME/Library/Audio/Plug-Ins/Components/Keel.component"; do
+            echo "== validating $b =="
+            "$PV" --strictness-level 5 --validate-in-process \
+                  --skip-gui-tests --timeout-ms 300000 --validate "$b"
+          done
+
+      - name: Package the VST3 zip (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ver = (Select-String -Path keel.py -Pattern '__version__\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
@@ -157,11 +200,43 @@ jobs:
           Compress-Archive -Path $vst3 -DestinationPath $zip -Force
           Get-ChildItem dist\Keel-VST3-windows-*.zip
 
-      - name: Upload plugin artifact
+      - name: Package the VST3 + AU zip (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          ver=$(grep -oE '__version__\s*=\s*"[^"]+"' keel.py | grep -oE '"[^"]+"' | tr -d '"')
+          echo "Keel version: $ver"
+          mkdir -p dist
+          # ditto -c -k --keepParent preserves the .vst3/.component bundle layout
+          # (and resource forks) inside a single zip.
+          ditto -c -k --keepParent \
+            "plugin/build/KeelPlugin_artefacts/Release/VST3/Keel.vst3" dist/_vst3.zip
+          # Stage both bundles, then zip the folder so users get Keel.vst3 +
+          # Keel.component side by side.
+          stage="dist/Keel-plugins-macos"
+          mkdir -p "$stage"
+          cp -R "plugin/build/KeelPlugin_artefacts/Release/VST3/Keel.vst3" "$stage/"
+          cp -R "plugin/build/KeelPlugin_artefacts/Release/AU/Keel.component" "$stage/"
+          rm -f dist/_vst3.zip
+          ( cd dist && ditto -c -k --keepParent "Keel-plugins-macos" "Keel-plugins-macos-$ver.zip" )
+          rm -rf "$stage"
+          ls -la dist/Keel-plugins-macos-*.zip
+
+      - name: Upload plugin artifact (Windows)
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v7
         with:
           name: Keel-vst3-windows
           path: dist/Keel-VST3-windows-*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload plugin artifact (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Keel-plugins-macos
+          path: dist/Keel-plugins-macos-*.zip
           if-no-files-found: error
           retention-days: 7
 
