@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <juce_audio_formats/juce_audio_formats.h>  // AudioFormatManager/Reader (reference readout)
 #include <cmath>
 
 namespace
@@ -31,6 +32,108 @@ namespace
     constexpr float  kLimReleaseMs = 120.0f;  // matches pedalboard Limiter
 
     inline double dbToGain (double db) { return std::pow (10.0, db / 20.0); }
+
+    // --- Offline reference measurement (ADR-0035) -----------------------------
+    // Integrated LUFS (BS.1770-4, full gating) + 4x-oversampled true-peak of a
+    // whole buffer. Static, not real-time: this matches what meters.py reports for
+    // the same file (pyloudnorm is also BS.1770-4 integrated). Returns
+    // { integratedLufs, dBTP }, each kSilenceFloor when there is nothing to show.
+    std::pair<float, float> measureReferenceStats (const juce::AudioBuffer<float>& buf,
+                                                   double sr)
+    {
+        const int numCh = juce::jmin (buf.getNumChannels(), 2);
+        const int n     = buf.getNumSamples();
+        if (numCh <= 0 || n <= 0 || sr <= 0.0)
+            return { kSilenceFloor, kSilenceFloor };
+
+        // K-weight a copy (same prefilters as the live momentary meter).
+        juce::AudioBuffer<float> k (numCh, n);
+        auto shelf = juce::dsp::IIR::Coefficients<float>::makeHighShelf (
+            sr, (float) kShelfFreq, (float) kShelfQ,
+            (float) std::pow (10.0, kShelfGainDb / 20.0));
+        auto hp = juce::dsp::IIR::Coefficients<float>::makeHighPass (
+            sr, (float) kHpFreq, (float) kHpQ);
+        for (int ch = 0; ch < numCh; ++ch)
+        {
+            juce::dsp::IIR::Filter<float> f1, f2;
+            f1.coefficients = shelf;
+            f2.coefficients = hp;
+            const juce::dsp::ProcessSpec spec { sr, (juce::uint32) juce::jmax (1, n), 1 };
+            f1.prepare (spec); f2.prepare (spec);
+            f1.reset();        f2.reset();
+            const float* src = buf.getReadPointer (ch);
+            float* dst = k.getWritePointer (ch);
+            for (int i = 0; i < n; ++i)
+                dst[i] = f2.processSample (f1.processSample (src[i]));
+        }
+
+        // Integrated loudness over 400 ms blocks at a 100 ms hop (75% overlap),
+        // with the absolute (-70 LUFS) then relative (-10 LU) gates.
+        const int blockLen = juce::jmax (1, (int) std::round (sr * 0.4));
+        const int hop      = juce::jmax (1, (int) std::round (sr * 0.1));
+        std::vector<double> blockZ, blockL;
+        for (int start = 0; start + blockLen <= n; start += hop)
+        {
+            double z = 0.0;
+            for (int ch = 0; ch < numCh; ++ch)
+            {
+                const float* x = k.getReadPointer (ch);
+                double s = 0.0;
+                for (int i = 0; i < blockLen; ++i)
+                    s += (double) x[start + i] * (double) x[start + i];
+                z += s / blockLen;            // channel weight G = 1.0 for L/R
+            }
+            blockZ.push_back (z);
+            blockL.push_back (z > 1.0e-12 ? -0.691 + 10.0 * std::log10 (z) : -1000.0);
+        }
+
+        float integrated = kSilenceFloor;
+        if (! blockZ.empty())
+        {
+            double sumAbs = 0.0; int cntAbs = 0;
+            for (size_t i = 0; i < blockZ.size(); ++i)
+                if (blockL[i] >= -70.0) { sumAbs += blockZ[i]; ++cntAbs; }
+
+            if (cntAbs > 0)
+            {
+                const double relThresh =
+                    -0.691 + 10.0 * std::log10 (sumAbs / cntAbs) - 10.0;
+                double sumRel = 0.0; int cntRel = 0;
+                for (size_t i = 0; i < blockZ.size(); ++i)
+                    if (blockL[i] >= -70.0 && blockL[i] >= relThresh)
+                        { sumRel += blockZ[i]; ++cntRel; }
+
+                if (cntRel > 0)
+                {
+                    const double meanRel = sumRel / cntRel;
+                    integrated = meanRel > 1.0e-12
+                        ? (float) (-0.691 + 10.0 * std::log10 (meanRel))
+                        : kSilenceFloor;
+                }
+            }
+        }
+
+        // True peak: 4x oversample the whole buffer, take the inter-sample max.
+        float tp = kSilenceFloor;
+        {
+            juce::AudioBuffer<float> tpBuf (numCh, n);
+            for (int ch = 0; ch < numCh; ++ch)
+                tpBuf.copyFrom (ch, 0, buf, ch, 0, n);
+            juce::dsp::Oversampling<float> os (
+                (size_t) numCh, 2,
+                juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR);
+            os.initProcessing ((size_t) n);
+            juce::dsp::AudioBlock<float> blk (tpBuf);
+            auto up = os.processSamplesUp (blk);
+            float peak = 0.0f;
+            for (size_t ch = 0; ch < up.getNumChannels(); ++ch)
+                for (size_t i = 0; i < up.getNumSamples(); ++i)
+                    peak = juce::jmax (peak, std::abs (up.getSample ((int) ch, (int) i)));
+            tp = peak > 1.0e-9f ? juce::Decibels::gainToDecibels (peak) : kSilenceFloor;
+        }
+
+        return { integrated, tp };
+    }
 }
 
 KeelAudioProcessor::KeelAudioProcessor()
@@ -64,8 +167,10 @@ KeelAudioProcessor::makeParameterLayout()
         ParameterID { "makeup", 1 }, "Makeup",
         NormalisableRange<float> (-12.0f, 24.0f, 0.1f), 0.0f));
 
-    layout.add (std::make_unique<AudioParameterBool> (
-        ParameterID { "reference", 1 }, "Use Reference", false));
+    // NOTE: there is intentionally no "reference" parameter. The reference is a
+    // user-loaded file measured offline for a passive LUFS/TP readout (ADR-0035),
+    // not an automatable on/off match -- so it lives in the state tree (the file
+    // path), not as a host-automatable parameter.
 
     // Default ON: this gates the master tone-stage glue comp, which mastering.py
     // ALWAYS applies. Default-on keeps the out-of-box master in sync with the
@@ -180,6 +285,62 @@ void KeelAudioProcessor::resetMeters()
     truePeakHold = 0.0f;
     momentaryLufs.store (kSilenceFloor);
     truePeakDb.store (kSilenceFloor);
+}
+
+void KeelAudioProcessor::loadReference (const juce::File& file)
+{
+    if (! file.existsAsFile())
+    {
+        clearReference();
+        return;
+    }
+
+    referenceName = file.getFileName();
+    referenceLoading.store (true);
+    referenceLufs.store (kSilenceFloor);
+    referenceTruePeak.store (kSilenceFloor);
+    apvts.state.setProperty ("referencePath", file.getFullPathName(), nullptr);
+
+    // Measure off the message thread -- a full song is a few million samples.
+    juce::Thread::launch ([this, file]
+    {
+        juce::AudioFormatManager fm;
+        fm.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (fm.createReaderFor (file));
+        if (reader == nullptr)
+        {
+            referenceLoading.store (false);
+            return;
+        }
+
+        const int numCh = (int) juce::jlimit (1, 2, (int) reader->numChannels);
+        // Cap at 12 min so a stray huge file can't exhaust memory; references are
+        // single songs, far under this.
+        const auto maxLen = (juce::int64) (reader->sampleRate * 60.0 * 12.0);
+        const int  n      = (int) juce::jmin (maxLen, reader->lengthInSamples);
+        if (n <= 0)
+        {
+            referenceLoading.store (false);
+            return;
+        }
+
+        juce::AudioBuffer<float> buf (juce::jmax (1, numCh), n);
+        reader->read (&buf, 0, n, 0, true, true);
+
+        const auto stats = measureReferenceStats (buf, reader->sampleRate);
+        referenceLufs.store (stats.first);
+        referenceTruePeak.store (stats.second);
+        referenceLoading.store (false);
+    });
+}
+
+void KeelAudioProcessor::clearReference()
+{
+    referenceName = {};
+    referenceLoading.store (false);
+    referenceLufs.store (kSilenceFloor);
+    referenceTruePeak.store (kSilenceFloor);
+    apvts.state.setProperty ("referencePath", juce::String(), nullptr);
 }
 
 void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
@@ -334,7 +495,15 @@ void KeelAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
         if (xml->hasTagName (apvts.state.getType()))
+        {
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
+
+            // Re-measure a saved reference, if any, so its readout returns.
+            const auto path = apvts.state.getProperty ("referencePath",
+                                                       juce::String()).toString();
+            if (path.isNotEmpty())
+                loadReference (juce::File (path));
+        }
 }
 
 // JUCE entry point.

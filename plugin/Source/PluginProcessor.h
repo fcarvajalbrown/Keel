@@ -63,6 +63,23 @@ public:
     std::atomic<float> momentaryLufs { -100.0f };
     std::atomic<float> truePeakDb    { -100.0f };
 
+    // --- Reference loudness/peak READOUT (ADR-0035) ---
+    // A user-loaded reference file is measured ONCE, offline, on a background
+    // thread, and its integrated LUFS + true-peak are shown next to the live
+    // master meters. This is a passive readout, NOT a live match -- the spectral
+    // / ML reference match stays the offline Matchering path in the CLI/GUI. The
+    // measured values are written by the worker thread, read on the UI thread.
+    // -100.0f means "no reference / not measured yet".
+    std::atomic<float> referenceLufs     { -100.0f };  // integrated, BS.1770-4 gated
+    std::atomic<float> referenceTruePeak { -100.0f };  // dBTP, 4x oversampled
+    std::atomic<bool>  referenceLoading  { false };
+    juce::String       referenceName;                  // touched on the UI thread only
+
+    // Load + offline-measure a reference file (call from the message thread); pass
+    // an empty/non-existent file via clearReference() to drop it.
+    void loadReference (const juce::File& file);
+    void clearReference();
+
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout makeParameterLayout();
 

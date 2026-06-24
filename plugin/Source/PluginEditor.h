@@ -4,7 +4,8 @@
 // language (KeelLookAndFeel: teal palette, Space Grotesk, the hull mark, gradient
 // meters). It drops the standalone's file->label table and balance faders and
 // keeps only the master controls (preset / target-LUFS reference / TP ceiling /
-// Makeup / reference / glue) plus the two live OUTPUT meters. No Finalize button:
+// Makeup / glue) plus the two live OUTPUT meters and a passive reference
+// loudness/peak readout (ADR-0035). No Finalize button:
 // the plugin is a self-contained real-time master; you deliver by exporting.
 
 #pragma once
@@ -39,21 +40,27 @@ private:
     juce::Label  lufsLabel, tpLabel, makeupLabel;
     juce::Slider lufsSlider, tpSlider, makeupSlider;
 
-    juce::ToggleButton referenceToggle { "Reference" };
-    juce::ToggleButton glueToggle      { "Bus glue" };
+    juce::ToggleButton glueToggle { "Bus glue" };
+
+    // Reference: a passive loudness/peak readout off a user-loaded file (ADR-0035),
+    // NOT a live match. Load -> offline-measure -> show LUFS/TP next to the meters.
+    juce::Label      referenceLabel, referenceReadout;
+    juce::TextButton referenceLoadButton  { "Load reference..." };
+    juce::TextButton referenceClearButton { "Clear" };
+    std::unique_ptr<juce::FileChooser> referenceChooser;
 
     keel::Meter lufsMeter, tpMeter;
     juce::Label exportNote;
 
     // Card backgrounds: filled in resized(), painted in paint().
-    juce::Rectangle<int> cardTargets, cardDrive, cardMeters;
+    juce::Rectangle<int> cardTargets, cardDrive, cardReference, cardMeters;
 
     using ComboAttachment  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::unique_ptr<ComboAttachment>  presetAttachment;
     std::unique_ptr<SliderAttachment> lufsAttachment, tpAttachment, makeupAttachment;
-    std::unique_ptr<ButtonAttachment> referenceAttachment, glueAttachment;
+    std::unique_ptr<ButtonAttachment> glueAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KeelAudioProcessorEditor)
 };

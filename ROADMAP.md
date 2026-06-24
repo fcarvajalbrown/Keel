@@ -140,8 +140,13 @@ Bring the plugin level with the GUI's reach.
       sync with `mastering.py` (DSP SYNC RULE honoured — no Python change needed,
       default-on preserves parity), OFF is a labelled plugin-only deviation. By-ear
       A/B (below) is the remaining sign-off.
-- [ ] **Wire the Reference toggle** into the live chain — or, if a live reference
-      match is out of scope for the plugin, remove the control and document why.
+- [x] **Reference control resolved (ADR-0035).** A live reference *match* is out of
+      scope for the plugin (Matchering is offline/Python and a real match is ML-ish,
+      against the deterministic doctrine), so the dead `reference` toggle was
+      replaced with a **passive reference readout**: load a file → it is measured
+      once, offline, on a background thread → its **integrated LUFS + true-peak**
+      show next to the live meters. No DSP-master change (metering/UI only, no DSP
+      SYNC). The spectral match stays the offline Matchering path in the CLI/GUI.
 - [ ] **macOS plugin build (VST3 + AU)** in CI, attached to the release.
 - [ ] **By-ear A/B** sign-off: plugin live master vs a `build.py` render of the
       same audio (expect close, not identical) — user task.
@@ -158,9 +163,10 @@ Bring the plugin level with the GUI's reach.
 >   -14" claim visible/auditable).
 > - **Loudness-matched bypass / A-B** (proves *character*, not just level — Keel
 >   deliberately raises loudness).
-> - **Reference loudness/peak readout** — one clean resolution of the Reference
->   toggle fork above: show the reference's LUFS/TP next to the master, no live
->   ML/spectral match (that stays the offline Matchering path).
+> - **Reference loudness/peak readout** — DONE (ADR-0035): the chosen resolution of
+>   the Reference-toggle fork. Shows a loaded reference's integrated LUFS / true-peak
+>   next to the master, no live ML/spectral match (that stays the offline Matchering
+>   path).
 > - **AU plugin format** (+ optional CLAP) — AU is mandatory for Logic/Mac,
 >   near-zero DSP work; pairs with the macOS build item.
 > - **hiDPI resize, undo/redo, user presets, tooltips/first-run note** (the

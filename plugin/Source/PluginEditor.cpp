@@ -70,11 +70,38 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     addAndMakeVisible (makeupSlider);
     makeupAttachment = std::make_unique<SliderAttachment> (apvts, "makeup", makeupSlider);
 
-    // --- Optional toggles ---
-    addAndMakeVisible (referenceToggle);
+    // --- Bus-glue toggle ---
     addAndMakeVisible (glueToggle);
-    referenceAttachment = std::make_unique<ButtonAttachment> (apvts, "reference", referenceToggle);
-    glueAttachment      = std::make_unique<ButtonAttachment> (apvts, "glue", glueToggle);
+    glueAttachment = std::make_unique<ButtonAttachment> (apvts, "glue", glueToggle);
+
+    // --- Reference readout (passive; load a file, see its LUFS/TP) ---
+    sectionLabel (referenceLabel, "Reference");
+
+    referenceReadout.setText ("No reference loaded", juce::dontSendNotification);
+    referenceReadout.setFont (look.display (10.0f));
+    referenceReadout.setColour (juce::Label::textColourId, keel::palette::text);
+    addAndMakeVisible (referenceReadout);
+
+    addAndMakeVisible (referenceLoadButton);
+    referenceLoadButton.onClick = [this]
+    {
+        referenceChooser = std::make_unique<juce::FileChooser> (
+            "Choose a reference track",
+            juce::File::getSpecialLocation (juce::File::userMusicDirectory),
+            "*.wav;*.aiff;*.aif;*.flac;*.mp3;*.ogg");
+
+        const auto flags = juce::FileBrowserComponent::openMode
+                         | juce::FileBrowserComponent::canSelectFiles;
+        referenceChooser->launchAsync (flags, [this] (const juce::FileChooser& fc)
+        {
+            const auto file = fc.getResult();
+            if (file.existsAsFile())
+                processor.loadReference (file);
+        });
+    };
+
+    addAndMakeVisible (referenceClearButton);
+    referenceClearButton.onClick = [this] { processor.clearReference(); };
 
     // --- Live meters (display-only, reading the OUTPUT) ---
     lufsMeter.setTarget (-14.0f);
@@ -91,7 +118,7 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     exportNote.setJustificationType (juce::Justification::centredTop);
     addAndMakeVisible (exportNote);
 
-    setSize (440, 560);
+    setSize (440, 668);
     startTimerHz (30);
 }
 
@@ -122,6 +149,26 @@ void KeelAudioProcessorEditor::timerCallback()
     tpMeter.setTarget (tpCeil);
     tpMeter.setDangerAbove (tpCeil);
     tpMeter.setValue (processor.truePeakDb.load());
+
+    // Reference readout: "measuring..." -> "<name>:  -14.2 LUFS   -0.8 dBTP".
+    juce::String refText;
+    if (processor.referenceLoading.load())
+        refText = "Measuring " + processor.referenceName + "...";
+    else
+    {
+        const float rl = processor.referenceLufs.load();
+        const float rt = processor.referenceTruePeak.load();
+        if (processor.referenceName.isEmpty())
+            refText = "No reference loaded";
+        else if (rl <= -99.0f)
+            refText = processor.referenceName + ":  (could not measure)";
+        else
+            refText = processor.referenceName + ":  "
+                    + juce::String (rl, 1) + " LUFS    "
+                    + juce::String (rt, 1) + " dBTP";
+    }
+    if (referenceReadout.getText() != refText)
+        referenceReadout.setText (refText, juce::dontSendNotification);
 }
 
 void KeelAudioProcessorEditor::paint (juce::Graphics& g)
@@ -137,6 +184,7 @@ void KeelAudioProcessorEditor::paint (juce::Graphics& g)
     };
     card (cardTargets, {});
     card (cardDrive, {});
+    card (cardReference, {});
     card (cardMeters, {});
 }
 
@@ -171,15 +219,27 @@ void KeelAudioProcessorEditor::resized()
     }
     r.removeFromTop (12);
 
-    // card: Drive (makeup + toggles)
-    cardDrive = r.removeFromTop (104);
+    // card: Drive (makeup + glue toggle)
+    cardDrive = r.removeFromTop (96);
     {
         auto c = cardDrive.reduced (14);
         labelledRow (c.removeFromTop (28), makeupLabel, makeupSlider);
         c.removeFromTop (10);
-        auto row = c.removeFromTop (24);
-        referenceToggle.setBounds (row.removeFromLeft (row.getWidth() / 2));
-        glueToggle.setBounds (row);
+        glueToggle.setBounds (c.removeFromTop (24));
+    }
+    r.removeFromTop (12);
+
+    // card: Reference (passive LUFS/TP readout off a loaded file)
+    cardReference = r.removeFromTop (104);
+    {
+        auto c = cardReference.reduced (14);
+        referenceLabel.setBounds (c.removeFromTop (20));
+        referenceReadout.setBounds (c.removeFromTop (24));
+        c.removeFromTop (8);
+        auto row = c.removeFromTop (26);
+        referenceClearButton.setBounds (row.removeFromRight (84));
+        row.removeFromRight (8);
+        referenceLoadButton.setBounds (row);
     }
     r.removeFromTop (12);
 

@@ -52,6 +52,7 @@ Status values: `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 - [ADR-0027](0027-plugin-live-cpp-chain.md) — Plugin runs a live C++ master chain (preview) + byte-identical Python finalize; DSP sync rule *(superseded by ADR-0029)*
 - [ADR-0029](0029-plugin-self-contained-master.md) — Plugin is a self-contained real-time master; drop Finalize; manual Makeup; delivery via DAW export
 - [ADR-0030](0030-plugin-bus-glue-toggle.md) — Plugin Bus-glue toggle gated, default ON (keeps the master in sync with mastering.py)
+- [ADR-0035](0035-plugin-reference-readout.md) — Plugin Reference control is a passive loudness/peak readout (no live match; Matchering stays the offline path)
 
 ### Scope refinements (post-research, 2026-06-22)
 - [ADR-0031](0031-master-tilt-knob-carveout.md) — Master-tone carve-out: one broadband tilt knob allowed (post-1.0); M/S EQ + multiband stay out
