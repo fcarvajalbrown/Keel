@@ -85,6 +85,43 @@ def _os_limit(sig, rate, ceiling_db, factor=OVERSAMPLE):
     return np.asarray(out, dtype=np.float32)
 
 
+def _compliance(lufs, tp, target_lufs, tp_ceiling_db, lufs_tol=0.5, tp_tol=0.1):
+    """PASS/FAIL verdict for a rendered master against its spec. Keel's internal
+    chain normalizes to the exact target and enforces the true-peak ceiling, so a
+    PASS here is a *measured* guarantee, not marketing. On the reference
+    (Matchering) path `target_lufs` is None — the reference sets loudness, so the
+    loudness check is skipped and only the true-peak ceiling is asserted."""
+    lufs_ok = (None if (target_lufs is None or not np.isfinite(lufs))
+               else bool(abs(lufs - target_lufs) <= lufs_tol))
+    tp_ok = bool(np.isfinite(tp) and tp <= tp_ceiling_db + tp_tol)
+    checks = [c for c in (lufs_ok, tp_ok) if c is not None]
+    return {"target_lufs": target_lufs, "tp_ceiling_db": tp_ceiling_db,
+            "lufs_ok": lufs_ok, "tp_ok": tp_ok,
+            "lufs_tol": lufs_tol, "tp_tol": tp_tol,
+            "verdict": "PASS" if all(checks) else "FAIL"}
+
+
+def _report(audio, rate, path, out_path, target_lufs, tp_ceiling_db, **extra):
+    """Build a master report dict: loudness + true-peak, the PLR/PSR dynamics and
+    stereo phase-correlation meters, and the PASS/FAIL compliance stamp. Shared by
+    the internal and reference paths so every master carries the same QC block."""
+    lufs = meters.integrated_lufs(audio, rate)
+    tp = meters.true_peak_db(audio, rate)
+    st = meters.short_term_lufs_max(audio, rate)
+    plr, psr = meters.dynamics(tp, lufs, st)
+    rep = {
+        "path": path,
+        "lufs": round(lufs, 2) if np.isfinite(lufs) else lufs,
+        "true_peak_db": round(tp, 2) if np.isfinite(tp) else tp,
+        "plr": plr, "psr": psr,
+        "correlation": round(meters.correlation(audio), 3),
+        "compliance": _compliance(lufs, tp, target_lufs, tp_ceiling_db),
+        "out": str(out_path),
+    }
+    rep.update(extra)
+    return rep
+
+
 def _internal_master(mix_path, out_path, target_lufs, tp_ceiling_db):
     audio, rate = sf.read(str(mix_path), dtype="float32", always_2d=True)
     # guard --master-only on a foreign/corrupt mix: NaN/Inf samples become
@@ -134,12 +171,11 @@ def _internal_master(mix_path, out_path, target_lufs, tp_ceiling_db):
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     sf.write(str(out_path), audio, rate, subtype="PCM_24")
-    return {"path": "internal", "lufs": round(meters.integrated_lufs(audio, rate), 2),
-            "true_peak_db": round(meters.true_peak_db(audio, rate), 2),
-            "out": str(out_path)}
+    return _report(audio, rate, "internal", out_path,
+                   target_lufs=target_lufs, tp_ceiling_db=tp_ceiling_db)
 
 
-def _reference_master(mix_path, ref_path, out_path):
+def _reference_master(mix_path, ref_path, out_path, tp_ceiling_db=-1.0):
     import matchering as mg
     mg.log(warning_handler=lambda *_: None)  # quiet; engine reports its own summary
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
@@ -149,10 +185,11 @@ def _reference_master(mix_path, ref_path, out_path):
         results=[mg.pcm24(str(out_path))],
     )
     audio, rate = sf.read(str(out_path), dtype="float32", always_2d=True)
-    return {"path": "matchering", "reference": str(ref_path),
-            "lufs": round(meters.integrated_lufs(audio, rate), 2),
-            "true_peak_db": round(meters.true_peak_db(audio, rate), 2),
-            "out": str(out_path)}
+    # target_lufs is None on this path — the reference dictates loudness, so
+    # compliance asserts only the true-peak ceiling (loudness check skipped).
+    return _report(audio, rate, "matchering", out_path,
+                   target_lufs=None, tp_ceiling_db=tp_ceiling_db,
+                   reference=str(ref_path))
 
 
 def master(mix_path, recipe, out_path, references_dir=None):
@@ -162,7 +199,8 @@ def master(mix_path, recipe, out_path, references_dir=None):
     if ref and references_dir:
         ref_path = Path(references_dir) / ref
         if ref_path.exists():
-            return _reference_master(mix_path, ref_path, out_path)
+            return _reference_master(mix_path, ref_path, out_path,
+                                     tp_ceiling_db=recipe.get("tp_ceiling_db", -1.0))
     return _internal_master(
         mix_path, out_path,
         target_lufs=recipe.get("target_lufs", -9.0),

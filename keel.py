@@ -54,7 +54,9 @@ from mixer import (
 from mastering import master
 
 # --- metering ------------------------------------------------------------
-from meters import integrated_lufs, true_peak_db
+from meters import (
+    integrated_lufs, true_peak_db, short_term_lufs_max, correlation, dynamics,
+)
 
 __version__ = "0.5.0"
 
@@ -69,7 +71,8 @@ __all__ = [
     # master engine
     "master",
     # metering
-    "integrated_lufs", "true_peak_db",
+    "integrated_lufs", "true_peak_db", "short_term_lufs_max", "correlation",
+    "dynamics",
     # meta
     "__version__",
 ]

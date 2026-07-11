@@ -221,8 +221,9 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
         row["master"] = rep
         row["target_lufs"] = recipe.get("target_lufs")
         ptag = f"  preset:{preset}" if preset else ""
+        stamp = rep.get("compliance", {}).get("verdict", "")
         print(f"  master -> {rep['out']}  [{rep['path']}]  "
-              f"{rep['lufs']} LUFS  {rep['true_peak_db']} dBTP{ptag}")
+              f"{rep['lufs']} LUFS  {rep['true_peak_db']} dBTP  {stamp}{ptag}")
 
     return row if (row["mix"] or row["master"]) else None
 
@@ -236,6 +237,21 @@ def discover_batch(parent):
         if mixer.autodetect(sub):
             jobs.append((sub, sub.name))
     return jobs
+
+
+def _compliance_line(comp, ms):
+    """Render the per-check PASS/FAIL detail behind a master's compliance stamp:
+    the loudness-vs-target check (skipped on the reference path, where the
+    reference sets loudness) and the true-peak-ceiling check."""
+    parts = []
+    if comp.get("lufs_ok") is not None:
+        tag = "ok" if comp["lufs_ok"] else "OFF"
+        parts.append(f"loudness {ms['lufs']} within +/-{comp['lufs_tol']} LU of "
+                     f"{comp['target_lufs']} [{tag}]")
+    tp_tag = "ok" if comp.get("tp_ok") else "OVER"
+    parts.append(f"true-peak {ms['true_peak_db']} <= {comp['tp_ceiling_db']} dBTP "
+                 f"[{tp_tag}]")
+    return " | ".join(parts)
 
 
 def write_report(report, out_dir):
@@ -266,8 +282,21 @@ def write_report(report, out_dir):
             tgt = row.get("target_lufs")
             off = ("" if tgt is None or not isinstance(ms["lufs"], (int, float))
                    else f"  (target {tgt}, off by {round(ms['lufs'] - tgt, 2)} LU)")
+            comp = ms.get("compliance", {})
+            stamp = f"  —  **{comp['verdict']}**" if comp.get("verdict") else ""
             L.append(f"- Master [{ms['path']}]: **{ms['lufs']} LUFS**, "
-                     f"**{ms['true_peak_db']} dBTP**{off}")
+                     f"**{ms['true_peak_db']} dBTP**{off}{stamp}")
+            dyn = []
+            if ms.get("plr") is not None:
+                dyn.append(f"PLR {ms['plr']} dB")
+            if ms.get("psr") is not None:
+                dyn.append(f"PSR {ms['psr']} dB")
+            if ms.get("correlation") is not None:
+                dyn.append(f"phase corr {ms['correlation']:+.2f}")
+            if dyn:
+                L.append(f"  - dynamics: {' | '.join(dyn)}")
+            if comp:
+                L.append(f"  - checks: {_compliance_line(comp, ms)}")
         L.append("")
     out_path = Path(out_dir) / "REPORT.md"
     out_path.write_text("\n".join(L), encoding="utf-8")

@@ -248,6 +248,81 @@ class TestMasterLanding(unittest.TestCase):
             self.assertEqual(a.read_bytes(), b.read_bytes())
 
 
+class TestComplianceMeters(unittest.TestCase):
+    """PLR/PSR + phase-correlation meters and the PASS/FAIL compliance stamp are
+    pure arithmetic on values Keel already measures — no DSP-master change."""
+
+    def test_correlation_mono_and_stereo(self):
+        # a dual-mono stereo buffer is perfectly in phase -> +1.0
+        mono = np.ones((1000, 2), dtype=np.float32) * 0.3
+        self.assertAlmostEqual(meters.correlation(mono), 1.0, places=5)
+        # L = -R is fully out of phase -> -1.0 (a mono-fold cancels)
+        t = np.arange(1000) / RATE
+        s = np.sin(2 * np.pi * 100 * t)
+        anti = np.column_stack([s, -s]).astype(np.float32)
+        self.assertAlmostEqual(meters.correlation(anti), -1.0, places=5)
+        # a true mono (frames,) buffer is trivially +1.0
+        self.assertEqual(meters.correlation(s.astype(np.float32)), 1.0)
+
+    def test_dynamics_arithmetic_and_nan_safe(self):
+        # PLR = true-peak - integrated; PSR = true-peak - short-term max
+        plr, psr = meters.dynamics(-1.0, -14.0, -11.0)
+        self.assertEqual(plr, 13.0)
+        self.assertEqual(psr, 10.0)
+        # non-finite inputs (silence) collapse to None, never a crash / nan
+        p, s = meters.dynamics(float("-inf"), float("-inf"), float("-inf"))
+        self.assertIsNone(p)
+        self.assertIsNone(s)
+
+    def test_short_term_max_ge_integrated(self):
+        # a signal that is loud only in its middle third: the short-term max must
+        # sit at/above the (quieter) whole-file integrated loudness.
+        n = int(6 * RATE)
+        t = np.arange(n) / RATE
+        sig = (0.3 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+        sig[: n // 3] *= 0.05
+        sig[2 * n // 3:] *= 0.05
+        st = meters.short_term_lufs_max(sig, RATE)
+        it = meters.integrated_lufs(sig, RATE)
+        self.assertTrue(np.isfinite(st) and np.isfinite(it))
+        self.assertGreaterEqual(st, it - 0.1)
+
+    def test_master_report_carries_compliance_and_meters(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = _make_song(d)
+            mix_wav = Path(d) / "mix.wav"
+            mixer.mix(folder, recipes.mix_recipe(), mix_wav,
+                      mapping=mixer.autodetect(folder))
+            rep = mastering.master(mix_wav,
+                                   recipes.master_recipe({"target_lufs": -14.0,
+                                                          "tp_ceiling_db": -1.0}),
+                                   Path(d) / "master.wav")
+            for k in ("plr", "psr", "correlation", "compliance"):
+                self.assertIn(k, rep)
+            comp = rep["compliance"]
+            # the internal chain hits the target and holds the ceiling -> PASS
+            self.assertEqual(comp["verdict"], "PASS")
+            self.assertTrue(comp["lufs_ok"])
+            self.assertTrue(comp["tp_ok"])
+
+    def test_compliance_fails_when_target_unreachable(self):
+        # -14 LUFS AND -30 dBTP can't both hold on this material: the chain honours
+        # the ceiling (peaks trimmed to -30) so loudness collapses well under the
+        # target, and the stamp reports FAIL on the loudness check — honestly.
+        with tempfile.TemporaryDirectory() as d:
+            folder = _make_song(d)
+            mix_wav = Path(d) / "mix.wav"
+            mixer.mix(folder, recipes.mix_recipe(), mix_wav,
+                      mapping=mixer.autodetect(folder))
+            rep = mastering.master(mix_wav,
+                                   recipes.master_recipe({"target_lufs": -14.0,
+                                                          "tp_ceiling_db": -30.0}),
+                                   Path(d) / "m.wav")
+            self.assertEqual(rep["compliance"]["verdict"], "FAIL")
+            self.assertFalse(rep["compliance"]["lufs_ok"])
+            self.assertTrue(rep["compliance"]["tp_ok"])  # ceiling still held
+
+
 class TestBuildIntegration(unittest.TestCase):
     def test_process_one_with_preset(self):
         with tempfile.TemporaryDirectory() as d, \

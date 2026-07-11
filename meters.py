@@ -68,6 +68,64 @@ def true_peak_db(audio, rate, oversample=4):
     return 20.0 * np.log10(peak) if peak > 0 else float("-inf")
 
 
+def short_term_lufs_max(audio, rate, window_s=3.0, hop_s=1.0):
+    """Loudest short-term loudness (LUFS): the max loudness over a sliding
+    `window_s`-second window (BS.1770 short-term is a 3 s window), stepped by
+    `hop_s`. Used for PSR (peak-to-short-term). Returns the whole-file integrated
+    loudness when the audio is shorter than one window, and -inf on silence.
+
+    Each window is measured with the same BS.1770-4 meter as the integrated
+    value; over a 3 s window the relative gate removes nothing meaningful, so this
+    tracks the true short-term envelope closely while staying fully deterministic."""
+    a = _as_2d(audio)
+    n = a.shape[0]
+    win = int(window_s * rate)
+    hop = max(1, int(hop_s * rate))
+    if n < win or win <= 0:
+        return integrated_lufs(a, rate)
+    m = _meter(rate)
+    best = float("-inf")
+    for start in range(0, n - win + 1, hop):
+        try:
+            loud = float(m.integrated_loudness(a[start:start + win]))
+        except Exception:
+            continue
+        if np.isfinite(loud) and loud > best:
+            best = loud
+    return best
+
+
+def correlation(audio):
+    """Stereo phase-correlation coefficient in [-1.0, +1.0]. +1 = fully in-phase
+    (a mono signal folds down cleanly), 0 = decorrelated / wide, < 0 = out of
+    phase (a mono fold-down will partially cancel — a mono-compatibility risk).
+    A mono buffer is trivially +1.0. Silence -> +1.0 (nothing to cancel)."""
+    a = _as_2d(audio)
+    if a.shape[1] < 2:
+        return 1.0
+    l = a[:, 0].astype(np.float64)
+    r = a[:, 1].astype(np.float64)
+    denom = float(np.sqrt(np.sum(l * l) * np.sum(r * r)))
+    if denom <= 0.0:
+        return 1.0
+    return float(np.sum(l * r) / denom)
+
+
+def dynamics(true_peak, integrated, short_term_max):
+    """Return (PLR, PSR) in dB from already-measured values — pure arithmetic.
+
+    PLR (Peak-to-Loudness Ratio) = true-peak - integrated loudness: how much
+    headroom the whole master leaves above its average loudness (bigger = more
+    dynamic / less squashed). PSR (Peak-to-Short-term Ratio) = true-peak - the
+    loudest short-term loudness: a microdynamics figure less biased by quiet
+    sections. Either is None when its inputs are non-finite (e.g. silence)."""
+    def _diff(a, b):
+        if not (np.isfinite(a) and np.isfinite(b)):
+            return None
+        return round(float(a) - float(b), 2)
+    return _diff(true_peak, integrated), _diff(true_peak, short_term_max)
+
+
 def db_to_gain(db):
     return float(10.0 ** (db / 20.0))
 
