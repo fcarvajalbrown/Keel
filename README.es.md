@@ -24,7 +24,7 @@
 
 <div align="center">
 
-[![estado](https://img.shields.io/badge/estado-alpha-orange.svg)](ROADMAP.md)
+[![estado](https://img.shields.io/badge/estado-beta-yellow.svg)](ROADMAP.md)
 [![motor: AGPL v3](https://img.shields.io/badge/motor-AGPL%20v3-blue.svg)](LICENSE)
 [![uso comercial: USD 20/asiento](https://img.shields.io/badge/uso%20comercial-USD%2020%2Fasiento-blueviolet.svg)](COMMERCIAL-LICENSE.md)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](requirements.txt)

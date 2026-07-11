@@ -22,7 +22,7 @@
 
 <div align="center">
 
-[![status](https://img.shields.io/badge/status-alpha-orange.svg)](ROADMAP.md)
+[![status](https://img.shields.io/badge/status-beta-yellow.svg)](ROADMAP.md)
 [![engine: AGPL v3](https://img.shields.io/badge/engine-AGPL%20v3-blue.svg)](LICENSE)
 [![commercial use: USD 20/seat](https://img.shields.io/badge/commercial%20use-USD%2020%2Fseat-blueviolet.svg)](COMMERCIAL-LICENSE.md)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](requirements.txt)
