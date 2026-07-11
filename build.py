@@ -248,12 +248,17 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
         # transcode the finished master into the extra delivery formats (no DSP
         # re-run — the master WAV is the single source for every format).
         if formats:
-            enc = encode.export(master_wav, formats, out_dir, f"{name}_master")
+            enc = encode.export(master_wav, formats, out_dir, f"{name}_master",
+                                tp_ceiling_db=recipe.get("tp_ceiling_db"))
             row["encoded"] = enc
             for e in enc:
                 kb = round(e["bytes"] / 1024)
                 tag = "lossless" if e["lossless"] else "lossy"
-                print(f"  encode -> {e['out']}  [{e['format']}, {tag}, {kb} KB]")
+                v = e.get("tp_verify")
+                vtag = (f"  post-TP {v['post_tp_db']} dBTP {v['verdict']}"
+                        if v else "")
+                print(f"  encode -> {e['out']}  [{e['format']}, {tag}, "
+                      f"{kb} KB]{vtag}")
 
     return row if (row["mix"] or row["master"]) else None
 
@@ -333,6 +338,11 @@ def write_report(report, out_dir):
                      f"({'lossless' if e['lossless'] else 'lossy'}, "
                      f"{round(e['bytes'] / 1024)} KB)" for e in enc]
             L.append(f"- Encoded: {', '.join(parts)}")
+            verified = [e for e in enc if e.get("tp_verify")]
+            if verified:
+                vp = [f"{e['format'].upper()} {e['tp_verify']['post_tp_db']} dBTP "
+                      f"[{e['tp_verify']['verdict']}]" for e in verified]
+                L.append(f"  - post-codec true-peak: {' | '.join(vp)}")
         L.append("")
     out_path = Path(out_dir) / "REPORT.md"
     out_path.write_text("\n".join(L), encoding="utf-8")

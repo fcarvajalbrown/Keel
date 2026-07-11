@@ -450,6 +450,52 @@ class TestEncode(unittest.TestCase):
                 self.assertEqual(r, RATE)
                 self.assertGreater(back.shape[0], 0)
 
+    def test_flac_post_tp_matches_master(self):
+        # FLAC is bit-exact, so its post-codec true-peak equals the master's and
+        # a ceiling at/under it reads PASS.
+        with tempfile.TemporaryDirectory() as d:
+            master = self._master(d)
+            master_tp = encode.measure_true_peak(master)
+            enc = encode.export(master, ["flac"], d, "song",
+                                tp_ceiling_db=master_tp + 0.5)[0]
+            self.assertIn("tp_verify", enc)
+            self.assertEqual(enc["tp_verify"]["verdict"], "PASS")
+            self.assertAlmostEqual(enc["tp_verify"]["post_tp_db"],
+                                   round(master_tp, 2), delta=0.01)
+
+    def test_post_codec_gate_grades_over_ceiling(self):
+        # a deliberately tiny ceiling below the master's own peak must NOT read
+        # PASS: the gate reports WARN (over ceiling) or FAIL (clipped), honestly.
+        with tempfile.TemporaryDirectory() as d:
+            master = self._master(d)   # ~-14 dBFS sine, peak ~ -14 dBTP
+            enc = encode.export(master, ["mp3"], d, "song",
+                                tp_ceiling_db=-30.0)[0]
+            self.assertIn(enc["tp_verify"]["verdict"], ("WARN", "FAIL"))
+            self.assertTrue(enc["tp_verify"]["over_ceiling"])
+
+    def test_verify_flags_clipping_as_fail(self):
+        # a full-scale master decodes with intersample peaks over 0 dBTP -> FAIL.
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "hot.wav"
+            t = np.arange(int(SECONDS * RATE)) / RATE
+            s = (0.999 * np.sin(2 * np.pi * 997 * t)).astype(np.float32)
+            sf.write(str(p), np.column_stack([s, s]), RATE, subtype="PCM_16")
+            v = encode.verify_true_peak(p, tp_ceiling_db=-1.0)
+            # a hot sine near full scale sits above the -1 ceiling at least.
+            self.assertTrue(v["over_ceiling"])
+
+    def test_aac_post_tp_via_ffmpeg_decode(self):
+        # libsndfile can't decode AAC; measure_true_peak must fall back to ffmpeg
+        # and still return a finite dBTP + a verdict. Skips if no ffmpeg.
+        if not encode.ffmpeg_exe():
+            self.skipTest("no ffmpeg for AAC")
+        with tempfile.TemporaryDirectory() as d:
+            master = self._master(d)
+            enc = encode.export(master, ["aac"], d, "song", tp_ceiling_db=-1.0)[0]
+            self.assertIn("tp_verify", enc)
+            self.assertTrue(np.isfinite(enc["tp_verify"]["post_tp_db"]))
+            self.assertIn(enc["tp_verify"]["verdict"], ("PASS", "WARN", "FAIL"))
+
     def test_available_formats_superset(self):
         fmts = encode.available_formats()
         for f in ("wav", "flac", "mp3", "ogg"):

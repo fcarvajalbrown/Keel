@@ -58,7 +58,10 @@ from mastering import master
 from dither import quantize as dither_quantize
 
 # --- delivery-format export ----------------------------------------------
-from encode import export as encode_master, available_formats, parse_formats
+from encode import (
+    export as encode_master, available_formats, parse_formats,
+    verify_true_peak, measure_true_peak,
+)
 
 # --- metering ------------------------------------------------------------
 from meters import (
@@ -81,6 +84,7 @@ __all__ = [
     "dither_quantize",
     # delivery-format export
     "encode_master", "available_formats", "parse_formats",
+    "verify_true_peak", "measure_true_peak",
     # metering
     "integrated_lufs", "true_peak_db", "short_term_lufs_max", "correlation",
     "dynamics",

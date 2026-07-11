@@ -31,6 +31,8 @@ from pathlib import Path
 
 import soundfile as sf
 
+import meters
+
 # libsndfile-native targets: no external tool needed (offline-clean). Each maps to
 # a (soundfile format, subtype-or-None) — None means "follow the master's depth".
 _SF_FORMATS = {
@@ -98,7 +100,56 @@ def _flac_subtype(master_subtype):
     return master_subtype if master_subtype in ("PCM_16", "PCM_24") else "PCM_24"
 
 
-def encode_one(master_path, fmt, out_path, aac_bitrate="256k"):
+def measure_true_peak(path):
+    """4x-oversampled true-peak (dBTP) of a rendered/encoded file — decode it and
+    meter it exactly as the master was metered (meters.true_peak_db).
+
+    libsndfile decodes WAV/FLAC/MP3/OGG directly. AAC/M4A it can't decode, so we
+    fall back to ffmpeg: transcode to a temporary float WAV, meter that, discard
+    it. (The ffmpeg that produced the AAC is by definition present here.)"""
+    try:
+        audio, rate = sf.read(str(path), dtype="float32", always_2d=True)
+    except sf.LibsndfileError:
+        exe = ffmpeg_exe()
+        if not exe:
+            raise
+        import tempfile
+        tmpdir = tempfile.mkdtemp(prefix="keel_tp_")
+        tmp = Path(tmpdir) / "decode.wav"
+        subprocess.run([exe, "-y", "-hide_banner", "-loglevel", "error",
+                        "-i", str(path), "-c:a", "pcm_f32le", str(tmp)],
+                       check=True, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.PIPE)
+        try:
+            audio, rate = sf.read(str(tmp), dtype="float32", always_2d=True)
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+    return meters.true_peak_db(audio, rate)
+
+
+def verify_true_peak(path, tp_ceiling_db):
+    """Re-measure a delivery file's true-peak AFTER encoding and grade it against
+    the master's ceiling. Lossy transcoding (AAC/MP3/Ogg) reconstructs the
+    waveform and can push intersample peaks ABOVE the master's — this is the read-
+    only gate that makes 'Keel leaves headroom for transcoding' auditable rather
+    than a claim. It NEVER reshapes the master; it only reports:
+
+      PASS  post-codec true-peak stayed at/under the delivered ceiling.
+      WARN  the codec ate into the headroom (over the ceiling) but did not clip.
+      FAIL  post-codec true-peak went over 0 dBTP — it will clip on playback.
+    """
+    tp = measure_true_peak(path)
+    clipped = bool(tp > 0.0) if (tp == tp) else False  # tp==tp guards -inf/NaN
+    over_ceiling = bool(tp > tp_ceiling_db + 0.05) if (tp == tp) else False
+    verdict = "FAIL" if clipped else ("WARN" if over_ceiling else "PASS")
+    return {"ceiling_db": tp_ceiling_db,
+            "post_tp_db": round(tp, 2) if (tp == tp) else tp,
+            "over_ceiling": over_ceiling, "clipped": clipped,
+            "verdict": verdict}
+
+
+def encode_one(master_path, fmt, out_path, aac_bitrate="256k",
+               tp_ceiling_db=None):
     """Transcode the master at `master_path` into a single `fmt` file at
     `out_path`. Returns a small info dict. Assumes `fmt` was validated by
     parse_formats (available + known)."""
@@ -117,9 +168,12 @@ def encode_one(master_path, fmt, out_path, aac_bitrate="256k"):
                str(out_path)]
         subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL,
                        stderr=subprocess.PIPE)
-    return {"format": fmt, "out": str(out_path),
+    info = {"format": fmt, "out": str(out_path),
             "lossless": fmt in _LOSSLESS,
             "bytes": out_path.stat().st_size if out_path.exists() else 0}
+    if tp_ceiling_db is not None:
+        info["tp_verify"] = verify_true_peak(out_path, tp_ceiling_db)
+    return info
 
 
 def _ext_for(fmt):
@@ -129,13 +183,17 @@ def _ext_for(fmt):
     return fmt
 
 
-def export(master_path, formats, out_dir, name, aac_bitrate="256k"):
+def export(master_path, formats, out_dir, name, aac_bitrate="256k",
+           tp_ceiling_db=None):
     """Transcode the master into every requested delivery format alongside it.
     `formats` is a validated list (see parse_formats). Writes
-    <out_dir>/<name>.<ext> per format and returns a list of info dicts."""
+    <out_dir>/<name>.<ext> per format and returns a list of info dicts. When
+    `tp_ceiling_db` is given, each file is decoded and true-peak-re-measured (an
+    advisory PASS/WARN/FAIL gate — see verify_true_peak)."""
     results = []
     for fmt in formats:
         out_path = Path(out_dir) / f"{name}.{_ext_for(fmt)}"
         results.append(encode_one(master_path, fmt, out_path,
-                                   aac_bitrate=aac_bitrate))
+                                   aac_bitrate=aac_bitrate,
+                                   tp_ceiling_db=tp_ceiling_db))
     return results
