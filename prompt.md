@@ -7,6 +7,41 @@ real-world material; the GUI scaffold + cross-platform builds now exist too.
 
 ## >>> START HERE — immediate next task
 
+**This session (2026-07-11) — `v0.6.0-beta` "Delivery & metering depth" SHIPPED
+(engine milestone).** All seven roadmap items landed as atomic commits + tests,
+CI-verified green, tag `v0.6.0-beta` pushed. **No master tone math changed
+anywhere in v0.6, so the plugin C++ chain needed no mirror — no DSP SYNC.** Test
+suite **39 → 73**. What shipped (each its own module/flag, all deterministic):
+- **Compliance stamp + meters** — every master in `out/REPORT.md` carries a
+  PASS/FAIL verdict (loudness within +/-0.5 LU of target, TP at/under ceiling) +
+  PLR/PSR dynamics + stereo phase-correlation (`meters.py`, pure arithmetic).
+- **`--auto-tp`** — opt-in TP ceiling keyed to loudness (-14→-1, -9→-2 dBTP,
+  clamped [-2,-1]); an explicit `--tp` wins; OFF by default so PRESETS/DEFAULT
+  unchanged (`recipes.tp_ceiling_for_lufs`).
+- **Seeded TPDF dither** (`dither.py`) for sub-32-bit export — `--bit-depth
+  {16,24,32}` / `--dither {tpdf,shaped}`, seeded PRNG so determinism holds;
+  defaults (24-bit, no dither) reproduce old output byte-for-byte.
+- **Encoded formats** (`encode.py`) — `--format flac,mp3,ogg,aac`; FLAC/MP3/OGG
+  via libsndfile (offline), AAC via optional ffmpeg. FLAC bit-exact.
+- **Post-codec TP gate** — decode each encoded file, re-measure true-peak, grade
+  PASS/WARN/FAIL (AAC decoded via ffmpeg fallback). Advisory, never reshapes.
+- **`--targets streaming,-16,loud`** — one master PER target, each re-run at-spec
+  in its own file (`build.run`/`_resolve_master_targets`, `row['masters']` list).
+- **`--album`** (with `--batch`) — masters each track to a per-track target keyed
+  to its offset from the album's integrated loudness (`meters.album_loudness`), so
+  relative track loudness is preserved while the album mean lands on target.
+- **`--match-loudness ref.wav`** — deterministic non-ML reference-loudness match
+  (`mastering.loudness_recipe_from`); the spectral match stays offline Matchering.
+Also swept docs: README badge alpha→beta + download links → v0.6.0-beta, new
+Delivery & metering section; ROADMAP v0.6 marked shipped + "Where we are"
+advanced; release-notes rewritten; RELEASE.md lineage extended. **NEXT agent:
+confirm the `v0.6.0-beta` release published green (all 5 assets attached), then
+pick the next milestone via the blue option UI — the natural next track is
+`v0.7.0-beta` (go-to-market: landing page, donation/commercial checkout links,
+trademark check, `README.es` full parity) or the `v1.0.0` signing gate.**
+
+---
+
 **This session (2026-06-22) — `v0.5` started + roadmap restructured.** Shipped the
 first `v0.5.0-beta` item: the **plugin Bus-glue toggle is now wired** (commit
 `31b736e`) — it gates the master glue comp, default ON so the out-of-box master
