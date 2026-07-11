@@ -13,29 +13,34 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 
 ---
 
-## Where we are: `v0.5.0-beta`
+## Where we are: `v0.6.0-beta`
 
 The DSP core is **done and validated**; the CLI, the desktop GUI, and the VST3
 plugin all drive the same engine and all build green. There are no unfinished
 code stubs left — the remaining distance to a stable **1.0** is about
-**parity, reach, and launch**, not unwritten features:
+**reach and launch**, not unwritten features:
 
 - **Trust — DONE (`v0.4`).** The test suite runs in CI as a release gate on
   Windows + macOS; the VST3 plugin is built + pluginval-smoke-tested in CI; bad
   input (malformed `keel.json`, corrupt/NaN/silent audio, `--batch`) degrades
   gracefully and is covered by tests. One tag now ships GUI + plugin together.
-- **Parity** — closed in code: the plugin's Bus-glue toggle is wired (ADR-0030)
-  and the dead Reference toggle is now a passive loudness/peak readout (ADR-0035);
-  the macOS plugin build (VST3 + AU) is wired into CI. Remaining: a first green
-  Mac CI run and a by-ear A/B sign-off.
+- **Parity — DONE (`v0.5`).** The plugin's Bus-glue toggle is wired (ADR-0030),
+  the dead Reference toggle is now a passive loudness/peak readout (ADR-0035), and
+  the macOS plugin build (VST3 + AU) ships in CI, verified green on a Mac runner.
+- **Delivery & metering depth — DONE (`v0.6`).** Every master carries a PASS/FAIL
+  compliance stamp + PLR/PSR + phase-correlation meters; sub-32-bit export dithers
+  (seeded TPDF); WAV/FLAC/MP3/OGG/AAC delivery formats with a post-codec true-peak
+  re-measure gate; multi-target one-pass export; an opt-in loudness-keyed TP
+  ceiling; album loudness-consistency mode; and deterministic reference-loudness
+  matching. Suite **39 → 73**.
 - **Reach** — no landing page, no live donation / commercial-checkout links, no
-  trademark check, `README.es` is condensed not full.
+  trademark check, `README.es` is condensed not full (`v0.7`).
 - **Launch** — the installers and the plugin are **unsigned** (SmartScreen /
-  Gatekeeper warnings); signing needs the publication fee paid.
+  Gatekeeper warnings); signing needs the publication fee paid (`v1.0`).
 
-The road from here to 1.0 is staged as **betas** (`v0.4` → `v0.5` → `v0.6`),
-then the **`v1.0.0`** stamp. The GUI and the plugin are **versioned in lockstep**
-— one version number, bumped together (see CLAUDE.md "Versioning (STRICT)").
+The road from here to 1.0 is staged as **betas** (`v0.4` → `v0.5` → `v0.6` →
+`v0.7`), then the **`v1.0.0`** stamp. The GUI and the plugin are **versioned in
+lockstep** — one version number, bumped together (see CLAUDE.md "Versioning").
 
 ---
 
@@ -192,31 +197,38 @@ Bring the plugin level with the GUI's reach.
 >   is safe and useful here. The CLI/GUI stays fixed so byte-identical determinism
 >   holds. No DSP-SYNC issue (reference math unchanged).
 
-### `v0.6.0-beta` — Delivery & metering depth (approved 2026-06-22)
+### `v0.6.0-beta` — Delivery & metering depth  ✓ shipped
 An engine-side milestone: a cluster of in-scope, deterministic wins. These turn
 Keel's "loudness/TP-safe" *marketing* into a *measured guarantee* the AI-mastering
-competitors can't honestly make. None touch the master tone math, so no DSP SYNC
-obligation (except the dither seed decision).
-- [ ] **Dither (TPDF, optional noise-shaping)** at sub-32-bit export only. Needs a
-      **seeded-PRNG** carve-out so "same stems + recipe = identical output" holds
-      (dither is random by definition).
-- [ ] **Post-codec true-peak re-measure + TP-verify gate:** encode the master to
-      AAC/MP3, re-measure true-peak (lossy transcode inflates intersample peaks),
-      and assert PASS/FAIL. Read-only/advisory — never auto-reshapes the master.
-- [ ] **Multi-target one-pass export** (-14 Spotify/YT, -16 Apple, -9 club...),
-      re-running the chain per target so each file is genuinely at-spec.
-- [ ] **Encoded output formats** (decided 2026-06-22): export not just WAV but
-      **MP3 / OGG / FLAC / AAC** (and others). FLAC stays bit-exact; the lossy
-      formats are deterministic *given the same encoder version* but are NOT part
-      of the byte-identical guarantee (that stays a PCM/WAV promise). Pairs with the
-      post-codec TP re-measure above. Still **no DAW project/session files** — that
-      remains a non-goal.
-- [ ] **True-peak ceiling keyed to loudness** (-14 -> -1, -9 -> -2 dBTP) as an
-      overridable default.
-- [ ] **PASS/FAIL compliance stamp** in `out/REPORT.md` + **PLR/PSR** and
+competitors can't honestly make. None touch the master tone math, so **no DSP SYNC**
+was needed (the dither seed is a new render-path carve-out, not a master-math
+change). Test suite **39 → 73**.
+- [x] **Dither (TPDF, optional noise-shaping)** at sub-32-bit export only, via a
+      **seeded-PRNG** carve-out so "same stems + recipe + seed = identical output"
+      still holds (`dither.py`; `--bit-depth {16,24,32}` / `--dither {tpdf,shaped}`).
+      Defaults (24-bit, no dither) reproduce the historical output byte-for-byte.
+- [x] **Post-codec true-peak re-measure + TP-verify gate:** decode each encoded
+      file and re-measure true-peak, grading PASS/WARN/FAIL against the ceiling
+      (AAC decoded via ffmpeg). Read-only/advisory — never reshapes the master.
+- [x] **Multi-target one-pass export** (`--targets streaming,-16,loud`): one master
+      per target, each re-running the chain so every file is genuinely at-spec, in
+      its own non-colliding file.
+- [x] **Encoded output formats** (`--format flac,mp3,ogg,aac`): FLAC/MP3/OGG via
+      libsndfile (offline-clean), AAC via optional ffmpeg. FLAC stays bit-exact;
+      the lossy formats are deterministic given the encoder version but NOT part of
+      the byte-identical guarantee (that stays a PCM/WAV promise). Still **no DAW
+      project/session files** — that remains a non-goal.
+- [x] **True-peak ceiling keyed to loudness** (`--auto-tp`: -14 → -1, -9 → -2 dBTP),
+      an **opt-in overridable default** (an explicit `--tp` always wins). Off by
+      default, so PRESETS / DEFAULT_MASTER / the fixed -14/-1 targets are unchanged.
+- [x] **PASS/FAIL compliance stamp** in `out/REPORT.md` + **PLR/PSR** and
       **phase-correlation** meters (arithmetic on values Keel already computes).
-- [ ] **Album loudness-consistency mode** for `--batch`; recipe-replayable
-      Matchering (store a reference's extracted target as a deterministic recipe).
+- [x] **Album loudness-consistency mode** (`--album` with `--batch`): masters each
+      track to a per-track target keyed to its offset from the album's integrated
+      loudness, so relative track loudness is preserved while the album lands on
+      target. Plus **deterministic replayable reference loudness** (`--match-loudness`
+      extracts a reference's integrated LUFS as a plain, replayable target — the
+      non-ML face of reference matching; the spectral match stays offline Matchering).
 
 ### `v0.7.0-beta` — Go-to-market
 Stand up everything a stranger needs to find, trust, and pay for Keel.

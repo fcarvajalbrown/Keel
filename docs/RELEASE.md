@@ -88,3 +88,11 @@ Prefer the tag + CI path when you can — it also builds and attaches the macOS
   Reference toggle becomes a passive reference loudness/peak readout measured with
   libebur128 (canonical BS.1770, matches the CLI/GUI numbers). CI also auto-prunes
   old prerelease assets (keeps the newest two) to stay under storage quota.
+- `v0.6.0-beta` — Delivery & metering depth (engine): a PASS/FAIL compliance stamp
+  + PLR/PSR + phase-correlation meters on every master; encoded delivery formats
+  (`--format` WAV/FLAC/MP3/OGG/AAC) with a post-codec true-peak re-measure gate;
+  multi-target one-pass export (`--targets`); seeded TPDF dither for sub-32-bit
+  export (`--bit-depth`/`--dither`); an opt-in loudness-keyed TP ceiling
+  (`--auto-tp`); album loudness-consistency mode (`--album`); and deterministic
+  reference-loudness matching (`--match-loudness`). No master tone math changed, so
+  no DSP SYNC. Test suite 39 → 73.

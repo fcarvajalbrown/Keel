@@ -6,12 +6,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.5.0-beta/KeelSetup-0.5.0.exe">
+  <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.6.0-beta/KeelSetup-0.6.0.exe">
     <img src="https://img.shields.io/badge/Download%20for%20Windows-Beta%20installer-2ea44f?style=for-the-badge&logo=windows&logoColor=white"
          alt="Download Keel for Windows — beta installer">
   </a>
 </p>
-<p align="center"><sub>DAW user? Get the <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.5.0-beta/Keel-VST3-windows-0.5.0.zip">VST3 plugin (Windows)</a> or the <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.5.0-beta/Keel-plugins-macos-0.5.0.zip">VST3 + AU plugin (macOS)</a>.</sub></p>
+<p align="center"><sub>DAW user? Get the <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.6.0-beta/Keel-VST3-windows-0.6.0.zip">VST3 plugin (Windows)</a> or the <a href="https://github.com/fcarvajalbrown/Keel/releases/download/v0.6.0-beta/Keel-plugins-macos-0.6.0.zip">VST3 + AU plugin (macOS)</a>.</sub></p>
 <p align="center"><sub>Unsigned beta: Windows may warn — click <b>More info &rarr; Run anyway</b>. macOS &amp; other downloads on the <a href="https://github.com/fcarvajalbrown/Keel/releases/latest">releases page</a>.</sub></p>
 
 > A **deterministic** automix + automaster engine. Give it a folder of
@@ -193,10 +193,27 @@ python build.py --stems ./my_song --preset loud           # house-sound loudness
 python build.py --list-presets                            # list the named presets
 python build.py --stems ./my_song --lufs -11 --tp -1      # push louder, set TP ceiling
 python build.py --stems ./my_song --ref "C:\refs\ref.wav" # match a reference (Matchering)
+python build.py --stems ./my_song --match-loudness a.wav  # match a reference's LOUDNESS only
 python build.py --stems ./my_song --mix-only              # stop after the mix
 python build.py --stems ./my_song --master-only           # remaster an existing mix
 python build.py --batch "C:\path\to\album" --out out      # every subfolder (its own keel.json)
 ```
+
+### Delivery & metering (v0.6)
+
+```powershell
+python build.py --stems ./my_song --format flac,mp3,ogg,aac  # extra delivery formats (AAC needs ffmpeg)
+python build.py --stems ./my_song --bit-depth 16 --dither tpdf  # seeded dither for 16-bit export
+python build.py --stems ./my_song --targets streaming,-16,loud  # one master PER target, each at-spec
+python build.py --stems ./my_song --auto-tp                  # TP ceiling follows loudness (-14->-1, -9->-2)
+python build.py --batch ./album --album                      # album mode: preserve relative track loudness
+```
+
+Every master carries a **PASS/FAIL compliance stamp** (loudness within tolerance
+of target, true-peak at/under the ceiling) plus **PLR/PSR** dynamics and
+**phase-correlation** meters in `out/REPORT.md`. Encoded files are re-decoded and
+their **post-codec true-peak** re-measured, so "we leave headroom for transcoding"
+is a measured guarantee, not a claim.
 
 ---
 

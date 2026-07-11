@@ -1,7 +1,8 @@
-**Beta** release of Keel (deterministic automix + automaster) — the desktop GUI
-and the **Keel plugin**, now on **Windows and macOS**, built together by CI. This
-release closes the plugin's parity gap: a macOS plugin (VST3 + AU), a wired
-Bus-glue control, and a reference loudness/peak readout.
+**Beta** release of Keel (deterministic automix + automaster). This one is an
+**engine** release — "Delivery & metering depth". It turns Keel's loudness/true-
+peak-safe promise into a *measured guarantee* on every render, and adds the export
+formats and multi-target/album workflows a musician actually delivers with. No
+master tone math changed, so the plugin and the CLI/GUI master stay in step.
 
 ## Downloads
 - **Windows app** — `KeelSetup-<ver>.exe` (recommended installer) or `Keel.exe` (portable).
@@ -15,20 +16,32 @@ Bus-glue control, and a reference loudness/peak readout.
   rescan (Logic Pro / GarageBand use the AU).
 
 ## New in this release
-- **macOS plugin — VST3 + Audio Unit.** The plugin now builds for macOS alongside
-  Windows, including an **AU** for Logic Pro and GarageBand. The same self-contained
-  live master chain runs on every platform; both formats are built and
-  smoke-validated (pluginval) in CI, so one release ships the Windows and macOS
-  plugins together with the apps.
-- **Reference loudness/peak readout.** Load a track you admire and the plugin
-  measures its **integrated LUFS + true-peak** — offline, once, on a background
-  thread — and shows them next to the live master meters, so you can aim the Makeup
-  gain at a real target. It's measured with libebur128 (canonical ITU-R BS.1770),
-  so the numbers line up with the CLI/GUI. This is a passive readout, **not** a live
-  match — the spectral/reference match stays the offline path in the CLI/GUI.
-- **Bus-glue toggle, wired.** The plugin's Bus-glue control now actually gates the
-  master glue compressor (default **on**, so the out-of-box master still matches the
-  CLI/GUI); turning it off is a labelled, plugin-only deviation.
+- **PASS/FAIL compliance stamp + dynamics meters.** Every master in `out/REPORT.md`
+  now carries a PASS/FAIL verdict (loudness within tolerance of target, true-peak
+  at/under the ceiling) plus **PLR** (peak-to-loudness), **PSR** (peak-to-short-term)
+  and **stereo phase-correlation** — pure arithmetic on values Keel already measures.
+- **Encoded delivery formats** — `--format flac,mp3,ogg,aac`. FLAC/MP3/OGG go
+  through libsndfile (offline, no extra tool); AAC uses ffmpeg if present. FLAC is
+  bit-exact; the lossy formats are deterministic given the encoder version.
+- **Post-codec true-peak gate.** Each encoded file is decoded and re-metered, and
+  its post-codec true-peak graded PASS/WARN/FAIL against the ceiling — so "we leave
+  headroom for lossy transcoding" is auditable, not a claim. Advisory only; it never
+  reshapes the master.
+- **Multi-target one-pass export** — `--targets streaming,-16,loud` renders one
+  master per target in a single pass, each re-running the chain so every file is
+  genuinely at-spec, in its own file.
+- **Seeded dither for sub-32-bit export** — `--bit-depth 16 --dither tpdf` (or
+  `shaped`). TPDF dither removes quantization distortion when going to 16/24-bit,
+  and the PRNG is seeded so output stays deterministic (same stems + recipe + seed
+  = identical file).
+- **Loudness-keyed true-peak ceiling** — opt-in `--auto-tp` follows the target
+  (-14 → -1, -9 → -2 dBTP); an explicit `--tp` still wins. Off by default.
+- **Album loudness-consistency mode** — `--album` (with `--batch`) preserves the
+  intended loudness differences between tracks instead of flattening every track to
+  the same LUFS, while the album mean lands on target.
+- **Deterministic reference-loudness match** — `--match-loudness ref.wav` measures
+  a reference's integrated LUFS and uses it as the target (no ML/spectral match;
+  the spectral match stays the offline Matchering path).
 
 ## Heads-up: these builds are unsigned
 They are not yet code-signed, so the OS will warn on first launch:
