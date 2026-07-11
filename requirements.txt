@@ -12,3 +12,11 @@ pedalboard         # Spotify audio-effects + optional VST3 host (the "mix cook")
 #   pip install matchering
 #   pip install --no-index --find-links vendor matchering   # offline
 # matchering
+
+# Optional: AAC/M4A delivery export (build.py --format aac). FLAC/MP3/OGG need no
+# external tool (libsndfile), but AAC has no libsndfile encoder, so it needs an
+# ffmpeg. `imageio-ffmpeg` ships a static ffmpeg binary; a system ffmpeg on PATH
+# works too. Without either, --format aac raises a clear error and the other
+# formats are unaffected.
+#   pip install imageio-ffmpeg
+# imageio-ffmpeg

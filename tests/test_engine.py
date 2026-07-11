@@ -37,6 +37,7 @@ import mastering
 import meters
 import build
 import dither
+import encode
 
 RATE = 44100
 SECONDS = 3.0  # > the LUFS gating window, short enough to stay fast
@@ -405,6 +406,64 @@ class TestDither(unittest.TestCase):
             out = Path(d) / "m.wav"
             mastering.master(mix_wav, recipes.master_recipe(), out)
             self.assertEqual(sf.info(str(out)).subtype, "PCM_24")
+
+
+class TestEncode(unittest.TestCase):
+    """Delivery-format export: transcode the finished master to FLAC/MP3/OGG
+    (libsndfile, offline) and AAC (ffmpeg, optional). No DSP re-run."""
+
+    def _master(self, d, subtype="PCM_24"):
+        p = Path(d) / "master.wav"
+        t = np.arange(int(SECONDS * RATE)) / RATE
+        s = (0.2 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+        sf.write(str(p), np.column_stack([s, s]), RATE, subtype=subtype)
+        return p
+
+    def test_parse_formats_drops_wav_and_dedups(self):
+        self.assertEqual(encode.parse_formats("wav,flac,flac,mp3"),
+                         ["flac", "mp3"])
+        self.assertEqual(encode.parse_formats(""), [])
+
+    def test_parse_formats_rejects_unknown(self):
+        with self.assertRaises(ValueError):
+            encode.parse_formats("flac,bogus")
+
+    def test_flac_is_bit_exact_to_master(self):
+        with tempfile.TemporaryDirectory() as d:
+            master = self._master(d)
+            enc = encode.export(master, ["flac"], d, "song")[0]
+            self.assertTrue(enc["lossless"])
+            orig, _ = sf.read(str(master), dtype="float32", always_2d=True)
+            back, _ = sf.read(enc["out"], dtype="float32", always_2d=True)
+            # FLAC is lossless -> decoded samples equal the master's, bit for bit.
+            self.assertTrue(np.array_equal(orig, back))
+
+    def test_lossy_formats_write_and_decode(self):
+        with tempfile.TemporaryDirectory() as d:
+            master = self._master(d)
+            enc = encode.export(master, ["mp3", "ogg"], d, "song")
+            self.assertEqual({e["format"] for e in enc}, {"mp3", "ogg"})
+            for e in enc:
+                self.assertFalse(e["lossless"])
+                self.assertTrue(Path(e["out"]).exists())
+                back, r = sf.read(e["out"], always_2d=True)
+                self.assertEqual(r, RATE)
+                self.assertGreater(back.shape[0], 0)
+
+    def test_available_formats_superset(self):
+        fmts = encode.available_formats()
+        for f in ("wav", "flac", "mp3", "ogg"):
+            self.assertIn(f, fmts)   # always available via libsndfile
+
+    def test_aac_needs_ffmpeg_or_raises(self):
+        # AAC is only offered when an ffmpeg is present; otherwise a clear error.
+        if encode.ffmpeg_exe():
+            self.assertIn("aac", encode.available_formats())
+            self.assertEqual(encode.parse_formats("aac"), ["aac"])
+        else:
+            self.assertNotIn("aac", encode.available_formats())
+            with self.assertRaises(ValueError):
+                encode.parse_formats("aac")
 
 
 class TestBuildIntegration(unittest.TestCase):

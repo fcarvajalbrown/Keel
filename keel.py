@@ -57,6 +57,9 @@ from mastering import master
 # --- dithered quantization (sub-32-bit export) ---------------------------
 from dither import quantize as dither_quantize
 
+# --- delivery-format export ----------------------------------------------
+from encode import export as encode_master, available_formats, parse_formats
+
 # --- metering ------------------------------------------------------------
 from meters import (
     integrated_lufs, true_peak_db, short_term_lufs_max, correlation, dynamics,
@@ -76,6 +79,8 @@ __all__ = [
     "master",
     # dither
     "dither_quantize",
+    # delivery-format export
+    "encode_master", "available_formats", "parse_formats",
     # metering
     "integrated_lufs", "true_peak_db", "short_term_lufs_max", "correlation",
     "dynamics",

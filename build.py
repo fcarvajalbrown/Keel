@@ -48,6 +48,8 @@ STAGE / MASTER controls:
                                           -9->-2 dBTP); --tp still overrides it
       --bit-depth 16 --dither tpdf        export word length + seeded dither
                                           (dither when going sub-32-bit, e.g. 16)
+      --format flac,mp3                   also transcode the master to these
+                                          delivery formats (FLAC/MP3/OGG/AAC)
       --ref "C:\\refs\\master.wav"         match a reference (ignores --lufs)
 
 PRESETS (named master loudness profiles, applied live at render — they override
@@ -66,6 +68,7 @@ from pathlib import Path
 import recipes
 import mixer
 import mastering
+import encode
 
 MAPPING_NAME = "keel.json"
 
@@ -165,7 +168,7 @@ def write_mapping_doc(path, doc):
 def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
                 preset=None, target_lufs=None, tp_ceiling=None, ref=None,
                 glue=None, auto_tp=None, bit_depth=24, dither=None, dither_seed=0,
-                do_mix=True, do_master=True):
+                formats=None, do_mix=True, do_master=True):
     """Mix and/or master one folder of stems via its keel.json mapping. Returns a
     REPORT.md row dict, or None if it was skipped."""
     stems_dir = Path(stems_dir)
@@ -242,6 +245,16 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
         print(f"  master -> {rep['out']}  [{rep['path']}]  "
               f"{rep['lufs']} LUFS  {rep['true_peak_db']} dBTP  {stamp}{dtag}{ptag}")
 
+        # transcode the finished master into the extra delivery formats (no DSP
+        # re-run — the master WAV is the single source for every format).
+        if formats:
+            enc = encode.export(master_wav, formats, out_dir, f"{name}_master")
+            row["encoded"] = enc
+            for e in enc:
+                kb = round(e["bytes"] / 1024)
+                tag = "lossless" if e["lossless"] else "lossy"
+                print(f"  encode -> {e['out']}  [{e['format']}, {tag}, {kb} KB]")
+
     return row if (row["mix"] or row["master"]) else None
 
 
@@ -314,6 +327,12 @@ def write_report(report, out_dir):
                 L.append(f"  - dynamics: {' | '.join(dyn)}")
             if comp:
                 L.append(f"  - checks: {_compliance_line(comp, ms)}")
+        enc = row.get("encoded")
+        if enc:
+            parts = [f"{e['format'].upper()} "
+                     f"({'lossless' if e['lossless'] else 'lossy'}, "
+                     f"{round(e['bytes'] / 1024)} KB)" for e in enc]
+            L.append(f"- Encoded: {', '.join(parts)}")
         L.append("")
     out_path = Path(out_dir) / "REPORT.md"
     out_path.write_text("\n".join(L), encoding="utf-8")
@@ -361,6 +380,10 @@ def main(argv):
                     metavar="N",
                     help="PRNG seed for --dither (default: 0) — keeps output "
                          "deterministic")
+    ap.add_argument("--format", metavar="LIST", dest="formats",
+                    help="also export the master to these delivery formats "
+                         "(comma list: flac,mp3,ogg,aac). WAV is always written; "
+                         "FLAC is lossless, the rest lossy. AAC needs ffmpeg")
     glue_grp = ap.add_mutually_exclusive_group()
     glue_grp.add_argument("--glue", dest="glue", action="store_const", const=True,
                           default=None,
@@ -389,6 +412,13 @@ def main(argv):
         except ValueError as e:
             ap.error(str(e))
 
+    formats = []
+    if args.formats:  # fail fast on an unknown / unavailable export format
+        try:
+            formats = encode.parse_formats(args.formats)
+        except ValueError as e:
+            ap.error(str(e))
+
     if args.batch:
         if not Path(args.batch).expanduser().is_dir():
             ap.error(f"--batch folder not found: {args.batch}")
@@ -413,7 +443,8 @@ def main(argv):
                 preset=args.preset, target_lufs=args.lufs, tp_ceiling=args.tp,
                 ref=args.ref, glue=args.glue, auto_tp=args.auto_tp,
                 bit_depth=args.bit_depth, dither=args.dither,
-                dither_seed=args.dither_seed, do_mix=do_mix, do_master=do_master)
+                dither_seed=args.dither_seed, formats=formats,
+                do_mix=do_mix, do_master=do_master)
         except (ValueError, FileNotFoundError) as e:
             print(f"  [error] {name}: {e}")
             errors += 1
