@@ -797,6 +797,37 @@ class TestBatchIntegration(unittest.TestCase):
             self.assertIn("songA", txt)
             self.assertIn("songB", txt)
 
+    def test_album_mode_preserves_relative_loudness(self):
+        # two tracks of different arrangement density -> different mix loudness.
+        # album mode must keep their loudness DIFFERENCE (not flatten both to one
+        # LUFS) while the album mean lands on the target.
+        with tempfile.TemporaryDirectory() as d, \
+                tempfile.TemporaryDirectory() as out:
+            sparse = Path(d) / "ballad"
+            sparse.mkdir()
+            _sine(sparse / "vox.wav", freq=330.0)
+            _sine(sparse / "piano.wav", freq=220.0)
+            dense = Path(d) / "rocker"
+            dense.mkdir()
+            _make_song(dense)   # five stems -> denser, louder mix
+            build.main(["--batch", d, "--out", out, "--album"])
+            import soundfile as _sf
+            def lufs(name):
+                a, r = _sf.read(str(Path(out) / f"{name}_master.wav"),
+                                always_2d=True)
+                return meters.integrated_lufs(a, r)
+            lb, lr = lufs("ballad"), lufs("rocker")
+            # the dense rocker stays louder than the sparse ballad (spread kept)...
+            self.assertGreater(lr - lb, 0.8)
+            # ...and neither is simply pinned to -14 (that would be track mode)
+            self.assertFalse(abs(lb + 14.0) < 0.3 and abs(lr + 14.0) < 0.3)
+
+    def test_album_requires_batch(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = _make_song(d)
+            with self.assertRaises(SystemExit):     # argparse ap.error -> exit
+                build.main(["--stems", str(folder), "--album"])
+
     def test_batch_continues_past_a_bad_job(self):
         # good folder + a folder with a malformed keel.json: the good one still
         # renders, the bad one is reported but does not abort the batch.

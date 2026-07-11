@@ -126,6 +126,23 @@ def dynamics(true_peak, integrated, short_term_max):
     return _diff(true_peak, integrated), _diff(true_peak, short_term_max)
 
 
+def album_loudness(track_lufs_durations):
+    """Album integrated loudness (LUFS) from per-track (integrated_lufs, seconds)
+    pairs: the duration-weighted mean of the tracks' LINEAR loudness, then back to
+    LUFS. This is the EBU R128 album-normalisation figure — one number for the
+    whole album — used to derive the single shared gain that preserves relative
+    track-to-track loudness. Silent/non-finite tracks are ignored; -inf if all
+    are silent."""
+    num = den = 0.0
+    for lufs, dur in track_lufs_durations:
+        if np.isfinite(lufs) and dur > 0:
+            num += dur * (10.0 ** (lufs / 10.0))
+            den += dur
+    if den <= 0.0:
+        return float("-inf")
+    return float(10.0 * np.log10(num / den))
+
+
 def db_to_gain(db):
     return float(10.0 ** (db / 20.0))
 

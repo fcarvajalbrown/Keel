@@ -38,6 +38,8 @@ MODES:
       python build.py --stems ./stems --map my.json  # use a mapping elsewhere
   BATCH — every immediate subfolder that contains stems:
       python build.py --batch "C:\\path\\to\\album" --out out
+      python build.py --batch ./album --album   # one shared album gain, relative
+                                                 # track loudness preserved
 
 STAGE / MASTER controls:
       --mix-only / --master-only          stop after mix / remaster existing mix
@@ -66,9 +68,13 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
+import soundfile as sf
+
 import recipes
 import mixer
 import mastering
+import meters
 import encode
 
 MAPPING_NAME = "keel.json"
@@ -379,6 +385,72 @@ def _master_report_lines(ms, labelled=False):
     return lines
 
 
+def run_album(jobs, out_dir, args, formats):
+    """Album loudness-consistency mode. Mix every track, measure each mix's
+    loudness, then master each to a PER-TRACK target set by its offset from the
+    album's integrated loudness: track_target = album_target + (track - album).
+
+    A louder-mixed track gets a proportionally louder master and a quieter one a
+    quieter master, so the intended loudness differences BETWEEN tracks survive
+    (EBU R128 album normalisation) — instead of flattening every track to the same
+    LUFS. Because the offsets are measured against the album mean, the album's own
+    integrated loudness lands on the target while each track still runs the normal
+    exact-normalize + true-peak chain (so each is precise and TP-safe).
+    Returns (report, errors)."""
+    out_dir = Path(out_dir)
+    _suffix, tgt_ov = _resolve_master_targets(None, args.preset, args.lufs)[0]
+    album_target = tgt_ov.get("target_lufs", recipes.DEFAULT_MASTER["target_lufs"])
+
+    # pass 1 — mix every track; measure each mix's integrated loudness + duration.
+    tracks, errors = [], 0
+    for stems_dir, name in jobs:
+        try:
+            row = process_one(stems_dir, out_dir, name, map_file=args.map_file,
+                              glue=args.glue, do_mix=True, do_master=False)
+        except (ValueError, FileNotFoundError) as e:
+            print(f"  [error] {name}: {e}")
+            errors += 1
+            continue
+        if not row or not row.get("mix"):
+            continue
+        audio, rate = sf.read(str(out_dir / f"{name}_mix.wav"),
+                              dtype="float32", always_2d=True)
+        tracks.append({"stems": stems_dir, "name": name,
+                       "lufs": meters.integrated_lufs(audio, rate),
+                       "seconds": row["mix"]["seconds"], "mix": row["mix"]})
+    if not tracks:
+        return [], errors
+
+    # the album's integrated loudness -> each track's offset from it.
+    album_lufs = meters.album_loudness([(t["lufs"], t["seconds"]) for t in tracks])
+    print(f"\n[album] {len(tracks)} tracks | album loudness "
+          f"{round(album_lufs, 2)} LUFS -> target {album_target} LUFS; each "
+          f"track offset by its own level so relative loudness is preserved\n")
+
+    # pass 2 — master each track to its album-adjusted per-track target.
+    report = []
+    for t in tracks:
+        delta = ((t["lufs"] - album_lufs)
+                 if (np.isfinite(t["lufs"]) and np.isfinite(album_lufs)) else 0.0)
+        track_target = round(album_target + delta, 2)
+        try:
+            mrow = process_one(
+                t["stems"], out_dir, t["name"], map_file=args.map_file,
+                target_lufs=track_target, tp_ceiling=args.tp, ref=args.ref,
+                auto_tp=args.auto_tp, bit_depth=args.bit_depth, dither=args.dither,
+                dither_seed=args.dither_seed, formats=formats,
+                do_mix=False, do_master=True)
+        except (ValueError, FileNotFoundError) as e:
+            print(f"  [error] {t['name']}: {e}")
+            errors += 1
+            continue
+        if mrow:
+            mrow["mix"] = t["mix"]                 # fold pass-1 mix info back in
+            mrow["album_offset"] = round(delta, 2)
+            report.append(mrow)
+    return report, errors
+
+
 def write_report(report, out_dir):
     """One-glance QC sheet: per-project group balance (pre/post LUFS) + master
     loudness/true-peak vs. target. Written to <out>/REPORT.md."""
@@ -402,6 +474,9 @@ def write_report(report, out_dir):
                     L.append(f"| {b['label']} | {b['files']} | {b['pre_lufs']} "
                              f"| {b['gain_db']} | {b['post_lufs']} |")
                 L.append("")
+        if row.get("album_offset") is not None:
+            L.append(f"- Album offset: {row['album_offset']:+.2f} LU vs the album "
+                     f"mean (relative track loudness preserved)")
         masters = row.get("masters") or ([row["master"]] if row.get("master")
                                           else [])
         multi = len(masters) > 1
@@ -476,6 +551,10 @@ def main(argv):
                                  "(-14 LUFS->-1, -9->-2 dBTP); --tp still overrides")
     autotp_grp.add_argument("--no-auto-tp", dest="auto_tp", action="store_const",
                             const=False, help="force a fixed true-peak ceiling")
+    ap.add_argument("--album", action="store_true",
+                    help="album loudness-consistency mode (with --batch): one "
+                         "shared gain across all tracks, preserving their relative "
+                         "loudness instead of normalizing each to the same LUFS")
     ap.add_argument("--mix-only", action="store_true", help="stop after the mix")
     ap.add_argument("--master-only", action="store_true",
                     help="remaster existing out/<name>_mix.wav")
@@ -504,6 +583,13 @@ def main(argv):
         except ValueError as e:
             ap.error(str(e))
 
+    if args.album:  # album mode owns its own mix+master two-pass over a batch
+        if not args.batch:
+            ap.error("--album needs --batch (album consistency is across tracks)")
+        if targets or args.scan or args.mix_only or args.master_only:
+            ap.error("--album can't combine with --targets/--scan/--mix-only/"
+                     "--master-only (it renders one shared-gain master per track)")
+
     if args.batch:
         if not Path(args.batch).expanduser().is_dir():
             ap.error(f"--batch folder not found: {args.batch}")
@@ -517,25 +603,29 @@ def main(argv):
             ap.error(f"--stems folder not found: {stems}")
         jobs = [(stems, args.name or stems.name)]
 
-    report, errors = [], 0
-    for stems_dir, name in jobs:
-        # A bad input for one job (malformed keel.json, unreadable/corrupt audio,
-        # a samplerate mismatch) is reported as a clean line and the run carries
-        # on to the next job, rather than aborting the batch with a traceback.
-        try:
-            row = process_one(
-                stems_dir, args.out, name, map_file=args.map_file, scan=args.scan,
-                preset=args.preset, target_lufs=args.lufs, tp_ceiling=args.tp,
-                ref=args.ref, glue=args.glue, auto_tp=args.auto_tp,
-                bit_depth=args.bit_depth, dither=args.dither,
-                dither_seed=args.dither_seed, formats=formats, targets=targets,
-                do_mix=do_mix, do_master=do_master)
-        except (ValueError, FileNotFoundError) as e:
-            print(f"  [error] {name}: {e}")
-            errors += 1
-            continue
-        if row:
-            report.append(row)
+    if args.album:
+        report, errors = run_album(jobs, args.out, args, formats)
+    else:
+        report, errors = [], 0
+        for stems_dir, name in jobs:
+            # A bad input for one job (malformed keel.json, unreadable/corrupt
+            # audio, a samplerate mismatch) is reported as a clean line and the run
+            # carries on to the next job, rather than aborting with a traceback.
+            try:
+                row = process_one(
+                    stems_dir, args.out, name, map_file=args.map_file,
+                    scan=args.scan, preset=args.preset, target_lufs=args.lufs,
+                    tp_ceiling=args.tp, ref=args.ref, glue=args.glue,
+                    auto_tp=args.auto_tp, bit_depth=args.bit_depth,
+                    dither=args.dither, dither_seed=args.dither_seed,
+                    formats=formats, targets=targets,
+                    do_mix=do_mix, do_master=do_master)
+            except (ValueError, FileNotFoundError) as e:
+                print(f"  [error] {name}: {e}")
+                errors += 1
+                continue
+            if row:
+                report.append(row)
 
     if report:
         write_report(report, args.out)

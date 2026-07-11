@@ -66,6 +66,7 @@ from encode import (
 # --- metering ------------------------------------------------------------
 from meters import (
     integrated_lufs, true_peak_db, short_term_lufs_max, correlation, dynamics,
+    album_loudness,
 )
 
 __version__ = "0.5.0"
@@ -87,7 +88,7 @@ __all__ = [
     "verify_true_peak", "measure_true_peak",
     # metering
     "integrated_lufs", "true_peak_db", "short_term_lufs_max", "correlation",
-    "dynamics",
+    "dynamics", "album_loudness",
     # meta
     "__version__",
 ]
