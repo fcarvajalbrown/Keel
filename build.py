@@ -44,6 +44,8 @@ STAGE / MASTER controls:
       --glue / --no-glue                  force the bus-glue compressor on/off
       --preset loud                       house-sound loudness profile (see below)
       --lufs -11 --tp -1                  override the mapping's master target
+      --auto-tp                           key the TP ceiling to loudness (-14->-1,
+                                          -9->-2 dBTP); --tp still overrides it
       --ref "C:\\refs\\master.wav"         match a reference (ignores --lufs)
 
 PRESETS (named master loudness profiles, applied live at render — they override
@@ -107,6 +109,7 @@ def build_mapping_doc(stems_dir):
         "pan": {},
         "spread": {},
         "glue": False,   # gentle bus-glue compressor; OFF (stems are mix-ready)
+        "auto_tp": False,  # key the true-peak ceiling to loudness; OFF (fixed -1)
         "master": {
             "target_lufs": recipes.DEFAULT_MASTER["target_lufs"],
             "tp_ceiling_db": recipes.DEFAULT_MASTER["tp_ceiling_db"],
@@ -159,7 +162,7 @@ def write_mapping_doc(path, doc):
 
 def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
                 preset=None, target_lufs=None, tp_ceiling=None, ref=None,
-                glue=None, do_mix=True, do_master=True):
+                glue=None, auto_tp=None, do_mix=True, do_master=True):
     """Mix and/or master one folder of stems via its keel.json mapping. Returns a
     REPORT.md row dict, or None if it was skipped."""
     stems_dir = Path(stems_dir)
@@ -211,8 +214,15 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
             m_ov.update(recipes.preset_master(preset))
         if target_lufs is not None:  # explicit --lufs/--tp still beat the preset
             m_ov["target_lufs"] = target_lufs
+        # true-peak ceiling precedence: an explicit --tp always wins; otherwise, if
+        # auto-tp is on (CLI --auto-tp or keel.json "auto_tp"), key the ceiling to
+        # the resolved loudness target; otherwise the preset/keel.json ceiling stands.
+        eff_auto_tp = doc.get("auto_tp", False) if auto_tp is None else auto_tp
         if tp_ceiling is not None:
             m_ov["tp_ceiling_db"] = tp_ceiling
+        elif eff_auto_tp:
+            tgt = m_ov.get("target_lufs", recipes.DEFAULT_MASTER["target_lufs"])
+            m_ov["tp_ceiling_db"] = recipes.tp_ceiling_for_lufs(tgt)
         refs_dir, ref_name = _resolve_ref(ref)
         if ref_name:
             m_ov["reference"] = ref_name
@@ -340,6 +350,13 @@ def main(argv):
                                "(overrides keel.json; default OFF)")
     glue_grp.add_argument("--no-glue", dest="glue", action="store_const",
                           const=False, help="force bus glue OFF")
+    autotp_grp = ap.add_mutually_exclusive_group()
+    autotp_grp.add_argument("--auto-tp", dest="auto_tp", action="store_const",
+                            const=True, default=None,
+                            help="key the true-peak ceiling to the loudness target "
+                                 "(-14 LUFS->-1, -9->-2 dBTP); --tp still overrides")
+    autotp_grp.add_argument("--no-auto-tp", dest="auto_tp", action="store_const",
+                            const=False, help="force a fixed true-peak ceiling")
     ap.add_argument("--mix-only", action="store_true", help="stop after the mix")
     ap.add_argument("--master-only", action="store_true",
                     help="remaster existing out/<name>_mix.wav")
@@ -376,7 +393,8 @@ def main(argv):
             row = process_one(
                 stems_dir, args.out, name, map_file=args.map_file, scan=args.scan,
                 preset=args.preset, target_lufs=args.lufs, tp_ceiling=args.tp,
-                ref=args.ref, glue=args.glue, do_mix=do_mix, do_master=do_master)
+                ref=args.ref, glue=args.glue, auto_tp=args.auto_tp,
+                do_mix=do_mix, do_master=do_master)
         except (ValueError, FileNotFoundError) as e:
             print(f"  [error] {name}: {e}")
             errors += 1

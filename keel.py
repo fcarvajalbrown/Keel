@@ -39,6 +39,7 @@ from recipes import (
     mix_recipe,
     master_recipe,
     preset_master,
+    tp_ceiling_for_lufs,
 )
 
 # --- mix engine ----------------------------------------------------------
@@ -65,7 +66,7 @@ __all__ = [
     "STEMS", "KNOWN_LABELS", "STEM_ALIASES", "DEFAULT_BALANCE", "DEFAULT_PAN",
     "DEFAULT_SPREAD",
     "DEFAULT_CHAIN", "DEFAULT_MASTER", "PRESETS", "DEFAULT_PRESET",
-    "mix_recipe", "master_recipe", "preset_master",
+    "mix_recipe", "master_recipe", "preset_master", "tp_ceiling_for_lufs",
     # mix engine
     "mix", "autodetect", "group_files", "INTERNAL_ANCHOR_LUFS", "OTHER_LABEL",
     # master engine

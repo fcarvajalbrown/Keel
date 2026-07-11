@@ -105,6 +105,17 @@ class TestRecipes(unittest.TestCase):
         self.assertEqual(r["tp_ceiling_db"],
                          recipes.DEFAULT_MASTER["tp_ceiling_db"])
 
+    def test_tp_ceiling_for_lufs_curve_and_clamp(self):
+        # the two research-anchored points...
+        self.assertEqual(recipes.tp_ceiling_for_lufs(-14.0), -1.0)
+        self.assertEqual(recipes.tp_ceiling_for_lufs(-9.0), -2.0)
+        # ...a midpoint interpolates...
+        self.assertEqual(recipes.tp_ceiling_for_lufs(-11.5), -1.5)
+        # ...and it clamps to [-2, -1] outside the anchors (never above the -1
+        # streaming floor for a quiet target, never below -2 for a very hot one).
+        self.assertEqual(recipes.tp_ceiling_for_lufs(-16.0), -1.0)
+        self.assertEqual(recipes.tp_ceiling_for_lufs(-6.0), -2.0)
+
 
 class TestUserPresets(unittest.TestCase):
     def setUp(self):
@@ -334,6 +345,34 @@ class TestBuildIntegration(unittest.TestCase):
             self.assertAlmostEqual(row["master"]["lufs"], -10.0, delta=0.3)
             # the loud preset overrode the keel.json default target
             self.assertEqual(row["target_lufs"], -10.0)
+
+    def test_auto_tp_keys_ceiling_to_loudness(self):
+        # --auto-tp derives the ceiling from the target when no explicit --tp is
+        # given: a hot -9 target should master under a -2 dBTP ceiling, not -1.
+        with tempfile.TemporaryDirectory() as d, \
+                tempfile.TemporaryDirectory() as out:
+            folder = _make_song(d)
+            row = build.process_one(folder, out, "hot", target_lufs=-9.0,
+                                    auto_tp=True)
+            self.assertEqual(row["master"]["compliance"]["tp_ceiling_db"], -2.0)
+            self.assertLessEqual(row["master"]["true_peak_db"], -2.0 + 0.2)
+
+    def test_explicit_tp_overrides_auto_tp(self):
+        # an explicit --tp always wins over the auto-keyed ceiling.
+        with tempfile.TemporaryDirectory() as d, \
+                tempfile.TemporaryDirectory() as out:
+            folder = _make_song(d)
+            row = build.process_one(folder, out, "x", target_lufs=-9.0,
+                                    tp_ceiling=-1.5, auto_tp=True)
+            self.assertEqual(row["master"]["compliance"]["tp_ceiling_db"], -1.5)
+
+    def test_auto_tp_off_by_default_keeps_fixed_ceiling(self):
+        # default (no --auto-tp): a custom target keeps the fixed -1 ceiling.
+        with tempfile.TemporaryDirectory() as d, \
+                tempfile.TemporaryDirectory() as out:
+            folder = _make_song(d)
+            row = build.process_one(folder, out, "d", target_lufs=-9.0)
+            self.assertEqual(row["master"]["compliance"]["tp_ceiling_db"], -1.0)
 
     def test_glue_toggle_plumbing(self):
         # The --glue/keel.json toggle must thread through to a valid render on

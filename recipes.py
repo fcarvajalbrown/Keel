@@ -213,6 +213,23 @@ def master_recipe(overrides=None):
     return _deep_merge(DEFAULT_MASTER, overrides or {})
 
 
+def tp_ceiling_for_lufs(target_lufs):
+    """Recommend a true-peak ceiling (dBTP) for a loudness target — an OPT-IN,
+    overridable default (build.py --auto-tp / keel.json "auto_tp"; an explicit
+    --tp always wins).
+
+    Louder masters are limited harder, and lossy transcoding (AAC/Ogg/MP3)
+    inflates their intersample peaks more, so a hotter target wants MORE headroom
+    below 0. The curve is anchored on two research-backed points — -14 LUFS ->
+    -1 dBTP (the Spotify/Apple/Tidal streaming standard) and -9 LUFS -> -2 dBTP
+    (heavily-limited loud masters; Amazon Music already asks -2) — and clamped to
+    [-2.0, -1.0] so it never rises above the -1 streaming floor nor dips below the
+    -2 conservative bound. Off by default, so the fixed -1 ceiling (and the plugin)
+    are unchanged — no DSP SYNC."""
+    ceiling = -1.0 - (float(target_lufs) + 14.0) / 5.0
+    return round(max(-2.0, min(-1.0, ceiling)), 2)
+
+
 def preset_master(name):
     """Return the master overrides ({target_lufs, tp_ceiling_db}) for a named
     preset, as a fresh copy. Raises ValueError naming the valid presets on an
