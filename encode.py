@@ -61,10 +61,18 @@ def ffmpeg_exe():
         return shutil.which("ffmpeg")
 
 
+def _sf_available():
+    """The subset of our libsndfile-native targets this build can actually write.
+    WAV/FLAC/OGG are universal; MP3 needs libsndfile >= 1.1, so it's checked
+    against the runtime rather than assumed."""
+    have = set(sf.available_formats())          # e.g. {'WAV','FLAC','MP3','OGG'}
+    return {k for k, (fmt, _sub) in _SF_FORMATS.items() if fmt in have}
+
+
 def available_formats():
-    """The delivery formats this machine can produce right now. WAV/FLAC/OGG/MP3
-    are always available (libsndfile); AAC/M4A only if an ffmpeg is found."""
-    fmts = set(_SF_FORMATS)
+    """The delivery formats this machine can produce right now: the libsndfile
+    targets this build supports, plus AAC/M4A when an ffmpeg is found."""
+    fmts = _sf_available()
     if ffmpeg_exe():
         fmts |= set(_FFMPEG_FORMATS)
     return fmts
@@ -88,6 +96,10 @@ def parse_formats(spec):
             raise ValueError(
                 f"{f!r} export needs ffmpeg (install imageio-ffmpeg or put "
                 f"ffmpeg on PATH); WAV/FLAC/OGG/MP3 need no external tool.")
+        if f in _SF_FORMATS and f not in _sf_available():
+            raise ValueError(
+                f"{f!r} export isn't supported by this libsndfile build "
+                f"(needs a newer soundfile/libsndfile); FLAC/OGG/WAV always work.")
         if f not in seen:
             seen.add(f)
             out.append(f)

@@ -439,10 +439,14 @@ class TestEncode(unittest.TestCase):
             self.assertTrue(np.array_equal(orig, back))
 
     def test_lossy_formats_write_and_decode(self):
+        avail = encode.available_formats()
+        want = [f for f in ("mp3", "ogg") if f in avail]
+        if not want:
+            self.skipTest("no lossy libsndfile formats in this build")
         with tempfile.TemporaryDirectory() as d:
             master = self._master(d)
-            enc = encode.export(master, ["mp3", "ogg"], d, "song")
-            self.assertEqual({e["format"] for e in enc}, {"mp3", "ogg"})
+            enc = encode.export(master, want, d, "song")
+            self.assertEqual({e["format"] for e in enc}, set(want))
             for e in enc:
                 self.assertFalse(e["lossless"])
                 self.assertTrue(Path(e["out"]).exists())
@@ -466,9 +470,13 @@ class TestEncode(unittest.TestCase):
     def test_post_codec_gate_grades_over_ceiling(self):
         # a deliberately tiny ceiling below the master's own peak must NOT read
         # PASS: the gate reports WARN (over ceiling) or FAIL (clipped), honestly.
+        lossy = next((f for f in ("mp3", "ogg")
+                      if f in encode.available_formats()), None)
+        if not lossy:
+            self.skipTest("no lossy libsndfile format in this build")
         with tempfile.TemporaryDirectory() as d:
             master = self._master(d)   # ~-14 dBFS sine, peak ~ -14 dBTP
-            enc = encode.export(master, ["mp3"], d, "song",
+            enc = encode.export(master, [lossy], d, "song",
                                 tp_ceiling_db=-30.0)[0]
             self.assertIn(enc["tp_verify"]["verdict"], ("WARN", "FAIL"))
             self.assertTrue(enc["tp_verify"]["over_ceiling"])
@@ -498,8 +506,8 @@ class TestEncode(unittest.TestCase):
 
     def test_available_formats_superset(self):
         fmts = encode.available_formats()
-        for f in ("wav", "flac", "mp3", "ogg"):
-            self.assertIn(f, fmts)   # always available via libsndfile
+        for f in ("wav", "flac", "ogg"):
+            self.assertIn(f, fmts)   # universal in every libsndfile build
 
     def test_aac_needs_ffmpeg_or_raises(self):
         # AAC is only offered when an ffmpeg is present; otherwise a clear error.
