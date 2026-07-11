@@ -54,6 +54,9 @@ from mixer import (
 # --- master engine -------------------------------------------------------
 from mastering import master
 
+# --- dithered quantization (sub-32-bit export) ---------------------------
+from dither import quantize as dither_quantize
+
 # --- metering ------------------------------------------------------------
 from meters import (
     integrated_lufs, true_peak_db, short_term_lufs_max, correlation, dynamics,
@@ -71,6 +74,8 @@ __all__ = [
     "mix", "autodetect", "group_files", "INTERNAL_ANCHOR_LUFS", "OTHER_LABEL",
     # master engine
     "master",
+    # dither
+    "dither_quantize",
     # metering
     "integrated_lufs", "true_peak_db", "short_term_lufs_max", "correlation",
     "dynamics",

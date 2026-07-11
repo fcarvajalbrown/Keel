@@ -46,6 +46,8 @@ STAGE / MASTER controls:
       --lufs -11 --tp -1                  override the mapping's master target
       --auto-tp                           key the TP ceiling to loudness (-14->-1,
                                           -9->-2 dBTP); --tp still overrides it
+      --bit-depth 16 --dither tpdf        export word length + seeded dither
+                                          (dither when going sub-32-bit, e.g. 16)
       --ref "C:\\refs\\master.wav"         match a reference (ignores --lufs)
 
 PRESETS (named master loudness profiles, applied live at render — they override
@@ -162,7 +164,8 @@ def write_mapping_doc(path, doc):
 
 def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
                 preset=None, target_lufs=None, tp_ceiling=None, ref=None,
-                glue=None, auto_tp=None, do_mix=True, do_master=True):
+                glue=None, auto_tp=None, bit_depth=24, dither=None, dither_seed=0,
+                do_mix=True, do_master=True):
     """Mix and/or master one folder of stems via its keel.json mapping. Returns a
     REPORT.md row dict, or None if it was skipped."""
     stems_dir = Path(stems_dir)
@@ -227,13 +230,17 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
         if ref_name:
             m_ov["reference"] = ref_name
         recipe = recipes.master_recipe(m_ov)
-        rep = mastering.master(mix_wav, recipe, master_wav, references_dir=refs_dir)
+        rep = mastering.master(mix_wav, recipe, master_wav, references_dir=refs_dir,
+                               bit_depth=bit_depth, dither=dither,
+                               dither_seed=dither_seed)
         row["master"] = rep
         row["target_lufs"] = recipe.get("target_lufs")
         ptag = f"  preset:{preset}" if preset else ""
+        dtag = (f"  {bit_depth}-bit/{dither}" if dither
+                else (f"  {bit_depth}-bit" if bit_depth != 24 else ""))
         stamp = rep.get("compliance", {}).get("verdict", "")
         print(f"  master -> {rep['out']}  [{rep['path']}]  "
-              f"{rep['lufs']} LUFS  {rep['true_peak_db']} dBTP  {stamp}{ptag}")
+              f"{rep['lufs']} LUFS  {rep['true_peak_db']} dBTP  {stamp}{dtag}{ptag}")
 
     return row if (row["mix"] or row["master"]) else None
 
@@ -343,6 +350,17 @@ def main(argv):
                     help="override the mapping's true-peak ceiling")
     ap.add_argument("--ref", metavar="FILE",
                     help="reference master; if set, Keel matches it (--lufs ignored)")
+    ap.add_argument("--bit-depth", type=int, choices=(16, 24, 32), default=24,
+                    dest="bit_depth", metavar="N",
+                    help="master word length: 16/24-bit PCM or 32-bit float "
+                         "(default: 24)")
+    ap.add_argument("--dither", choices=("tpdf", "shaped"), default=None,
+                    help="seeded dither before sub-32-bit quantization: flat TPDF "
+                         "or noise-shaped (default: none). Use when exporting 16-bit")
+    ap.add_argument("--dither-seed", type=int, default=0, dest="dither_seed",
+                    metavar="N",
+                    help="PRNG seed for --dither (default: 0) — keeps output "
+                         "deterministic")
     glue_grp = ap.add_mutually_exclusive_group()
     glue_grp.add_argument("--glue", dest="glue", action="store_const", const=True,
                           default=None,
@@ -394,7 +412,8 @@ def main(argv):
                 stems_dir, args.out, name, map_file=args.map_file, scan=args.scan,
                 preset=args.preset, target_lufs=args.lufs, tp_ceiling=args.tp,
                 ref=args.ref, glue=args.glue, auto_tp=args.auto_tp,
-                do_mix=do_mix, do_master=do_master)
+                bit_depth=args.bit_depth, dither=args.dither,
+                dither_seed=args.dither_seed, do_mix=do_mix, do_master=do_master)
         except (ValueError, FileNotFoundError) as e:
             print(f"  [error] {name}: {e}")
             errors += 1

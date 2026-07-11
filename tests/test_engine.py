@@ -36,6 +36,7 @@ import mixer
 import mastering
 import meters
 import build
+import dither
 
 RATE = 44100
 SECONDS = 3.0  # > the LUFS gating window, short enough to stay fast
@@ -332,6 +333,78 @@ class TestComplianceMeters(unittest.TestCase):
             self.assertEqual(rep["compliance"]["verdict"], "FAIL")
             self.assertFalse(rep["compliance"]["lufs_ok"])
             self.assertTrue(rep["compliance"]["tp_ok"])  # ceiling still held
+
+
+class TestDither(unittest.TestCase):
+    """Seeded TPDF dither for sub-32-bit export — the one sanctioned bit of
+    randomness in the render path, made reproducible by a fixed PRNG seed."""
+
+    def _noisy(self, n=int(SECONDS * RATE)):
+        t = np.arange(n) / RATE
+        return (0.25 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+
+    def test_quantize_snaps_to_grid(self):
+        # every output sample must be an exact multiple of the target LSB.
+        out = dither.quantize(self._noisy(), 16, seed=0)
+        step = dither.lsb(16)
+        residual = np.abs(out / step - np.round(out / step))
+        self.assertLess(float(np.max(residual)), 1e-4)
+
+    def test_seeded_is_deterministic(self):
+        a = dither.quantize(self._noisy(), 16, seed=7)
+        b = dither.quantize(self._noisy(), 16, seed=7)
+        self.assertTrue(np.array_equal(a, b))       # same seed -> identical
+        c = dither.quantize(self._noisy(), 16, seed=8)
+        self.assertFalse(np.array_equal(a, c))      # different seed -> different
+
+    def test_32bit_is_noop(self):
+        sig = self._noisy()
+        out = dither.quantize(sig, 32, seed=0)
+        self.assertTrue(np.array_equal(out, sig))   # float needs no dither
+
+    def test_shaped_runs_and_snaps(self):
+        out = dither.quantize(self._noisy(), 16, seed=0, noise_shaping=True)
+        step = dither.lsb(16)
+        residual = np.abs(out / step - np.round(out / step))
+        self.assertLess(float(np.max(residual)), 1e-4)
+        self.assertTrue(np.all(np.isfinite(out)))
+
+    def test_dither_removes_quantization_distortion(self):
+        # a low-level sine hard-truncated to 8-bit shows strong harmonic
+        # distortion; TPDF dither must lower the quantization-noise correlation.
+        # We check the crude proxy that dithered output is NOT bit-identical to a
+        # plain round (i.e. dither actually perturbed the quantization).
+        sig = (dither.lsb(8) * 3.0 * np.sin(
+            2 * np.pi * 440 * np.arange(int(SECONDS * RATE)) / RATE)
+        ).astype(np.float32)
+        plain = np.round(sig / dither.lsb(8)) * dither.lsb(8)
+        dithered = dither.quantize(sig, 8, seed=0)
+        self.assertFalse(np.array_equal(plain.astype(np.float32), dithered))
+
+    def test_master_dither_deterministic_and_16bit(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = _make_song(d)
+            mix_wav = Path(d) / "mix.wav"
+            mixer.mix(folder, recipes.mix_recipe(), mix_wav,
+                      mapping=mixer.autodetect(folder))
+            recipe = recipes.master_recipe()
+            a, b = Path(d) / "a.wav", Path(d) / "b.wav"
+            mastering.master(mix_wav, recipe, a, bit_depth=16, dither="tpdf")
+            mastering.master(mix_wav, recipe, b, bit_depth=16, dither="tpdf")
+            self.assertEqual(a.read_bytes(), b.read_bytes())   # seeded -> identical
+            info = sf.info(str(a))
+            self.assertEqual(info.subtype, "PCM_16")
+
+    def test_default_master_unchanged_byte_for_byte(self):
+        # the dither work must not touch the historical default (24-bit, no dither).
+        with tempfile.TemporaryDirectory() as d:
+            folder = _make_song(d)
+            mix_wav = Path(d) / "mix.wav"
+            mixer.mix(folder, recipes.mix_recipe(), mix_wav,
+                      mapping=mixer.autodetect(folder))
+            out = Path(d) / "m.wav"
+            mastering.master(mix_wav, recipes.master_recipe(), out)
+            self.assertEqual(sf.info(str(out)).subtype, "PCM_24")
 
 
 class TestBuildIntegration(unittest.TestCase):

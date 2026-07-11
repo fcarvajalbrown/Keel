@@ -30,6 +30,11 @@ import numpy as np
 import soundfile as sf
 
 import meters
+import dither as _dither
+
+# Output bit depth -> libsndfile subtype. 32 is float (no dither); 24/16 are the
+# dithered integer targets.
+_SUBTYPE = {16: "PCM_16", 24: "PCM_24", 32: "FLOAT"}
 
 try:
     from pedalboard import (
@@ -101,6 +106,19 @@ def _compliance(lufs, tp, target_lufs, tp_ceiling_db, lufs_tol=0.5, tp_tol=0.1):
             "verdict": "PASS" if all(checks) else "FAIL"}
 
 
+def _write_master(audio, rate, out_path, bit_depth, dither_mode, dither_seed):
+    """Write the finished master, dithering to `bit_depth` if asked. Returns the
+    audio AS WRITTEN (post-dither) so the report meters read the delivered file.
+    `dither_mode`: None | 'tpdf' | 'shaped'. bit_depth 32 -> float, never dithered.
+    Dither happens ONCE, here, at the final export — never on the intermediate mix."""
+    if dither_mode and bit_depth < 32:
+        audio = _dither.quantize(audio, bit_depth, seed=dither_seed,
+                                 noise_shaping=(dither_mode == "shaped"))
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    sf.write(str(out_path), audio, rate, subtype=_SUBTYPE.get(bit_depth, "PCM_24"))
+    return audio
+
+
 def _report(audio, rate, path, out_path, target_lufs, tp_ceiling_db, **extra):
     """Build a master report dict: loudness + true-peak, the PLR/PSR dynamics and
     stereo phase-correlation meters, and the PASS/FAIL compliance stamp. Shared by
@@ -122,7 +140,8 @@ def _report(audio, rate, path, out_path, target_lufs, tp_ceiling_db, **extra):
     return rep
 
 
-def _internal_master(mix_path, out_path, target_lufs, tp_ceiling_db):
+def _internal_master(mix_path, out_path, target_lufs, tp_ceiling_db,
+                     bit_depth=24, dither_mode=None, dither_seed=0):
     audio, rate = sf.read(str(mix_path), dtype="float32", always_2d=True)
     # guard --master-only on a foreign/corrupt mix: NaN/Inf samples become
     # silence so they can't poison the loudness/true-peak math (Keel's own mix
@@ -169,13 +188,14 @@ def _internal_master(mix_path, out_path, target_lufs, tp_ceiling_db):
         if np.isfinite(tp) and tp > tp_ceiling_db:
             audio = meters.apply_gain_db(audio, tp_ceiling_db - tp)
 
-    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    sf.write(str(out_path), audio, rate, subtype="PCM_24")
+    audio = _write_master(audio, rate, out_path, bit_depth, dither_mode, dither_seed)
     return _report(audio, rate, "internal", out_path,
-                   target_lufs=target_lufs, tp_ceiling_db=tp_ceiling_db)
+                   target_lufs=target_lufs, tp_ceiling_db=tp_ceiling_db,
+                   bit_depth=bit_depth, dither=dither_mode)
 
 
-def _reference_master(mix_path, ref_path, out_path, tp_ceiling_db=-1.0):
+def _reference_master(mix_path, ref_path, out_path, tp_ceiling_db=-1.0,
+                      bit_depth=24, dither_mode=None, dither_seed=0):
     import matchering as mg
     mg.log(warning_handler=lambda *_: None)  # quiet; engine reports its own summary
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
@@ -185,24 +205,38 @@ def _reference_master(mix_path, ref_path, out_path, tp_ceiling_db=-1.0):
         results=[mg.pcm24(str(out_path))],
     )
     audio, rate = sf.read(str(out_path), dtype="float32", always_2d=True)
+    # Matchering writes 24-bit PCM; re-quantize/re-write only if a different bit
+    # depth or dither was requested, so the default reference path is untouched.
+    if dither_mode or bit_depth != 24:
+        audio = _write_master(audio, rate, out_path, bit_depth,
+                              dither_mode, dither_seed)
     # target_lufs is None on this path — the reference dictates loudness, so
     # compliance asserts only the true-peak ceiling (loudness check skipped).
     return _report(audio, rate, "matchering", out_path,
                    target_lufs=None, tp_ceiling_db=tp_ceiling_db,
-                   reference=str(ref_path))
+                   reference=str(ref_path), bit_depth=bit_depth, dither=dither_mode)
 
 
-def master(mix_path, recipe, out_path, references_dir=None):
+def master(mix_path, recipe, out_path, references_dir=None,
+           bit_depth=24, dither=None, dither_seed=0):
     """Master one mix WAV. Uses Matchering if recipe['reference'] resolves to a
-    file under references_dir, else the internal chain. Returns a report dict."""
+    file under references_dir, else the internal chain. Returns a report dict.
+
+    `bit_depth` (16/24/32) sets the export word length; `dither` (None|'tpdf'|
+    'shaped') adds seeded TPDF dither before quantizing to a sub-32-bit depth
+    (see dither.py). Defaults (24-bit, no dither) reproduce the historical output
+    byte-for-byte."""
     ref = recipe.get("reference")
     if ref and references_dir:
         ref_path = Path(references_dir) / ref
         if ref_path.exists():
-            return _reference_master(mix_path, ref_path, out_path,
-                                     tp_ceiling_db=recipe.get("tp_ceiling_db", -1.0))
+            return _reference_master(
+                mix_path, ref_path, out_path,
+                tp_ceiling_db=recipe.get("tp_ceiling_db", -1.0),
+                bit_depth=bit_depth, dither_mode=dither, dither_seed=dither_seed)
     return _internal_master(
         mix_path, out_path,
         target_lufs=recipe.get("target_lufs", -9.0),
         tp_ceiling_db=recipe.get("tp_ceiling_db", -1.0),
+        bit_depth=bit_depth, dither_mode=dither, dither_seed=dither_seed,
     )
