@@ -44,6 +44,7 @@ STAGE / MASTER controls:
       --glue / --no-glue                  force the bus-glue compressor on/off
       --preset loud                       house-sound loudness profile (see below)
       --lufs -11 --tp -1                  override the mapping's master target
+      --targets streaming,-16,loud        one master PER target, each re-run at-spec
       --auto-tp                           key the TP ceiling to loudness (-14->-1,
                                           -9->-2 dBTP); --tp still overrides it
       --bit-depth 16 --dither tpdf        export word length + seeded dither
@@ -165,10 +166,50 @@ def write_mapping_doc(path, doc):
     Path(path).write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
 
 
+def _parse_targets(spec):
+    """Parse a '--targets streaming,-16,loud' spec into a list mixing preset NAMES
+    (str) and LUFS numbers (float). A preset name is validated here (raises
+    ValueError naming the valid presets on a typo)."""
+    out = []
+    for raw in spec.split(","):
+        s = raw.strip()
+        if not s:
+            continue
+        try:
+            out.append(float(s))
+        except ValueError:
+            recipes.preset_master(s)   # validate the preset name (raises)
+            out.append(s)
+    return out
+
+
+def _resolve_master_targets(targets, preset, target_lufs):
+    """Plan the master renders: return [(filename_suffix, master_override), ...].
+
+    Default (no --targets): a single render on the preset/--lufs path (suffix ""),
+    so `<name>_master.wav` is written exactly as before. With --targets, one
+    render per target — each a preset NAME or a LUFS number — carrying a labelled
+    suffix so the files don't collide (`_streaming`, `_-16LUFS`, ...)."""
+    if not targets:
+        ov = {}
+        if preset:
+            ov.update(recipes.preset_master(preset))
+        if target_lufs is not None:
+            ov["target_lufs"] = target_lufs
+        return [("", ov)]
+    specs = []
+    for tg in targets:
+        if isinstance(tg, str):                      # a preset name
+            specs.append((f"_{tg}", recipes.preset_master(tg)))
+        else:                                        # a LUFS number
+            specs.append((f"_{tg:g}LUFS", {"target_lufs": float(tg)}))
+    return specs
+
+
 def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
                 preset=None, target_lufs=None, tp_ceiling=None, ref=None,
                 glue=None, auto_tp=None, bit_depth=24, dither=None, dither_seed=0,
-                formats=None, do_mix=True, do_master=True):
+                formats=None, targets=None, do_mix=True, do_master=True):
     """Mix and/or master one folder of stems via its keel.json mapping. Returns a
     REPORT.md row dict, or None if it was skipped."""
     stems_dir = Path(stems_dir)
@@ -190,7 +231,6 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
 
     out_dir.mkdir(parents=True, exist_ok=True)
     mix_wav = out_dir / f"{name}_mix.wav"
-    master_wav = out_dir / f"{name}_master.wav"
     print(f"=== {name} ===")
     row = {"slug": name, "mix": None, "master": None}
 
@@ -215,52 +255,64 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
         if not mix_wav.exists():
             print(f"  [skip master] no mix at {mix_wav}")
             return row if row["mix"] else None
-        m_ov = dict(doc.get("master", {}))
-        if preset:  # named profile overrides the mapping's master block
-            m_ov.update(recipes.preset_master(preset))
-        if target_lufs is not None:  # explicit --lufs/--tp still beat the preset
-            m_ov["target_lufs"] = target_lufs
-        # true-peak ceiling precedence: an explicit --tp always wins; otherwise, if
-        # auto-tp is on (CLI --auto-tp or keel.json "auto_tp"), key the ceiling to
-        # the resolved loudness target; otherwise the preset/keel.json ceiling stands.
+        base = dict(doc.get("master", {}))
         eff_auto_tp = doc.get("auto_tp", False) if auto_tp is None else auto_tp
-        if tp_ceiling is not None:
-            m_ov["tp_ceiling_db"] = tp_ceiling
-        elif eff_auto_tp:
-            tgt = m_ov.get("target_lufs", recipes.DEFAULT_MASTER["target_lufs"])
-            m_ov["tp_ceiling_db"] = recipes.tp_ceiling_for_lufs(tgt)
         refs_dir, ref_name = _resolve_ref(ref)
-        if ref_name:
-            m_ov["reference"] = ref_name
-        recipe = recipes.master_recipe(m_ov)
-        rep = mastering.master(mix_wav, recipe, master_wav, references_dir=refs_dir,
-                               bit_depth=bit_depth, dither=dither,
-                               dither_seed=dither_seed)
-        row["master"] = rep
-        row["target_lufs"] = recipe.get("target_lufs")
-        ptag = f"  preset:{preset}" if preset else ""
         dtag = (f"  {bit_depth}-bit/{dither}" if dither
                 else (f"  {bit_depth}-bit" if bit_depth != 24 else ""))
-        stamp = rep.get("compliance", {}).get("verdict", "")
-        print(f"  master -> {rep['out']}  [{rep['path']}]  "
-              f"{rep['lufs']} LUFS  {rep['true_peak_db']} dBTP  {stamp}{dtag}{ptag}")
 
-        # transcode the finished master into the extra delivery formats (no DSP
-        # re-run — the master WAV is the single source for every format).
-        if formats:
-            enc = encode.export(master_wav, formats, out_dir, f"{name}_master",
-                                tp_ceiling_db=recipe.get("tp_ceiling_db"))
-            row["encoded"] = enc
-            for e in enc:
-                kb = round(e["bytes"] / 1024)
-                tag = "lossless" if e["lossless"] else "lossy"
-                v = e.get("tp_verify")
-                vtag = (f"  post-TP {v['post_tp_db']} dBTP {v['verdict']}"
-                        if v else "")
-                print(f"  encode -> {e['out']}  [{e['format']}, {tag}, "
-                      f"{kb} KB]{vtag}")
+        # One render per requested target (default: a single render on the
+        # preset/--lufs path). Each target re-runs the whole chain so every file
+        # is genuinely at-spec — a stereo master can't be re-normalized after the
+        # fact without breaking the true-peak guarantee (ADR-0001).
+        masters = []
+        for suffix, tgt_ov in _resolve_master_targets(targets, preset, target_lufs):
+            m_ov = dict(base)
+            m_ov.update(tgt_ov)
+            # true-peak ceiling precedence: explicit --tp wins; else auto-tp keyed
+            # to THIS target's loudness; else the preset/keel.json ceiling stands.
+            if tp_ceiling is not None:
+                m_ov["tp_ceiling_db"] = tp_ceiling
+            elif eff_auto_tp:
+                tgt = m_ov.get("target_lufs", recipes.DEFAULT_MASTER["target_lufs"])
+                m_ov["tp_ceiling_db"] = recipes.tp_ceiling_for_lufs(tgt)
+            if ref_name:  # a reference dictates loudness -> targets don't apply
+                m_ov["reference"] = ref_name
+            recipe = recipes.master_recipe(m_ov)
+            mwav = out_dir / f"{name}_master{suffix}.wav"
+            rep = mastering.master(mix_wav, recipe, mwav,
+                                   references_dir=refs_dir, bit_depth=bit_depth,
+                                   dither=dither, dither_seed=dither_seed)
+            # keep the requested target for the report (rep['lufs'] is measured)
+            rep["target_lufs_req"] = recipe.get("target_lufs")
+            stamp = rep.get("compliance", {}).get("verdict", "")
+            ttag = f"  target:{recipe.get('target_lufs')}" if suffix else ""
+            print(f"  master -> {rep['out']}  [{rep['path']}]  "
+                  f"{rep['lufs']} LUFS  {rep['true_peak_db']} dBTP  "
+                  f"{stamp}{dtag}{ttag}")
 
-    return row if (row["mix"] or row["master"]) else None
+            # transcode this master into the extra delivery formats (no DSP re-run
+            # — the master WAV is the single source for every format).
+            if formats:
+                enc = encode.export(mwav, formats, out_dir,
+                                    f"{name}_master{suffix}",
+                                    tp_ceiling_db=recipe.get("tp_ceiling_db"))
+                rep["encoded"] = enc
+                for e in enc:
+                    kb = round(e["bytes"] / 1024)
+                    tag = "lossless" if e["lossless"] else "lossy"
+                    v = e.get("tp_verify")
+                    vtag = (f"  post-TP {v['post_tp_db']} dBTP {v['verdict']}"
+                            if v else "")
+                    print(f"  encode -> {e['out']}  [{e['format']}, {tag}, "
+                          f"{kb} KB]{vtag}")
+            masters.append(rep)
+
+        row["masters"] = masters
+        row["master"] = masters[0]                       # back-compat (primary)
+        row["target_lufs"] = masters[0].get("target_lufs_req")
+
+    return row if (row["mix"] or row.get("master")) else None
 
 
 def discover_batch(parent):
@@ -289,6 +341,44 @@ def _compliance_line(comp, ms):
     return " | ".join(parts)
 
 
+def _master_report_lines(ms, labelled=False):
+    """Render one master's QC block: loudness/true-peak vs. target with the
+    PASS/FAIL stamp, the PLR/PSR + phase-correlation meters, the per-check detail,
+    and any encoded delivery formats (with their post-codec true-peak gate).
+    `labelled` prefixes the target when a project rendered several (multi-target)."""
+    tgt = ms.get("target_lufs_req")
+    off = ("" if tgt is None or not isinstance(ms["lufs"], (int, float))
+           else f"  (target {tgt}, off by {round(ms['lufs'] - tgt, 2)} LU)")
+    comp = ms.get("compliance", {})
+    stamp = f"  —  **{comp['verdict']}**" if comp.get("verdict") else ""
+    head = f"@ {tgt} LUFS " if (labelled and tgt is not None) else ""
+    lines = [f"- Master {head}[{ms['path']}]: **{ms['lufs']} LUFS**, "
+             f"**{ms['true_peak_db']} dBTP**{off}{stamp}"]
+    dyn = []
+    if ms.get("plr") is not None:
+        dyn.append(f"PLR {ms['plr']} dB")
+    if ms.get("psr") is not None:
+        dyn.append(f"PSR {ms['psr']} dB")
+    if ms.get("correlation") is not None:
+        dyn.append(f"phase corr {ms['correlation']:+.2f}")
+    if dyn:
+        lines.append(f"  - dynamics: {' | '.join(dyn)}")
+    if comp:
+        lines.append(f"  - checks: {_compliance_line(comp, ms)}")
+    enc = ms.get("encoded")
+    if enc:
+        parts = [f"{e['format'].upper()} "
+                 f"({'lossless' if e['lossless'] else 'lossy'}, "
+                 f"{round(e['bytes'] / 1024)} KB)" for e in enc]
+        lines.append(f"  - encoded: {', '.join(parts)}")
+        verified = [e for e in enc if e.get("tp_verify")]
+        if verified:
+            vp = [f"{e['format'].upper()} {e['tp_verify']['post_tp_db']} dBTP "
+                  f"[{e['tp_verify']['verdict']}]" for e in verified]
+            lines.append(f"  - post-codec true-peak: {' | '.join(vp)}")
+    return lines
+
+
 def write_report(report, out_dir):
     """One-glance QC sheet: per-project group balance (pre/post LUFS) + master
     loudness/true-peak vs. target. Written to <out>/REPORT.md."""
@@ -312,37 +402,11 @@ def write_report(report, out_dir):
                     L.append(f"| {b['label']} | {b['files']} | {b['pre_lufs']} "
                              f"| {b['gain_db']} | {b['post_lufs']} |")
                 L.append("")
-        ms = row.get("master")
-        if ms:
-            tgt = row.get("target_lufs")
-            off = ("" if tgt is None or not isinstance(ms["lufs"], (int, float))
-                   else f"  (target {tgt}, off by {round(ms['lufs'] - tgt, 2)} LU)")
-            comp = ms.get("compliance", {})
-            stamp = f"  —  **{comp['verdict']}**" if comp.get("verdict") else ""
-            L.append(f"- Master [{ms['path']}]: **{ms['lufs']} LUFS**, "
-                     f"**{ms['true_peak_db']} dBTP**{off}{stamp}")
-            dyn = []
-            if ms.get("plr") is not None:
-                dyn.append(f"PLR {ms['plr']} dB")
-            if ms.get("psr") is not None:
-                dyn.append(f"PSR {ms['psr']} dB")
-            if ms.get("correlation") is not None:
-                dyn.append(f"phase corr {ms['correlation']:+.2f}")
-            if dyn:
-                L.append(f"  - dynamics: {' | '.join(dyn)}")
-            if comp:
-                L.append(f"  - checks: {_compliance_line(comp, ms)}")
-        enc = row.get("encoded")
-        if enc:
-            parts = [f"{e['format'].upper()} "
-                     f"({'lossless' if e['lossless'] else 'lossy'}, "
-                     f"{round(e['bytes'] / 1024)} KB)" for e in enc]
-            L.append(f"- Encoded: {', '.join(parts)}")
-            verified = [e for e in enc if e.get("tp_verify")]
-            if verified:
-                vp = [f"{e['format'].upper()} {e['tp_verify']['post_tp_db']} dBTP "
-                      f"[{e['tp_verify']['verdict']}]" for e in verified]
-                L.append(f"  - post-codec true-peak: {' | '.join(vp)}")
+        masters = row.get("masters") or ([row["master"]] if row.get("master")
+                                          else [])
+        multi = len(masters) > 1
+        for ms in masters:
+            L.extend(_master_report_lines(ms, labelled=multi))
         L.append("")
     out_path = Path(out_dir) / "REPORT.md"
     out_path.write_text("\n".join(L), encoding="utf-8")
@@ -373,6 +437,10 @@ def main(argv):
                          "overrides the mapping's target, beaten by --lufs/--tp")
     ap.add_argument("--list-presets", action=_ListPresets,
                     help="list the named loudness presets and exit")
+    ap.add_argument("--targets", metavar="LIST",
+                    help="render one master PER target in a single pass (comma "
+                         "list of preset names and/or LUFS numbers, e.g. "
+                         "'streaming,-16,loud'); each re-runs the chain at-spec")
     ap.add_argument("--lufs", type=float, metavar="LUFS",
                     help="override the mapping's master loudness target")
     ap.add_argument("--tp", type=float, metavar="dBTP",
@@ -429,6 +497,13 @@ def main(argv):
         except ValueError as e:
             ap.error(str(e))
 
+    targets = None
+    if args.targets:  # fail fast on a typo'd preset name in a target
+        try:
+            targets = _parse_targets(args.targets)
+        except ValueError as e:
+            ap.error(str(e))
+
     if args.batch:
         if not Path(args.batch).expanduser().is_dir():
             ap.error(f"--batch folder not found: {args.batch}")
@@ -453,7 +528,7 @@ def main(argv):
                 preset=args.preset, target_lufs=args.lufs, tp_ceiling=args.tp,
                 ref=args.ref, glue=args.glue, auto_tp=args.auto_tp,
                 bit_depth=args.bit_depth, dither=args.dither,
-                dither_seed=args.dither_seed, formats=formats,
+                dither_seed=args.dither_seed, formats=formats, targets=targets,
                 do_mix=do_mix, do_master=do_master)
         except (ValueError, FileNotFoundError) as e:
             print(f"  [error] {name}: {e}")

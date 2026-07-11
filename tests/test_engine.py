@@ -552,6 +552,39 @@ class TestBuildIntegration(unittest.TestCase):
             row = build.process_one(folder, out, "d", target_lufs=-9.0)
             self.assertEqual(row["master"]["compliance"]["tp_ceiling_db"], -1.0)
 
+    def test_multi_target_renders_each_at_spec(self):
+        # --targets renders one master per target, each genuinely at its own LUFS.
+        with tempfile.TemporaryDirectory() as d, \
+                tempfile.TemporaryDirectory() as out:
+            folder = _make_song(d)
+            row = build.process_one(folder, out, "song",
+                                    targets=["streaming", -16.0, "loud"])
+            self.assertEqual(len(row["masters"]), 3)
+            got = {m["target_lufs_req"]: m["lufs"] for m in row["masters"]}
+            self.assertAlmostEqual(got[-14.0], -14.0, delta=0.3)
+            self.assertAlmostEqual(got[-16.0], -16.0, delta=0.3)
+            self.assertAlmostEqual(got[-10.0], -10.0, delta=0.3)
+            # distinct, non-colliding files exist for each target
+            for suffix in ("streaming", "-16LUFS", "loud"):
+                self.assertTrue((Path(out) / f"song_master_{suffix}.wav").exists())
+            # every target passes its own compliance
+            self.assertTrue(all(m["compliance"]["verdict"] == "PASS"
+                                for m in row["masters"]))
+
+    def test_parse_targets_mixes_presets_and_numbers(self):
+        self.assertEqual(build._parse_targets("streaming,-16,loud"),
+                         ["streaming", -16.0, "loud"])
+        with self.assertRaises(ValueError):
+            build._parse_targets("streaming,nope")
+
+    def test_single_target_default_filename_unchanged(self):
+        # the default (no --targets) still writes <name>_master.wav, unsuffixed.
+        with tempfile.TemporaryDirectory() as d, \
+                tempfile.TemporaryDirectory() as out:
+            folder = _make_song(d)
+            build.process_one(folder, out, "song")
+            self.assertTrue((Path(out) / "song_master.wav").exists())
+
     def test_glue_toggle_plumbing(self):
         # The --glue/keel.json toggle must thread through to a valid render on
         # both paths (glue only audibly engages on a hot bus, an ear call left
