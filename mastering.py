@@ -217,6 +217,30 @@ def _reference_master(mix_path, ref_path, out_path, tp_ceiling_db=-1.0,
                    reference=str(ref_path), bit_depth=bit_depth, dither=dither_mode)
 
 
+def loudness_recipe_from(ref_path):
+    """Extract a DETERMINISTIC, replayable master recipe from a reference track:
+    measure its integrated loudness and return {'target_lufs': <LUFS>}.
+
+    This is the deterministic, non-ML face of 'match a reference' — it captures
+    the reference's LOUDNESS as a plain target Keel's internal chain reproduces
+    exactly on any song, needing no reference file at replay time (unlike the
+    Matchering spectral-match path, ADR-0009, which needs the file and is not
+    byte-deterministic). Loudness only: the true-peak ceiling stays Keel's safe
+    default, so a hot reference can't drag your master's ceiling into clip risk."""
+    try:
+        audio, rate = sf.read(str(ref_path), dtype="float32", always_2d=True)
+    except sf.LibsndfileError as e:
+        raise ValueError(f"{Path(ref_path).name} is not a readable audio file "
+                         f"(corrupt or unsupported): {e}") from e
+    if not np.all(np.isfinite(audio)):
+        audio = np.nan_to_num(audio, nan=0.0, posinf=0.0, neginf=0.0)
+    lufs = meters.integrated_lufs(audio, rate)
+    if not np.isfinite(lufs):
+        raise ValueError(f"{Path(ref_path).name}: can't measure loudness (silent "
+                         f"or too short) — pick a finished, mastered reference.")
+    return {"target_lufs": round(lufs, 2)}
+
+
 def master(mix_path, recipe, out_path, references_dir=None,
            bit_depth=24, dither=None, dither_seed=0):
     """Master one mix WAV. Uses Matchering if recipe['reference'] resolves to a

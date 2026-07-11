@@ -54,6 +54,8 @@ STAGE / MASTER controls:
       --format flac,mp3                   also transcode the master to these
                                           delivery formats (FLAC/MP3/OGG/AAC)
       --ref "C:\\refs\\master.wav"         match a reference (ignores --lufs)
+      --match-loudness "C:\\refs\\a.wav"   match a reference's LOUDNESS only
+                                          (deterministic, no ML; beaten by --lufs)
 
 PRESETS (named master loudness profiles, applied live at render — they override
 the mapping's master block; an explicit --lufs/--tp still wins). `--list-presets`
@@ -522,6 +524,10 @@ def main(argv):
                     help="override the mapping's true-peak ceiling")
     ap.add_argument("--ref", metavar="FILE",
                     help="reference master; if set, Keel matches it (--lufs ignored)")
+    ap.add_argument("--match-loudness", metavar="FILE", dest="match_loudness",
+                    help="deterministically match a reference's LOUDNESS: measure "
+                         "its integrated LUFS and use it as the target (internal "
+                         "chain, no ML/spectral match). Beaten by an explicit --lufs")
     ap.add_argument("--bit-depth", type=int, choices=(16, 24, 32), default=24,
                     dest="bit_depth", metavar="N",
                     help="master word length: 16/24-bit PCM or 32-bit float "
@@ -582,6 +588,16 @@ def main(argv):
             targets = _parse_targets(args.targets)
         except ValueError as e:
             ap.error(str(e))
+
+    if args.match_loudness:  # deterministically match a reference's loudness
+        try:
+            extracted = mastering.loudness_recipe_from(args.match_loudness)
+        except (ValueError, FileNotFoundError) as e:
+            ap.error(str(e))
+        if args.lufs is None:            # an explicit --lufs still wins
+            args.lufs = extracted["target_lufs"]
+            print(f"[match-loudness] {Path(args.match_loudness).name} -> "
+                  f"{args.lufs} LUFS target")
 
     if args.album:  # album mode owns its own mix+master two-pass over a batch
         if not args.batch:

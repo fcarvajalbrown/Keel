@@ -52,7 +52,7 @@ from mixer import (
 )
 
 # --- master engine -------------------------------------------------------
-from mastering import master
+from mastering import master, loudness_recipe_from
 
 # --- dithered quantization (sub-32-bit export) ---------------------------
 from dither import quantize as dither_quantize
@@ -80,7 +80,7 @@ __all__ = [
     # mix engine
     "mix", "autodetect", "group_files", "INTERNAL_ANCHOR_LUFS", "OTHER_LABEL",
     # master engine
-    "master",
+    "master", "loudness_recipe_from",
     # dither
     "dither_quantize",
     # delivery-format export

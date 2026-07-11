@@ -552,6 +552,47 @@ class TestBuildIntegration(unittest.TestCase):
             row = build.process_one(folder, out, "d", target_lufs=-9.0)
             self.assertEqual(row["master"]["compliance"]["tp_ceiling_db"], -1.0)
 
+    def test_match_loudness_extracts_deterministic_target(self):
+        # loudness_recipe_from measures a reference's integrated LUFS as a plain,
+        # replayable target (deterministic, no ML/spectral match).
+        with tempfile.TemporaryDirectory() as d:
+            ref = Path(d) / "ref.wav"
+            t = np.arange(int(SECONDS * RATE)) / RATE
+            s = (0.3 * np.sin(2 * np.pi * 440 * t)).astype(np.float32)
+            sf.write(str(ref), np.column_stack([s, s]), RATE, subtype="PCM_24")
+            rec = mastering.loudness_recipe_from(ref)
+            self.assertIn("target_lufs", rec)
+            self.assertAlmostEqual(rec["target_lufs"],
+                                   meters.integrated_lufs(np.column_stack([s, s]),
+                                                          RATE), delta=0.05)
+            # loudness only — it must NOT dictate the ceiling
+            self.assertNotIn("tp_ceiling_db", rec)
+
+    def test_match_loudness_rejects_silence(self):
+        with tempfile.TemporaryDirectory() as d:
+            ref = Path(d) / "silent.wav"
+            sf.write(str(ref), np.zeros((int(SECONDS * RATE), 2), np.float32),
+                     RATE, subtype="PCM_24")
+            with self.assertRaises(ValueError):
+                mastering.loudness_recipe_from(ref)
+
+    def test_match_loudness_drives_master_target(self):
+        # end to end: --match-loudness makes the master land at the reference's LUFS.
+        with tempfile.TemporaryDirectory() as d, \
+                tempfile.TemporaryDirectory() as out:
+            folder = _make_song(d)
+            ref = Path(d) / "ref.wav"
+            t = np.arange(int(SECONDS * RATE)) / RATE
+            s = (0.12 * np.sin(2 * np.pi * 300 * t)).astype(np.float32)  # ~-16 LUFS
+            sf.write(str(ref), np.column_stack([s, s]), RATE, subtype="PCM_24")
+            ref_lufs = meters.integrated_lufs(np.column_stack([s, s]), RATE)
+            build.main(["--stems", str(folder), "--out", out,
+                        "--match-loudness", str(ref)])
+            a, r = sf.read(str(Path(out) / f"{folder.name}_master.wav"),
+                           always_2d=True)
+            self.assertAlmostEqual(meters.integrated_lufs(a, r), ref_lufs,
+                                   delta=0.4)
+
     def test_multi_target_renders_each_at_spec(self):
         # --targets renders one master per target, each genuinely at its own LUFS.
         with tempfile.TemporaryDirectory() as d, \
