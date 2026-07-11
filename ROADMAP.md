@@ -192,7 +192,33 @@ Bring the plugin level with the GUI's reach.
 >   is safe and useful here. The CLI/GUI stays fixed so byte-identical determinism
 >   holds. No DSP-SYNC issue (reference math unchanged).
 
-### `v0.6.0-beta` — Go-to-market
+### `v0.6.0-beta` — Delivery & metering depth (approved 2026-06-22)
+An engine-side milestone: a cluster of in-scope, deterministic wins. These turn
+Keel's "loudness/TP-safe" *marketing* into a *measured guarantee* the AI-mastering
+competitors can't honestly make. None touch the master tone math, so no DSP SYNC
+obligation (except the dither seed decision).
+- [ ] **Dither (TPDF, optional noise-shaping)** at sub-32-bit export only. Needs a
+      **seeded-PRNG** carve-out so "same stems + recipe = identical output" holds
+      (dither is random by definition).
+- [ ] **Post-codec true-peak re-measure + TP-verify gate:** encode the master to
+      AAC/MP3, re-measure true-peak (lossy transcode inflates intersample peaks),
+      and assert PASS/FAIL. Read-only/advisory — never auto-reshapes the master.
+- [ ] **Multi-target one-pass export** (-14 Spotify/YT, -16 Apple, -9 club...),
+      re-running the chain per target so each file is genuinely at-spec.
+- [ ] **Encoded output formats** (decided 2026-06-22): export not just WAV but
+      **MP3 / OGG / FLAC / AAC** (and others). FLAC stays bit-exact; the lossy
+      formats are deterministic *given the same encoder version* but are NOT part
+      of the byte-identical guarantee (that stays a PCM/WAV promise). Pairs with the
+      post-codec TP re-measure above. Still **no DAW project/session files** — that
+      remains a non-goal.
+- [ ] **True-peak ceiling keyed to loudness** (-14 -> -1, -9 -> -2 dBTP) as an
+      overridable default.
+- [ ] **PASS/FAIL compliance stamp** in `out/REPORT.md` + **PLR/PSR** and
+      **phase-correlation** meters (arithmetic on values Keel already computes).
+- [ ] **Album loudness-consistency mode** for `--batch`; recipe-replayable
+      Matchering (store a reference's extracted target as a deterministic recipe).
+
+### `v0.7.0-beta` — Go-to-market
 Stand up everything a stranger needs to find, trust, and pay for Keel.
 - [ ] **Landing page** on GitHub Pages (tagline, before/after demo, download
       buttons, donate + commercial-checkout links).
@@ -220,32 +246,6 @@ Stand up everything a stranger needs to find, trust, and pay for Keel.
 > - **Free-vs-paid differentiation decision:** what does the USD 20 seat add over
 >   the free individual tier (watermark/length-cap on the unpaid path vs feature
 >   cap)? An explicit call, not a silent one.
-
-### `v0.7.0-beta` — Delivery & metering depth (approved 2026-06-22)
-An engine-side milestone: a cluster of in-scope, deterministic wins. These turn
-Keel's "loudness/TP-safe" *marketing* into a *measured guarantee* the AI-mastering
-competitors can't honestly make. None touch the master tone math, so no DSP SYNC
-obligation (except the dither seed decision).
-- [ ] **Dither (TPDF, optional noise-shaping)** at sub-32-bit export only. Needs a
-      **seeded-PRNG** carve-out so "same stems + recipe = identical output" holds
-      (dither is random by definition).
-- [ ] **Post-codec true-peak re-measure + TP-verify gate:** encode the master to
-      AAC/MP3, re-measure true-peak (lossy transcode inflates intersample peaks),
-      and assert PASS/FAIL. Read-only/advisory — never auto-reshapes the master.
-- [ ] **Multi-target one-pass export** (-14 Spotify/YT, -16 Apple, -9 club...),
-      re-running the chain per target so each file is genuinely at-spec.
-- [ ] **Encoded output formats** (decided 2026-06-22): export not just WAV but
-      **MP3 / OGG / FLAC / AAC** (and others). FLAC stays bit-exact; the lossy
-      formats are deterministic *given the same encoder version* but are NOT part
-      of the byte-identical guarantee (that stays a PCM/WAV promise). Pairs with the
-      post-codec TP re-measure above. Still **no DAW project/session files** — that
-      remains a non-goal.
-- [ ] **True-peak ceiling keyed to loudness** (-14 -> -1, -9 -> -2 dBTP) as an
-      overridable default.
-- [ ] **PASS/FAIL compliance stamp** in `out/REPORT.md` + **PLR/PSR** and
-      **phase-correlation** meters (arithmetic on values Keel already computes).
-- [ ] **Album loudness-consistency mode** for `--batch`; recipe-replayable
-      Matchering (store a reference's extracted target as a deterministic recipe).
 
 ### `v1.0.0` — Stable (signing is the last gate)
 Sign, freeze, stamp. This is the only milestone that depends on paying the fee.
@@ -322,7 +322,7 @@ plugin-grade master) and web is the only path that keeps the exact spec.
 - No stem separation — Keel receives finished stems, it does not make them.
 - No **DAW project / session file** writing (`.als`, `.logicx`, ...) — a huge
   per-DAW maintenance surface for niche benefit; the plugin masters in-DAW. (Richer
-  *audio* export — MP3/OGG/FLAC/AAC + WAV — IS now in scope, see v0.7. Revised
+  *audio* export — MP3/OGG/FLAC/AAC + WAV — IS now in scope, see v0.6. Revised
   2026-06-22.)
 
 Research-confirmed declines (2026-06-22) — competitors do these; Keel deliberately
