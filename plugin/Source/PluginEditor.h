@@ -50,6 +50,10 @@ private:
     std::unique_ptr<juce::FileChooser> referenceChooser;
 
     keel::Meter lufsMeter, tpMeter;
+    // Short-term + momentary shown as a compact secondary line under the primary
+    // (integrated) meter; the Reset button restarts the integrated measurement.
+    juce::Label      lufsSecondary;
+    juce::TextButton resetIntgButton { "Reset" };
     juce::Label exportNote;
 
     // Card backgrounds: filled in resized(), painted in paint().

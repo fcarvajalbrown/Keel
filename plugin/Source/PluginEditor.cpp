@@ -13,7 +13,7 @@ namespace
 
 KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     : AudioProcessorEditor (&p), processor (p),
-      lufsMeter ("MOMENTARY", "LUFS", -40.0f, 0.0f, look),
+      lufsMeter ("INTEGRATED", "LUFS", -40.0f, 0.0f, look),
       tpMeter   ("TRUE PEAK", "dBTP", -24.0f, 0.0f, look)
 {
     setLookAndFeel (&look);
@@ -104,21 +104,33 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     referenceClearButton.onClick = [this] { processor.clearReference(); };
 
     // --- Live meters (display-only, reading the OUTPUT) ---
+    // The primary meter reads INTEGRATED loudness -- the number streaming services
+    // normalize on -- so Makeup is aimed at the right target.
     lufsMeter.setTarget (-14.0f);
     addAndMakeVisible (lufsMeter);
+
+    lufsSecondary.setText ("Short-term  --    Momentary  --", juce::dontSendNotification);
+    lufsSecondary.setFont (look.display (10.0f));
+    lufsSecondary.setColour (juce::Label::textColourId, keel::palette::muted);
+    addAndMakeVisible (lufsSecondary);
+
+    addAndMakeVisible (resetIntgButton);
+    resetIntgButton.onClick = [this] { processor.resetIntegrated(); };
+
     tpMeter.setTarget (-1.0f);
     tpMeter.setDangerAbove (-1.0f);
     addAndMakeVisible (tpMeter);
 
     // --- Export note (no Finalize: this IS the master) ---
-    exportNote.setText ("Raise Makeup so MOMENTARY hits target, then export "
-                        "with this on.", juce::dontSendNotification);
+    exportNote.setText ("Reset, play a loud section, then raise Makeup so INTEGRATED "
+                        "sits at target -- export with this on.",
+                        juce::dontSendNotification);
     exportNote.setFont (look.display (9.0f));
     exportNote.setColour (juce::Label::textColourId, keel::palette::faint);
     exportNote.setJustificationType (juce::Justification::centredTop);
     addAndMakeVisible (exportNote);
 
-    setSize (440, 668);
+    setSize (440, 712);
     startTimerHz (30);
 }
 
@@ -143,7 +155,15 @@ void KeelAudioProcessorEditor::applyPresetToTargets()
 void KeelAudioProcessorEditor::timerCallback()
 {
     lufsMeter.setTarget (processor.apvts.getRawParameterValue ("lufs")->load());
-    lufsMeter.setValue (processor.momentaryLufs.load());
+    lufsMeter.setValue (processor.integratedLufs.load());
+
+    // Secondary line: short-term + momentary (fast context under the integrated bar).
+    auto fmtLufs = [] (float v) { return v <= -99.0f ? juce::String ("--")
+                                                     : juce::String (v, 1); };
+    const juce::String secText = "Short-term  " + fmtLufs (processor.shortTermLufs.load())
+                               + "    Momentary  " + fmtLufs (processor.momentaryLufs.load());
+    if (lufsSecondary.getText() != secText)
+        lufsSecondary.setText (secText, juce::dontSendNotification);
 
     const float tpCeil = processor.apvts.getRawParameterValue ("tp")->load();
     tpMeter.setTarget (tpCeil);
@@ -244,11 +264,16 @@ void KeelAudioProcessorEditor::resized()
     r.removeFromTop (12);
 
     // card: Meters
-    cardMeters = r.removeFromTop (170);
+    cardMeters = r.removeFromTop (206);
     {
         auto c = cardMeters.reduced (14);
         lufsMeter.setBounds (c.removeFromTop (58));
-        c.removeFromTop (12);
+        c.removeFromTop (4);
+        auto secRow = c.removeFromTop (22);
+        resetIntgButton.setBounds (secRow.removeFromRight (60));
+        secRow.removeFromRight (8);
+        lufsSecondary.setBounds (secRow);
+        c.removeFromTop (10);
         tpMeter.setBounds (c.removeFromTop (58));
     }
     r.removeFromTop (10);

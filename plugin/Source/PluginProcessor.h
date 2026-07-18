@@ -60,8 +60,21 @@ public:
 
     // Display-only meter values, written on the audio thread, read on the UI
     // thread. -100.0f means "no signal yet".
-    std::atomic<float> momentaryLufs { -100.0f };
-    std::atomic<float> truePeakDb    { -100.0f };
+    //
+    // momentary  = 400 ms K-weighted window (fast, for transients).
+    // shortTerm  = 3 s K-weighted window (BS.1770 S).
+    // integrated = whole-program gated loudness (BS.1770 I) -- THE number streaming
+    //              services normalize on, so it is what Makeup should be aimed at.
+    std::atomic<float> momentaryLufs  { -100.0f };
+    std::atomic<float> shortTermLufs  { -100.0f };
+    std::atomic<float> integratedLufs { -100.0f };
+    std::atomic<float> truePeakDb     { -100.0f };
+
+    // Reset the integrated measurement (call from the UI thread). Integrated
+    // accumulates from the last reset, so the user dials Makeup, resets, then lets
+    // a representative loud section play and reads where it lands. RT-safe: this
+    // only raises a flag the audio thread honours at the top of the next block.
+    void resetIntegrated() { integratedResetRequested.store (true); }
 
     // --- Reference loudness/peak READOUT (ADR-0035) ---
     // A user-loaded reference file is measured ONCE, offline, on a background
@@ -111,6 +124,27 @@ private:
     double windowSumSq[2] { 0.0, 0.0 };
     int    windowSamples  { 0 };
     int    windowCapacitySamples { 1 };
+
+    // 3 s short-term window, a parallel deque fed the same per-block K-weighted
+    // energies as the momentary window above.
+    std::vector<Block> stWindow;
+    double stSumSq[2] { 0.0, 0.0 };
+    int    stSamples  { 0 };
+    int    stCapacitySamples { 1 };
+
+    // Integrated loudness (BS.1770-4 gated). The 400 ms momentary energy is sampled
+    // every 100 ms as a gating block, absolute-gated at -70 LKFS, and binned into a
+    // fixed 0.1 LU histogram; the -10 LU relative gate + integrated value are then
+    // evaluated over that histogram in constant memory. Hand-rolled precisely
+    // because libebur128's integrated mode allocates per block and must stay off
+    // the audio thread (it powers the offline reference readout only).
+    std::vector<int>    intgHist;        // count per 0.1 LU bin
+    std::vector<double> intgBinEnergy;   // precomputed linear energy at each bin centre
+    int    gateHopSamples   { 1 };
+    int    samplesSinceGate { 0 };
+    std::atomic<bool> integratedResetRequested { false };
+
+    void updateIntegrated();   // recompute the integrated value from the histogram
 
     // True-peak: 4x oversample the block, take the inter-sample max. Built in
     // prepareToPlay for the host's actual channel count.

@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 #include <juce_audio_formats/juce_audio_formats.h>  // AudioFormatManager/Reader (reference readout)
 #include <ebur128.h>                                // canonical BS.1770 (reference readout)
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -17,6 +18,13 @@ namespace
     constexpr double kHpQ         = 0.5003270373253953;
 
     constexpr float kSilenceFloor = -100.0f; // dB shown as "no signal"
+
+    // Integrated-loudness histogram (BS.1770-4 gated measurement). Gating-block
+    // loudness values are binned at 0.1 LU from the -70 LKFS absolute-gate floor
+    // upward; 760 bins reach +6 LKFS, comfortably above any mastered material.
+    constexpr double kIntgMinLufs  = -70.0;
+    constexpr double kIntgBinWidth = 0.1;
+    constexpr int    kIntgNumBins  = 760;
 
     // --- LIVE master chain constants -- MIRROR of mastering.py._internal_master.
     //     DSP SYNC RULE (ADR-0027): if these change in Python, change them here too.
@@ -181,6 +189,20 @@ void KeelAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     window.clear();
     window.reserve (256);
 
+    // Short-term (3 s) window + integrated-loudness gating state.
+    stCapacitySamples = juce::jmax (1, (int) std::round (currentSampleRate * 3.0));
+    stWindow.clear();
+    stWindow.reserve (512);
+
+    gateHopSamples = juce::jmax (1, (int) std::round (currentSampleRate * 0.1));
+    intgHist.assign ((size_t) kIntgNumBins, 0);
+    intgBinEnergy.resize ((size_t) kIntgNumBins);
+    for (int b = 0; b < kIntgNumBins; ++b)
+    {
+        const double centre = kIntgMinLufs + (b + 0.5) * kIntgBinWidth;
+        intgBinEnergy[(size_t) b] = std::pow (10.0, (centre + 0.691) / 10.0);
+    }
+
     const auto numCh = (size_t) juce::jmax (1, getTotalNumOutputChannels());
     const auto block = (size_t) juce::jmax (1, samplesPerBlock);
 
@@ -246,9 +268,52 @@ void KeelAudioProcessor::resetMeters()
     window.clear();
     windowSumSq[0] = windowSumSq[1] = 0.0;
     windowSamples = 0;
+    stWindow.clear();
+    stSumSq[0] = stSumSq[1] = 0.0;
+    stSamples = 0;
+    std::fill (intgHist.begin(), intgHist.end(), 0);
+    samplesSinceGate = 0;
+    integratedResetRequested.store (false);
     truePeakHold = 0.0f;
     momentaryLufs.store (kSilenceFloor);
+    shortTermLufs.store (kSilenceFloor);
+    integratedLufs.store (kSilenceFloor);
     truePeakDb.store (kSilenceFloor);
+}
+
+// Recompute the integrated loudness from the gating-block histogram: the -10 LU
+// relative gate is applied on top of the -70 LKFS absolute gate (all binned blocks
+// already clear the absolute gate), then integrated = mean energy of the surviving
+// blocks, expressed as LKFS. Called on the audio thread every 100 ms; the histogram
+// is only ever written on the audio thread, so this needs no lock.
+void KeelAudioProcessor::updateIntegrated()
+{
+    long long total = 0;
+    double sumEnergy = 0.0;
+    for (int b = 0; b < kIntgNumBins; ++b)
+    {
+        const int c = intgHist[(size_t) b];
+        if (c > 0) { total += c; sumEnergy += (double) c * intgBinEnergy[(size_t) b]; }
+    }
+    if (total <= 0) { integratedLufs.store (kSilenceFloor); return; }
+
+    const double meanAbs   = sumEnergy / (double) total;
+    const double relThresh = (-0.691 + 10.0 * std::log10 (meanAbs)) - 10.0;
+    int relBin = (int) std::floor ((relThresh - kIntgMinLufs) / kIntgBinWidth);
+    relBin = juce::jlimit (0, kIntgNumBins, relBin);
+
+    long long countRel   = 0;
+    double    sumEnergyRel = 0.0;
+    for (int b = relBin; b < kIntgNumBins; ++b)
+    {
+        const int c = intgHist[(size_t) b];
+        if (c > 0) { countRel += c; sumEnergyRel += (double) c * intgBinEnergy[(size_t) b]; }
+    }
+    if (countRel <= 0) { integratedLufs.store (kSilenceFloor); return; }
+
+    const double meanRel = sumEnergyRel / (double) countRel;
+    integratedLufs.store (juce::jmax (kSilenceFloor,
+        (float) (-0.691 + 10.0 * std::log10 (meanRel))));
 }
 
 void KeelAudioProcessor::loadReference (const juce::File& file)
@@ -380,6 +445,14 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // --- Below we only MEASURE the OUTPUT; we never write to the buffer. ---
 
+    // Honour a pending integrated reset before folding in this block's energy.
+    if (integratedResetRequested.exchange (false))
+    {
+        std::fill (intgHist.begin(), intgHist.end(), 0);
+        samplesSinceGate = 0;
+        integratedLufs.store (kSilenceFloor);
+    }
+
     // 1) Momentary LUFS over a 400 ms sliding window (K-weighted mean square).
     Block blk { { 0.0, 0.0 }, numSamples };
     for (int ch = 0; ch < juce::jmin (numCh, 2); ++ch)
@@ -418,6 +491,49 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             ? (float) (-0.691 + 10.0 * std::log10 (z))
             : kSilenceFloor;
         momentaryLufs.store (juce::jmax (kSilenceFloor, lufs));
+    }
+
+    // 1b) Short-term LUFS over a 3 s window (same K-weighted block energies).
+    stWindow.push_back (blk);
+    stSumSq[0] += blk.sumSq[0];
+    stSumSq[1] += blk.sumSq[1];
+    stSamples  += numSamples;
+    while (stSamples - stWindow.front().numSamples >= stCapacitySamples
+           && stWindow.size() > 1)
+    {
+        const Block& old = stWindow.front();
+        stSumSq[0] -= old.sumSq[0];
+        stSumSq[1] -= old.sumSq[1];
+        stSamples  -= old.numSamples;
+        stWindow.erase (stWindow.begin());
+    }
+    if (stSamples > 0)
+    {
+        const double z = (stSumSq[0] + stSumSq[1]) / (double) stSamples;
+        shortTermLufs.store (z > 1.0e-12
+            ? juce::jmax (kSilenceFloor, (float) (-0.691 + 10.0 * std::log10 (z)))
+            : kSilenceFloor);
+    }
+
+    // 1c) Integrated LUFS: once the 400 ms window is full, take its energy as a
+    //     BS.1770 gating block every 100 ms, absolute-gate at -70 LKFS, bin it, and
+    //     re-evaluate the gated integrated loudness.
+    samplesSinceGate += numSamples;
+    if (samplesSinceGate >= gateHopSamples && windowSamples >= windowCapacitySamples)
+    {
+        samplesSinceGate = 0;
+        const double z = (windowSumSq[0] + windowSumSq[1]) / (double) windowSamples;
+        if (z > 1.0e-12)
+        {
+            const double l = -0.691 + 10.0 * std::log10 (z);
+            if (l >= kIntgMinLufs)
+            {
+                int b = (int) std::floor ((l - kIntgMinLufs) / kIntgBinWidth);
+                b = juce::jlimit (0, kIntgNumBins - 1, b);
+                ++intgHist[(size_t) b];
+                updateIntegrated();
+            }
+        }
     }
 
     // 2) True peak: 4x oversample, inter-sample max, with a decay hold.
