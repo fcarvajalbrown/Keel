@@ -55,7 +55,12 @@ Status values: `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 - [ADR-0035](0035-plugin-reference-readout.md) — Plugin Reference control is a passive loudness/peak readout (no live match; Matchering stays the offline path)
 
 ### Scope refinements (post-research, 2026-06-22)
-- [ADR-0031](0031-master-tilt-knob-carveout.md) — Master-tone carve-out: one broadband tilt knob allowed (post-1.0); M/S EQ + multiband stay out
+- [ADR-0031](0031-master-tilt-knob-carveout.md) — Master-tone carve-out: one broadband tilt knob allowed; M/S EQ + multiband stay out *(scheduling superseded by ADR-0037)*
 - [ADR-0032](0032-encoded-export-formats.md) — Encoded export formats (MP3/OGG/FLAC/AAC); DAW project files stay a non-goal
 - [ADR-0033](0033-plugin-oversampling-selector.md) — Oversampling selector on the plugin live chain only; CLI/GUI stays fixed
 - [ADR-0034](0034-v2-reach-and-no-llm.md) — v2.0 reach (Android→iOS→web) + no Apple-Intelligence/LLM (separate product)
+
+### Release ladder redesign (2026-07-18)
+- [ADR-0036](0036-release-ladder-v07-to-v10.md) — Road to 1.0 restructured: v0.7 plugin depth → v0.8 DSP carve-outs → v0.9 DSP settle → v1.0 launch + freeze
+- [ADR-0037](0037-stereo-width-and-tilt-into-v08.md) — Stereo-width + tilt knob promoted from post-1.0 into v0.8 (opt-in, DSP-SYNC mirrored)
+- [ADR-0038](0038-dsp-parity-harness-freeze-gate.md) — Automated Python↔C++ DSP parity harness as the v0.9 freeze gate

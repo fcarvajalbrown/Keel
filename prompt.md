@@ -7,6 +7,29 @@ real-world material; the GUI scaffold + cross-platform builds now exist too.
 
 ## >>> START HERE — immediate next task
 
+**This session (2026-07-18) — road to 1.0 RESTRUCTURED (ADR-0036/0037/0038); no
+code yet.** The old plan was `v0.7` go-to-market → `v1.0` sign+freeze, with
+stereo-width + tilt parked post-1.0. New plan (decided with the user via the option
+UI): the remaining betas are **`v0.7` plugin depth → `v0.8` DSP carve-outs → `v0.9`
+DSP settle**, then **`v1.0` launch + freeze** (go-to-market folded into 1.0). The
+point: all DSP work finishes by `v0.8` and spends `v0.9` proving stable, so the 1.0
+freeze stays clean. Written into `ROADMAP.md` + ADR-0036/0037/0038 + ADR index;
+ADR-0031's *scheduling* superseded (its scope stands). **>>> IMMEDIATE NEXT TASK:
+build `v0.7.0-beta` — plugin depth (the user is handing this to me):**
+- **Metering/credibility (plugin):** integrated + short-term LUFS (the headline fix
+  — Makeup is aimed at a momentary meter today while streaming judges integrated),
+  LRA, loudness-history graph, gain-reduction history, true-peak peak-hold,
+  loudness-matched A/B bypass.
+- **UX/QoL (plugin):** hiDPI resize, undo/redo, user presets, tooltips + first-run
+  note, host-automation plumbing, accessibility labels. NO OpenGL/GPU.
+- **Oversampling-quality selector** (ADR-0033) — plugin-only; CLI/GUI stays fixed.
+- **GUI mirror:** loudness-matched A/B + richer post-render meters (LRA) into
+  `gui.py`.
+- **No master-tone math changes in v0.7 → no DSP SYNC.** Confirm scope/approach with
+  the user via the option UI before writing plugin code. Then `v0.8` = stereo-width
+  + tilt (opt-in, DSP-SYNC mirrored), `v0.9` = parity harness + golden tests +
+  frozen-DSP spec, `v1.0` = go-to-market + signing + freeze. See `ROADMAP.md`.
+
 **This session (2026-07-11) — `v0.6.0-beta` "Delivery & metering depth" SHIPPED
 (engine milestone).** All seven roadmap items landed as atomic commits + tests,
 CI-verified green, tag `v0.6.0-beta` pushed. **No master tone math changed

@@ -1,6 +1,6 @@
 # ADR-0031: Master-tone carve-out — a single broadband tilt knob
 
-- Status: Accepted
+- Status: Scheduling superseded by ADR-0037 (scope stands)
 - Date: 2026-06-22
 - Deciders: Felipe Carvajal Brown
 

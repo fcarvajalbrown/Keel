@@ -33,14 +33,24 @@ code stubs left — the remaining distance to a stable **1.0** is about
   re-measure gate; multi-target one-pass export; an opt-in loudness-keyed TP
   ceiling; album loudness-consistency mode; and deterministic reference-loudness
   matching. Suite **39 → 73**.
-- **Reach** — no landing page, no live donation / commercial-checkout links, no
-  trademark check, `README.es` is condensed not full (`v0.7`).
-- **Launch** — the installers and the plugin are **unsigned** (SmartScreen /
-  Gatekeeper warnings); signing needs the publication fee paid (`v1.0`).
+- **Plugin depth** — the plugin's by-ear Makeup gain is steered by a *momentary*
+  LUFS meter while streaming normalizes on *integrated* LUFS, so users aim at the
+  wrong number; the metering/UX depth that fixes that (plus the decided
+  oversampling selector) is unbuilt (`v0.7`).
+- **DSP feature-complete** — the two sanctioned master-tone widenings
+  (deterministic stereo-width, one broadband tilt knob) are still unbuilt (`v0.8`)
+  and then locked/parity-proven (`v0.9`) before the freeze.
+- **Launch** — no landing page, no live donation / commercial-checkout links, no
+  trademark check, `README.es` is condensed not full; and the installers + plugin
+  are **unsigned** (SmartScreen / Gatekeeper warnings). All of this lands together
+  at `v1.0` (signing needs the publication fee paid).
 
-The road from here to 1.0 is staged as **betas** (`v0.4` → `v0.5` → `v0.6` →
-`v0.7`), then the **`v1.0.0`** stamp. The GUI and the plugin are **versioned in
-lockstep** — one version number, bumped together (see CLAUDE.md "Versioning").
+The road from here to 1.0 was restructured (2026-07-18, ADR-0036): the remaining
+betas are **`v0.7` plugin depth → `v0.8` DSP carve-outs → `v0.9` DSP settle**, then
+the **`v1.0.0`** launch + freeze + stamp (go-to-market folds into 1.0). Staged as
+betas (`v0.4` → `v0.5` → `v0.6` → `v0.7` → `v0.8` → `v0.9`), then the stamp. The
+GUI and the plugin are **versioned in lockstep** — one version number, bumped
+together (see CLAUDE.md "Versioning").
 
 ---
 
@@ -113,9 +123,13 @@ Condensed history; the *why* for each lives in [`docs/adr/`](docs/adr/).
 
 ## Road to 1.0
 
-Five milestones. Each is a real release, revertable in isolation; the betas are
-publishable so changes can be tested in stages. **Code-signing is deliberately
-the very last step** — it gates only the `v1.0.0` stamp, nothing before it.
+Staged milestones — `v0.4` → `v0.5` → `v0.6` (shipped) → `v0.7` → `v0.8` → `v0.9`
+→ `v1.0.0`. Each is a real release, revertable in isolation; the betas are
+publishable so changes can be tested in stages. The ordering after `v0.6` was
+restructured on 2026-07-18 (ADR-0036) so all DSP work finishes by `v0.8` and
+spends `v0.9` proving stable, keeping the DSP freeze clean. **Code-signing is
+deliberately the very last step** — it gates only the `v1.0.0` stamp, nothing
+before it.
 
 ### `v0.4.0-beta` — Harden & CI (trust every build)  ✓ shipped
 Made the build trustworthy before adding reach.
@@ -230,8 +244,66 @@ change). Test suite **39 → 73**.
       extracts a reference's integrated LUFS as a plain, replayable target — the
       non-ML face of reference matching; the spectral match stays offline Matchering).
 
-### `v0.7.0-beta` — Go-to-market
-Stand up everything a stranger needs to find, trust, and pay for Keel.
+### `v0.7.0-beta` — Plugin depth (metering + UX)  (ADR-0036)
+Turn the plugin from "works" into "trustworthy and pro-grade". The credibility
+gap: Makeup is steered by a *momentary* LUFS meter while streaming judges
+*integrated* LUFS, so users aim at the wrong number. **All meter/UI/packaging — no
+master-tone math changes, so no DSP SYNC in this milestone.**
+- [ ] **Metering / credibility (plugin):** integrated + short-term LUFS meters
+      (the headline fix), **LRA** readout, a **loudness-history graph**,
+      **gain-reduction history**, **true-peak peak-hold**, and a
+      **loudness-matched A/B bypass** (proves *character*, not just level — Keel
+      deliberately raises loudness).
+- [ ] **UX / quality-of-life (plugin):** hiDPI resize, undo/redo, user presets,
+      tooltips + a first-run note (delivery-by-DAW-export is non-obvious),
+      host-automation plumbing, accessibility labels. **No OpenGL/GPU** (it worsens
+      JUCE VST3 hiDPI scaling — see non-goals).
+- [ ] **Oversampling-quality selector** on the plugin's live chain (ADR-0033) —
+      plugin-only; the CLI/GUI stays fixed so byte-identical determinism holds.
+- [ ] **GUI mirror:** bring the useful additions into `gui.py` too —
+      loudness-matched A/B and richer post-render meters (LRA alongside the
+      existing PLR/PSR + phase-correlation).
+
+### `v0.8.0-beta` — DSP carve-outs (stereo-width + tilt)  (ADR-0037)
+The two sanctioned master-tone widenings, promoted from post-1.0. Both **opt-in /
+off-by-default** so the deterministic default master and the "printed image
+preserved" promise are unchanged. Both touch the master math, so **each carries a
+DSP-SYNC mirror into the plugin C++ chain (ADR-0029) and an A/B re-check.**
+- [ ] **Deterministic stereo-width** — a flat linear M/S side-gain (NOT EQ),
+      placed **before** the true-peak limiter so the -1 dBTP guarantee holds. Off
+      by default (side-gain = 1.0). Lands in `mastering.py` / `recipes.py` + mirror.
+- [ ] **Single broadband tilt knob** — one deterministic brighter/darker curve on
+      the master; NOT per-band, NOT M/S (those stay non-goals). Neutral by default
+      (tilt = 0). Lands in `mastering.py` / `recipes.py` + mirror.
+- [ ] Note the DSP-SYNC in the commits; leave settling/parity proof to `v0.9`.
+
+### `v0.9.0-beta` — DSP settle & freeze-prep  (ADR-0038)
+No new master math. Prove the v0.8 carve-outs stable and the two implementations
+in sync, so the 1.0 freeze stamps an already-settled engine. This milestone is the
+"solution" that lets the carve-outs land pre-1.0 without endangering the freeze.
+- [ ] **Automated Python↔C++ parity harness** — render a fixed battery of test
+      signals through `mastering.py` and through a small **headless C++ render**
+      built from the plugin sources; measure the deltas (integrated LUFS,
+      true-peak, coarse spectral/RMS-per-band) and **assert each within tolerance**;
+      wire it into CI. Tolerance-based, not a null (the C++ limiter won't null
+      pedalboard's, ADR-0029). Turns the manual DSP SYNC promise into a gate.
+- [ ] **Golden-file regression tests** for stereo-width + tilt at representative
+      settings (incl. off/neutral), locking their output against drift.
+- [ ] **True-peak stress validation** with width + tilt engaged at extreme settings
+      across the real deliveries — the -1 dBTP guarantee must still hold.
+- [ ] **Written frozen-DSP spec sheet** — every master stage, coefficient, and
+      order — the precise reference the 1.0 freeze is declared against.
+- [ ] **By-ear A/B sign-off** on the carve-outs (Python render vs plugin) — user
+      task.
+- [ ] **Freeze-candidate ADR** declaring the DSP ready to freeze and naming the
+      residual parity tolerance as a measured quantity.
+
+### `v1.0.0` — Launch + Stable (go-to-market + signing, the last gate)
+The public debut: stand up everything a stranger needs to find, trust, and pay for
+Keel, then sign, freeze, and stamp. Go-to-market moved here from the original
+`v0.7` (ADR-0036). Signing is the only part that depends on paying the fee.
+
+**Go-to-market:**
 - [ ] **Landing page** on GitHub Pages (tagline, before/after demo, download
       buttons, donate + commercial-checkout links).
 - [ ] Stand up **donation + commercial-license checkout** links (PayPal donate;
@@ -242,8 +314,8 @@ Stand up everything a stranger needs to find, trust, and pay for Keel.
       presets table, project structure, library/tests/GUI-build sections).
 - [ ] Before/after demo audio from the user's **own** material (publish-safe).
 
-> **Candidates (2026-06-22 research sweep, not committed).** Sharpen the existing
-> items with what indie audio devs actually find works:
+> **Go-to-market candidates (2026-06-22 research sweep, not committed).** Sharpen
+> the items above with what indie audio devs actually find works:
 > - **Before/after A-B audio player** is the single highest-leverage conversion
 >   asset (and the artifact reviewers reuse) — must be honestly level-matched.
 > - For checkout, prefer a **Merchant-of-Record** (Lemon Squeezy / Paddle, ~5% +
@@ -259,14 +331,14 @@ Stand up everything a stranger needs to find, trust, and pay for Keel.
 >   the free individual tier (watermark/length-cap on the unpaid path vs feature
 >   cap)? An explicit call, not a silent one.
 
-### `v1.0.0` — Stable (signing is the last gate)
-Sign, freeze, stamp. This is the only milestone that depends on paying the fee.
+**Sign, freeze, stamp:**
 - [ ] **Windows Authenticode** signing of the installer + `Keel.exe` (removes the
       SmartScreen "unknown publisher" warning).
 - [ ] **Apple notarization** of `Keel.app` / `.dmg` and the macOS plugin (removes
       the Gatekeeper warning).
-- [ ] Drop the `-alpha`/`-beta` tag; **freeze the DSP** (note the two-disconnected-
-      impls risk per the DSP SYNC RULE before declaring it frozen).
+- [ ] Drop the `-alpha`/`-beta` tag; **freeze the DSP** — the two-disconnected-
+      impls risk (DSP SYNC RULE) is discharged by the `v0.9` parity harness +
+      frozen-DSP spec sheet (ADR-0038), so this stamps an already-settled engine.
 - [ ] Final docs/links sweep so nothing points at a stale version or asset URL
       (part of every release per CLAUDE.md "Versioning (STRICT)").
 - [ ] Tag **`v1.0.0`** covering the GUI + plugin **in lockstep**.
@@ -282,17 +354,10 @@ Sign, freeze, stamp. This is the only milestone that depends on paying the fee.
 
 ## Post-1.0 (later polish, not blocking)
 Ordered by value/likelihood (most valuable first):
-- **Deterministic stereo-width** (opt-in, off by default) — the one real *feature*
-  here: a flat linear M/S side-gain (NOT EQ; fully deterministic), placed *before*
-  the true-peak limiter so the TP guarantee holds. It changes the "printed image
-  preserved" default, so it stays opt-in; it touches the master math, so it carries
-  a DSP-SYNC mirror to the plugin — kept post-1.0 to stay clear of the 1.0 DSP
-  freeze. [decided 2026-06-22]
-- **Single broadband master tilt knob** (opt-in) — one deterministic
-  brighter/darker control on the master, NOT per-band and NOT M/S (those stay
-  non-goals). The one allowed widening of master tone beyond the existing fixed
-  tilt; touches master math, so it carries a DSP-SYNC mirror and is kept post-1.0
-  past the DSP freeze. [decided 2026-06-22]
+> **Moved earlier (2026-07-18, ADR-0037):** deterministic **stereo-width** and the
+> single broadband **tilt knob** were promoted from here into **`v0.8.0-beta`** so
+> 1.0 ships feature-complete; a dedicated `v0.9` settle milestone (ADR-0038) guards
+> the freeze. They are no longer post-1.0.
 - **macOS `.pkg` installer + Linux frozen binary** — distribution reach; the script
   already runs on Linux, so the binary is low-effort.
 - **Formal legal review of the dual-license texts** — do once commercial traction
