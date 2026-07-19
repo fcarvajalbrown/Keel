@@ -49,13 +49,16 @@ puede) mezclar y masterizar a mano: un comando, listo. El **ingeniero** que
 quiere una etapa de balance+máster determinista y scriptable dentro de un
 pipeline: objetivos de LUFS exactos, un medidor real de true peak sobremuestreado,
 reproducible a la muestra, con un reporte de control de calidad en cada corrida.
-La meta a largo plazo es una **GUI de escritorio** y un **VST/plugin** sobre el
-mismo motor — ver [`ROADMAP.md`](ROADMAP.md).
+Keel también viene como una **app de escritorio (GUI)** y un **plugin VST3 / AU**
+sobre el mismo motor determinista, así que puedes mezclar y masterizar desde una
+ventana de escritorio o dentro de tu DAW — ver [`ROADMAP.md`](ROADMAP.md).
 
 > Palabras clave: mezcla automática, masterización automática, normalización de
-> loudness, LUFS, true peak, ITU-R BS.1770-4, balance de stems, limitador,
-> cadena de máster, audio determinista, reproducible, audio en Python,
-> VST (planeado).
+> loudness, medidor de LUFS, LUFS integrado, short-term LUFS, rango de loudness
+> (LRA), limitador de true peak, ITU-R BS.1770-4, balance de stems, cadena de
+> máster, medidor de reducción de ganancia, audio determinista, masterización
+> reproducible, audio en Python, **plugin VST3**, **plugin AU**, masterización en
+> DAW, plugin de bus máster, Logic Pro, GarageBand.
 
 ---
 
@@ -71,6 +74,7 @@ mismo motor — ver [`ROADMAP.md`](ROADMAP.md).
 | **Masterización** | Cadena interna clip -> limit, **o** igualar una referencia comercial (Matchering) |
 | **Determinismo** | Mismas entradas -> salida **idéntica**. Sin ML, sin aleatoriedad en el render |
 | **Tono** | **Intacto** — Keel balancea y masteriza; nunca re-ecualiza tus stems |
+| **Front-ends** | **CLI**, app de escritorio (**GUI**) y **plugin VST3 / AU** — un solo motor determinista compartido |
 
 ---
 
@@ -162,18 +166,61 @@ vistazo para confirmar que aterrizó.
 
 ---
 
+## Plugin (VST3 / AU) — masteriza dentro de tu DAW
+
+Keel también viene como un **plugin de masterización en tiempo real y
+autocontenido**: ponlo en tu bus máster, ajústalo contra medidores en vivo y
+entrega exportando/bounceando desde tu DAW con el plugin activo — no hay un paso de
+render aparte. Corre un port fiel en C++ de la cadena de máster del motor (tono ->
+drive Makeup -> soft-clip sobremuestreado -> limitador de true peak 4x), así que lo
+que monitoreas es el máster.
+
+- **Formatos:** **VST3** (Windows + macOS) y **AU** (macOS — Logic Pro /
+  GarageBand), ambos compilados y probados con pluginval en CI, versionados en
+  bloque con la app.
+- **Medición, pensada para streaming:** **LUFS integrado + short-term + momentáneo**
+  (BS.1770-4) — apunta el Makeup al *integrado*, el número que normalizan Spotify /
+  YouTube / Apple — más **rango de loudness (LRA)**, un **historial de loudness** y
+  un **historial de reducción de ganancia** con scroll, un **peak-hold de true
+  peak**, y un **A/B igualado en loudness** para escuchar el *carácter*, no solo el
+  nivel. Carga una referencia para ver su LUFS integrado / true peak junto a los
+  medidores en vivo.
+- **Flujo / comodidades:** escalado hiDPI, deshacer/rehacer, presets de usuario,
+  tooltips + nota de primer uso, automatización del host y etiquetas de
+  accesibilidad, y un selector de **sobremuestreo 2x / 4x / 8x** solo del plugin
+  (CPU vs. supresión de aliasing).
+- **Spec exacto vs. máster en vivo:** el archivo byte-idéntico de **-14 LUFS /
+  -1 dBTP** vive en la app / CLI; el plugin cambia esa exactitud por un máster en
+  vivo autocontenido (el streaming re-normaliza el loudness de todos modos, y el
+  techo de true peak se aplica en vivo, así que los exports quedan seguros de picos).
+
+**Descarga:** toma `Keel-VST3-windows-<ver>.zip` (Windows) o
+`Keel-plugins-macos-<ver>.zip` (macOS VST3 + AU) desde la
+[última release](https://github.com/fcarvajalbrown/Keel/releases/latest),
+descomprime en tu carpeta de plugins y reescanea en tu DAW. Beta sin firmar (aviso
+de Gatekeeper / SmartScreen en el primer uso).
+
+---
+
 ## Hacia dónde va Keel
 
-Hoy Keel es una herramienta de línea de comandos. La misión es llegar a
-cualquier músico sobre el mismo motor determinista:
+Keel empezó como una herramienta de línea de comandos y hoy también viene como una
+**app de escritorio (GUI)** y un **plugin VST3 / AU** sobre el mismo motor
+determinista — el núcleo DSP está hecho y validado, y los tres front-ends usan una
+sola librería compartida (el DSP nunca se bifurca). Lo que falta antes de un **1.0**
+estable:
 
-1. **GUI de escritorio** — arrastra una carpeta de stems, ve las etiquetas y los
-   medidores de loudness, obtén tu mezcla + máster.
-2. **VST / plugin** — corre la etapa de balance + máster de Keel dentro de tu DAW.
+1. **Extensiones de DSP** — las dos opciones de tono sancionadas: un control
+   determinista de **ancho estéreo** y una única perilla de **tilt** de banda ancha,
+   ambas opcionales y apagadas por defecto para no cambiar el máster por defecto.
+2. **Asentar el DSP** — un arnés de paridad Python↔C++ + tests de archivo dorado
+   que fijan la cadena en vivo del plugin al motor antes de congelar el DSP.
+3. **Lanzamiento** — landing page, firma de código / notarización (quita los avisos
+   de SmartScreen / Gatekeeper) y el sello 1.0.
 
-El núcleo DSP está hecho y validado. Ver [`ROADMAP.md`](ROADMAP.md) para el plan
-y [`docs/adr/`](docs/adr/) para los registros de decisión (por qué el motor, la
-configuración, el toolkit, la licencia y el empaquetado son como son).
+Ver [`ROADMAP.md`](ROADMAP.md) para el plan por etapas y [`docs/adr/`](docs/adr/)
+para los registros de decisión (por qué el motor, la configuración, el toolkit, la
+licencia y el empaquetado son como son).
 
 ---
 
