@@ -85,6 +85,11 @@ public:
     void setValue (float v);       // pass -100 (or below floor) for "no signal"
     void setHold (float h);        // latched peak-hold marker; -100 hides it
 
+    // Read-only accessible value ("-14.0 LUFS" / "no signal") for screen readers,
+    // since the readout is painted (not a Label).
+    juce::String accessibleValueString() const;
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
     void paint (juce::Graphics&) override;
 
 private:
@@ -118,10 +123,15 @@ public:
     void push (float v);            // newest sample; <= -99 => gap
     void clearHistory();
 
+    // Read-only accessible "current value" of the scrolling trace.
+    juce::String accessibleValueString() const;
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
     void paint (juce::Graphics&) override;
 
 private:
     float frac (float v) const;
+    float currentSample() const;    // most recent non-gap sample, or -100
 
     juce::String title, unit;
     float vmin, vmax;

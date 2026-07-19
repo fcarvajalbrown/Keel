@@ -1,9 +1,24 @@
 #include "KeelLookAndFeel.h"
 #include "BinaryData.h"
 #include <algorithm>
+#include <functional>
 
 namespace keel
 {
+
+// A read-only text value interface backed by a std::function, so painted meters
+// and graphs can expose their live readout to screen readers.
+class ReadonlyTextValue : public juce::AccessibilityTextValueInterface
+{
+public:
+    explicit ReadonlyTextValue (std::function<juce::String()> getter)
+        : get (std::move (getter)) {}
+    bool isReadOnly() const override { return true; }
+    juce::String getCurrentValueAsString() const override { return get ? get() : juce::String(); }
+    void setValueAsString (const juce::String&) override {}
+private:
+    std::function<juce::String()> get;
+};
 
 // --- find a bundled .ttf whose original filename contains `match` ---
 static juce::Typeface::Ptr loadFace (const char* match)
@@ -204,6 +219,19 @@ void Meter::setHold (float h)
     repaint();
 }
 
+juce::String Meter::accessibleValueString() const
+{
+    return hasValue ? juce::String (value, 1) + " " + unit : "no signal";
+}
+
+std::unique_ptr<juce::AccessibilityHandler> Meter::createAccessibilityHandler()
+{
+    return std::make_unique<juce::AccessibilityHandler> (
+        *this, juce::AccessibilityRole::staticText, juce::AccessibilityActions{},
+        juce::AccessibilityHandler::Interfaces {
+            std::make_unique<ReadonlyTextValue> ([this] { return accessibleValueString(); }) });
+}
+
 float Meter::frac (float v) const
 {
     return juce::jlimit (0.0f, 1.0f, (v - vmin) / (vmax - vmin));
@@ -303,6 +331,31 @@ float HistoryGraph::frac (float v) const
     return juce::jlimit (0.0f, 1.0f, (v - vmin) / (vmax - vmin));
 }
 
+float HistoryGraph::currentSample() const
+{
+    for (int i = 0; i < count; ++i)
+    {
+        const int idx = ((head - 1 - i) % capacity + capacity) % capacity;
+        if (buf[(size_t) idx] > -99.0f)
+            return buf[(size_t) idx];
+    }
+    return -100.0f;
+}
+
+juce::String HistoryGraph::accessibleValueString() const
+{
+    const float v = currentSample();
+    return v <= -99.0f ? "no signal" : juce::String (v, 1) + " " + unit;
+}
+
+std::unique_ptr<juce::AccessibilityHandler> HistoryGraph::createAccessibilityHandler()
+{
+    return std::make_unique<juce::AccessibilityHandler> (
+        *this, juce::AccessibilityRole::staticText, juce::AccessibilityActions{},
+        juce::AccessibilityHandler::Interfaces {
+            std::make_unique<ReadonlyTextValue> ([this] { return accessibleValueString(); }) });
+}
+
 void HistoryGraph::paint (juce::Graphics& g)
 {
     const float w = (float) getWidth(), h = (float) getHeight();
@@ -329,13 +382,8 @@ void HistoryGraph::paint (juce::Graphics& g)
         g.drawDashedLine ({ plot.getX(), ty, plot.getRight(), ty }, dash, 2, 1.0f);
     }
 
-    // newest value (top-right readout); find the most recent non-gap sample
-    float current = -100.0f;
-    for (int i = 0; i < count; ++i)
-    {
-        const int idx = ((head - 1 - i) % capacity + capacity) % capacity;
-        if (buf[(size_t) idx] > -99.0f) { current = buf[(size_t) idx]; break; }
-    }
+    // newest value (top-right readout)
+    const float current = currentSample();
     g.setColour (palette::muted);
     g.setFont (look.display (8.5f));
     g.drawText (title, juce::Rectangle<float> (6.0f, 0.0f, w, topStrip),

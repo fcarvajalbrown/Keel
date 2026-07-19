@@ -145,6 +145,30 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     exportNote.setJustificationType (juce::Justification::centredTop);
     addAndMakeVisible (exportNote);
 
+    // --- Accessibility: name + describe every control and painted meter so
+    //     screen readers can announce them (the painted meters/graphs expose their
+    //     live value via createAccessibilityHandler; see KeelLookAndFeel).
+    presetBox.setTitle ("Preset");
+    presetBox.setHelpText ("Loudness preset; sets target LUFS and true-peak ceiling");
+    lufsSlider.setTitle ("Target LUFS");
+    lufsSlider.setHelpText ("Target integrated loudness the meter aims at");
+    tpSlider.setTitle ("True-peak ceiling");
+    tpSlider.setHelpText ("Maximum true-peak the limiter holds, in dBTP");
+    makeupSlider.setTitle ("Makeup");
+    makeupSlider.setHelpText ("Drive into the clip and limiter; raise until integrated sits at target");
+    glueToggle.setTitle ("Bus glue");
+    glueToggle.setHelpText ("Master glue compressor; on matches the CLI/GUI master");
+    abToggle.setTitle ("A/B matched bypass");
+    abToggle.setHelpText ("Monitor the dry input loudness-matched to the master");
+    resetIntgButton.setTitle ("Reset meters");
+    resetIntgButton.setHelpText ("Reset integrated loudness, loudness range, peak-hold and the graphs");
+    referenceLoadButton.setTitle ("Load reference");
+    referenceClearButton.setTitle ("Clear reference");
+    lufsMeter.setTitle ("Integrated loudness");
+    tpMeter.setTitle ("True peak");
+    loudnessGraph.setTitle ("Loudness history");
+    grGraph.setTitle ("Gain-reduction history");
+
     setSize (440, 882);
     startTimerHz (30);
 }
