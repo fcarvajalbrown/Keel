@@ -27,6 +27,7 @@ public:
 
 private:
     void timerCallback() override;
+    void paintCards (juce::Graphics&);      // background + card panels (scaled content)
 
     void showFirstRunNoteIfNeeded();
 
@@ -35,6 +36,17 @@ private:
     void showUserPresetMenu();
     void saveUserPreset();
     void loadUserPreset (const juce::File&);
+
+    // hiDPI: the whole UI is laid out at a fixed logical size and scaled by an
+    // AffineTransform on this holder (software renderer, no OpenGL -- see non-goals).
+    static constexpr int kDesignW = 440;
+    static constexpr int kDesignH = 918;
+    struct ContentPanel : juce::Component
+    {
+        std::function<void (juce::Graphics&)> onPaint;
+        void paint (juce::Graphics& g) override { if (onPaint) onPaint (g); }
+    };
+    ContentPanel contentHolder;
 
     KeelAudioProcessor& processor;
     keel::KeelLookAndFeel look;

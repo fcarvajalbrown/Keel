@@ -210,7 +210,24 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     loudnessGraph.setTooltip ("Short-term loudness over time");
     grGraph.setTooltip ("Clip/limiter gain reduction over time");
 
-    // First-run note (once ever) + overlay covering the whole editor.
+    // hiDPI: reparent every control added above into the scaled content holder,
+    // so one AffineTransform scales the whole vector UI crisply. contentHolder and
+    // the tooltip window stay direct children of the editor (unscaled).
+    addAndMakeVisible (contentHolder);
+    {
+        juce::Array<juce::Component*> toMove;
+        for (int i = 0; i < getNumChildComponents(); ++i)
+        {
+            auto* c = getChildComponent (i);
+            if (c != &contentHolder && c != &tooltipWindow)
+                toMove.add (c);
+        }
+        for (auto* c : toMove)
+            contentHolder.addAndMakeVisible (c);
+    }
+    contentHolder.onPaint = [this] (juce::Graphics& g) { paintCards (g); };
+
+    // First-run note overlay sits above the scaled content (unscaled, full-cover).
     addChildComponent (firstRunNote);
     showFirstRunNoteIfNeeded();
 
@@ -219,7 +236,12 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     for (int i = 0; i < 6; ++i)
         lastParamValues[i] = processor.apvts.getRawParameterValue (undoIds[i])->load();
 
-    setSize (440, 918);
+    // Resizable with a locked aspect ratio (0.75x .. 2x of the design size).
+    setResizable (true, true);
+    if (auto* con = getConstrainer())
+        con->setFixedAspectRatio ((double) kDesignW / (double) kDesignH);
+    setResizeLimits (kDesignW * 3 / 4, kDesignH * 3 / 4, kDesignW * 2, kDesignH * 2);
+    setSize (kDesignW, kDesignH);
     startTimerHz (30);
 }
 
@@ -403,26 +425,37 @@ void KeelAudioProcessorEditor::timerCallback()
 
 void KeelAudioProcessorEditor::paint (juce::Graphics& g)
 {
+    g.fillAll (keel::palette::bg);   // fills behind the scaled content holder
+}
+
+void KeelAudioProcessorEditor::paintCards (juce::Graphics& g)
+{
     g.fillAll (keel::palette::bg);
 
-    auto card = [&g] (juce::Rectangle<int> r, const juce::String&)
+    auto card = [&g] (juce::Rectangle<int> r)
     {
         g.setColour (keel::palette::surface);
         g.fillRoundedRectangle (r.toFloat(), 12.0f);
         g.setColour (keel::palette::line);
         g.drawRoundedRectangle (r.toFloat().reduced (0.5f), 12.0f, 1.0f);
     };
-    card (cardTargets, {});
-    card (cardDrive, {});
-    card (cardReference, {});
-    card (cardMeters, {});
+    card (cardTargets);
+    card (cardDrive);
+    card (cardReference);
+    card (cardMeters);
 }
 
 void KeelAudioProcessorEditor::resized()
 {
-    firstRunNote.setBounds (getLocalBounds());   // full-cover modal overlay
+    // Scale the content holder to fill the (aspect-locked) editor; lay children out
+    // at the fixed logical design size inside it.
+    const float scale = (float) getWidth() / (float) kDesignW;
+    contentHolder.setBounds (0, 0, kDesignW, kDesignH);
+    contentHolder.setTransform (juce::AffineTransform::scale (scale));
 
-    auto r = getLocalBounds().reduced (16);
+    firstRunNote.setBounds (getLocalBounds());   // full-cover modal overlay (unscaled)
+
+    auto r = juce::Rectangle<int> (0, 0, kDesignW, kDesignH).reduced (16);
 
     // header
     auto header = r.removeFromTop (48);
