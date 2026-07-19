@@ -15,7 +15,8 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     : AudioProcessorEditor (&p), processor (p),
       lufsMeter ("INTEGRATED", "LUFS", -40.0f, 0.0f, look),
       tpMeter   ("TRUE PEAK", "dBTP", -24.0f, 0.0f, look),
-      loudnessGraph ("LOUDNESS HISTORY", "LUFS", -40.0f, 0.0f, look)
+      loudnessGraph ("LOUDNESS HISTORY", "LUFS", -40.0f, 0.0f, look),
+      grGraph       ("GAIN REDUCTION", "dB", -12.0f, 0.0f, look)
 {
     setLookAndFeel (&look);
     auto& apvts = processor.apvts;
@@ -132,6 +133,11 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     loudnessGraph.setTarget (-14.0f);
     addAndMakeVisible (loudnessGraph);
 
+    // Gain-reduction history: same span; hangs from 0 dB (no target line).
+    grGraph.setCapacity (40 * 30);
+    grGraph.setFillFromTop (true);
+    addAndMakeVisible (grGraph);
+
     // --- Export note (no Finalize: this IS the master) ---
     exportNote.setText ("Reset, play a loud section, then raise Makeup so INTEGRATED "
                         "sits at target -- export with this on.",
@@ -141,7 +147,7 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     exportNote.setJustificationType (juce::Justification::centredTop);
     addAndMakeVisible (exportNote);
 
-    setSize (440, 800);
+    setSize (440, 882);
     startTimerHz (30);
 }
 
@@ -184,6 +190,7 @@ void KeelAudioProcessorEditor::timerCallback()
 
     loudnessGraph.setTarget (processor.apvts.getRawParameterValue ("lufs")->load());
     loudnessGraph.push (processor.shortTermLufs.load());
+    grGraph.push (processor.gainReductionDb.load());
 
     const float tpCeil = processor.apvts.getRawParameterValue ("tp")->load();
     tpMeter.setTarget (tpCeil);
@@ -284,7 +291,7 @@ void KeelAudioProcessorEditor::resized()
     r.removeFromTop (12);
 
     // card: Meters
-    cardMeters = r.removeFromTop (292);
+    cardMeters = r.removeFromTop (374);
     {
         auto c = cardMeters.reduced (14);
         lufsMeter.setBounds (c.removeFromTop (58));
@@ -299,6 +306,8 @@ void KeelAudioProcessorEditor::resized()
         tpMeter.setBounds (c.removeFromTop (58));
         c.removeFromTop (12);
         loudnessGraph.setBounds (c.removeFromTop (70));
+        c.removeFromTop (12);
+        grGraph.setBounds (c.removeFromTop (70));
     }
     r.removeFromTop (10);
     exportNote.setBounds (r);

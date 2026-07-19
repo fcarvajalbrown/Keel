@@ -51,6 +51,7 @@ private:
 
     keel::Meter lufsMeter, tpMeter;
     keel::HistoryGraph loudnessGraph;   // short-term loudness over time (scrolling)
+    keel::HistoryGraph grGraph;         // clip/limiter gain reduction over time
     // Short-term + momentary shown as a compact secondary line under the primary
     // (integrated) meter; the Reset button restarts the integrated measurement.
     juce::Label      lufsSecondary;

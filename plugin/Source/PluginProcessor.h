@@ -74,6 +74,10 @@ public:
     // short-term data yet". Shares the integrated measurement session (same reset).
     std::atomic<float> loudnessRange  { -1.0f };
 
+    // Gain reduction applied by the clip/limiter stage, dB (0 = none, negative =
+    // reduction). Peak-in-vs-out per block, fast attack + slow release for display.
+    std::atomic<float> gainReductionDb { 0.0f };
+
     // Reset the integrated measurement (call from the UI thread). Integrated
     // accumulates from the last reset, so the user dials Makeup, resets, then lets
     // a representative loud section play and reads where it lands. RT-safe: this
@@ -160,6 +164,7 @@ private:
     // prepareToPlay for the host's actual channel count.
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
     float truePeakHold { 0.0f };       // linear, with decay for display
+    float grHold { 0.0f };             // dB (<= 0), fast attack + slow release
     double currentSampleRate { 48000.0 };
 
     void resetMeters();

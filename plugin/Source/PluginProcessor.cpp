@@ -277,10 +277,12 @@ void KeelAudioProcessor::resetMeters()
     samplesSinceGate = 0;
     integratedResetRequested.store (false);
     truePeakHold = 0.0f;
+    grHold = 0.0f;
     momentaryLufs.store (kSilenceFloor);
     shortTermLufs.store (kSilenceFloor);
     integratedLufs.store (kSilenceFloor);
     loudnessRange.store (-1.0f);
+    gainReductionDb.store (0.0f);
     truePeakDb.store (kSilenceFloor);
 }
 
@@ -471,6 +473,8 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // 3) Oversampled tanh soft-clip (a hair above the limiter ceiling so the
     //    clipper takes the very top) + 4) 4x true-peak limiter to the ceiling.
+    //    Peak in-vs-out across this stage gives the gain reduction to display.
+    const float preLimPeak = numSamples > 0 ? buffer.getMagnitude (0, numSamples) : 0.0f;
     if (processOversampler != nullptr && numSamples > 0)
     {
         const double clipCeil = dbToGain (juce::jmin (0.0, (double) tpCeilDb + 1.0));
@@ -488,6 +492,21 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         limiter.process (juce::dsp::ProcessContextReplacing<float> (upBlock));
 
         processOversampler->processSamplesDown (outBlock);
+    }
+
+    // Gain reduction (dB, <= 0): how much the clip/limiter pulled the peak down.
+    // Fast attack (jump to a deeper reduction) + slow release (~8 dB/s toward 0)
+    // so brief limiting stays legible on the history graph.
+    if (numSamples > 0)
+    {
+        const float postLimPeak = buffer.getMagnitude (0, numSamples);
+        float grDb = 0.0f;
+        if (preLimPeak > 1.0e-6f && postLimPeak > 1.0e-9f)
+            grDb = juce::jmin (0.0f,
+                juce::Decibels::gainToDecibels (postLimPeak / preLimPeak));
+        const float release = 8.0f * (float) (numSamples / currentSampleRate);
+        grHold = juce::jmin (grDb, grHold + release);
+        gainReductionDb.store (grHold);
     }
     // ===========================================================================
 
