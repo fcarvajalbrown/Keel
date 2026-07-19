@@ -169,6 +169,24 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     loudnessGraph.setTitle ("Loudness history");
     grGraph.setTitle ("Gain-reduction history");
 
+    // --- Hover tooltips ---
+    presetBox.setTooltip ("Loudness preset: sets Target LUFS + TP ceiling");
+    lufsSlider.setTooltip ("Target integrated loudness the meter aims at");
+    tpSlider.setTooltip ("True-peak ceiling the limiter holds (dBTP)");
+    makeupSlider.setTooltip ("Drive into the clip/limiter -- raise until INTEGRATED hits target");
+    glueToggle.setTooltip ("Master glue compressor (on = matches the CLI/GUI master)");
+    abToggle.setTooltip ("Bypass to the dry input, loudness-matched -- hear character, not level");
+    resetIntgButton.setTooltip ("Reset integrated, loudness range, peak-hold and the graphs");
+    referenceLoadButton.setTooltip ("Measure a reference file's integrated LUFS + true-peak");
+    lufsMeter.setTooltip ("Integrated loudness (what streaming normalizes on)");
+    tpMeter.setTooltip ("True peak; the bright marker is the held maximum");
+    loudnessGraph.setTooltip ("Short-term loudness over time");
+    grGraph.setTooltip ("Clip/limiter gain reduction over time");
+
+    // First-run note (once ever) + overlay covering the whole editor.
+    addChildComponent (firstRunNote);
+    showFirstRunNoteIfNeeded();
+
     setSize (440, 882);
     startTimerHz (30);
 }
@@ -177,6 +195,30 @@ KeelAudioProcessorEditor::~KeelAudioProcessorEditor()
 {
     stopTimer();
     setLookAndFeel (nullptr);
+}
+
+void KeelAudioProcessorEditor::showFirstRunNoteIfNeeded()
+{
+    // Persist "seen" as a marker file in the user app-data dir (once ever).
+    const auto marker = juce::File::getSpecialLocation (
+                            juce::File::userApplicationDataDirectory)
+                        .getChildFile ("Keel").getChildFile ("firstrun.done");
+    if (marker.existsAsFile())
+        return;
+
+    firstRunNote.setContent ("Keel IS the master",
+        "There is no separate export step -- Keel masters live on your master bus, "
+        "so you deliver by bouncing/exporting from your DAW with Keel active.\n\n"
+        "Raise Makeup until INTEGRATED sits at your target; the -1 dBTP ceiling is "
+        "held for you. For a guaranteed exact -14 LUFS file, use the Keel app or CLI.");
+    firstRunNote.onDismiss = [this, marker]
+    {
+        marker.getParentDirectory().createDirectory();
+        marker.create();
+        firstRunNote.setVisible (false);
+    };
+    firstRunNote.setVisible (true);
+    firstRunNote.toFront (false);
 }
 
 void KeelAudioProcessorEditor::timerCallback()
@@ -248,6 +290,8 @@ void KeelAudioProcessorEditor::paint (juce::Graphics& g)
 
 void KeelAudioProcessorEditor::resized()
 {
+    firstRunNote.setBounds (getLocalBounds());   // full-cover modal overlay
+
     auto r = getLocalBounds().reduced (16);
 
     // header

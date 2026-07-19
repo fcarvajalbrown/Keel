@@ -431,4 +431,52 @@ void HistoryGraph::paint (juce::Graphics& g)
     }
 }
 
+// ---------------------------------------------------------------- NoticeOverlay
+NoticeOverlay::NoticeOverlay (KeelLookAndFeel& lnf) : look (lnf)
+{
+    setInterceptsMouseClicks (true, true);   // block the UI beneath while shown
+
+    titleLabel.setFont (look.display (15.0f, true));
+    titleLabel.setColour (juce::Label::textColourId, palette::text);
+    titleLabel.setJustificationType (juce::Justification::centredLeft);
+    addAndMakeVisible (titleLabel);
+
+    bodyLabel.setFont (look.display (11.0f));
+    bodyLabel.setColour (juce::Label::textColourId, palette::muted);
+    bodyLabel.setJustificationType (juce::Justification::topLeft);
+    addAndMakeVisible (bodyLabel);
+
+    okButton.onClick = [this] { if (onDismiss) onDismiss(); };
+    addAndMakeVisible (okButton);
+}
+
+void NoticeOverlay::setContent (const juce::String& title, const juce::String& body)
+{
+    titleLabel.setText (title, juce::dontSendNotification);
+    bodyLabel.setText (body, juce::dontSendNotification);
+}
+
+void NoticeOverlay::paint (juce::Graphics& g)
+{
+    g.fillAll (juce::Colours::black.withAlpha (0.62f));   // dim scrim
+
+    auto card = getLocalBounds().withSizeKeepingCentre (
+        juce::jmin (360, getWidth() - 40), juce::jmin (230, getHeight() - 40)).toFloat();
+    g.setColour (palette::surface);
+    g.fillRoundedRectangle (card, 12.0f);
+    g.setColour (palette::teal_deep);
+    g.drawRoundedRectangle (card.reduced (0.5f), 12.0f, 1.0f);
+}
+
+void NoticeOverlay::resized()
+{
+    auto card = getLocalBounds().withSizeKeepingCentre (
+        juce::jmin (360, getWidth() - 40), juce::jmin (230, getHeight() - 40)).reduced (18);
+    titleLabel.setBounds (card.removeFromTop (24));
+    card.removeFromTop (8);
+    okButton.setBounds (card.removeFromBottom (30).removeFromRight (96));
+    card.removeFromBottom (10);
+    bodyLabel.setBounds (card);
+}
+
 } // namespace keel

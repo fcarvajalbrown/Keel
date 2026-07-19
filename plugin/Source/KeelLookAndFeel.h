@@ -9,6 +9,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <functional>
 #include <vector>
 
 namespace keel
@@ -74,7 +75,8 @@ public:
 
 // A horizontal LUFS / true-peak meter: title (top-left) + big readout (top-right)
 // + gradient bar with target / ceiling ticks. Display-only; fed setValue().
-class Meter : public juce::Component
+class Meter : public juce::Component,
+              public juce::SettableTooltipClient
 {
 public:
     Meter (juce::String title, juce::String unit, float vmin, float vmax,
@@ -111,7 +113,8 @@ private:
 // readout (top-right) + a teal trace over a fixed value range, with an optional
 // target line. Fed one sample per UI tick via push(); display-only. Reused for
 // loudness history and gain-reduction history. push(-100) breaks the trace (gap).
-class HistoryGraph : public juce::Component
+class HistoryGraph : public juce::Component,
+                     public juce::SettableTooltipClient
 {
 public:
     HistoryGraph (juce::String title, juce::String unit, float vmin, float vmax,
@@ -144,6 +147,26 @@ private:
     int   count { 0 };
     int   head { 0 };               // next write index
     KeelLookAndFeel& look;
+};
+
+// A dismissible modal notice: a dimmed scrim over the whole editor with a centred
+// card (title + body + "Got it"). Used for the first-run export explanation; eats
+// clicks so the UI beneath is inert while shown. Fires onDismiss when acknowledged.
+class NoticeOverlay : public juce::Component
+{
+public:
+    explicit NoticeOverlay (KeelLookAndFeel& lnf);
+
+    void setContent (const juce::String& title, const juce::String& body);
+    std::function<void()> onDismiss;
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+
+private:
+    KeelLookAndFeel& look;
+    juce::Label      titleLabel, bodyLabel;
+    juce::TextButton okButton { "Got it" };
 };
 
 } // namespace keel

@@ -27,8 +27,14 @@ public:
 private:
     void timerCallback() override;
 
+    void showFirstRunNoteIfNeeded();
+
     KeelAudioProcessor& processor;
     keel::KeelLookAndFeel look;
+
+    // Hover tooltips + a once-ever first-run note (persisted via PropertiesFile).
+    juce::TooltipWindow tooltipWindow { this };
+    keel::NoticeOverlay firstRunNote { look };
 
     keel::HullMark hullMark;
     juce::Label  titleLabel, subtitleLabel;
