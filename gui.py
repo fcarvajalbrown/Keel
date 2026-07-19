@@ -136,6 +136,8 @@ class PlaybackMeter(QObject):
         self.cursor = 0
         self.frame_bytes = 4
         self.total_us = 0
+        self.start_frame = 0    # absolute frame this stream began at (for A/B switch)
+        self.play_us = 0        # duration of THIS stream (remaining from start_frame)
         self._since_meter = 0
         self.timer = QTimer(self)
         self.timer.setInterval(self.TICK_MS)
@@ -150,15 +152,27 @@ class PlaybackMeter(QObject):
         return self.sink is not None
 
     def play(self, wav_path):
-        """Load `wav_path`, open a QAudioSink in push mode, and start streaming."""
-        self.stop()
+        """Load `wav_path` and start streaming it from the top."""
         audio, rate = sf.read(str(wav_path), dtype="float32", always_2d=True)
+        self.play_audio(audio, rate)
+
+    def play_audio(self, audio, rate, start_frame=0):
+        """Stream an in-memory (frames, channels) array from `start_frame`. Used
+        for the loudness-matched A/B, which swaps source mid-playback."""
+        self.stop()
+        audio = np.ascontiguousarray(audio, dtype="float32")
+        if audio.ndim == 1:
+            audio = audio[:, None]
         ch = audio.shape[1]
+        n = audio.shape[0]
+        start_frame = int(max(0, min(start_frame, max(0, n - 1))))
         self.audio, self.rate = audio, rate
         self.frame_bytes = ch * 2  # Int16 -> 2 bytes/sample/channel
         self.pcm = (np.clip(audio, -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
-        self.cursor = 0
-        self.total_us = int(audio.shape[0] / rate * 1_000_000)
+        self.cursor = start_frame * self.frame_bytes
+        self.start_frame = start_frame
+        self.total_us = int(n / rate * 1_000_000)
+        self.play_us = int((n - start_frame) / rate * 1_000_000)
         self._since_meter = 0
 
         fmt = QAudioFormat()
@@ -168,6 +182,12 @@ class PlaybackMeter(QObject):
         self.sink = QAudioSink(QMediaDevices.defaultAudioOutput(), fmt)
         self.io = self.sink.start()  # push-mode QIODevice
         self.timer.start()
+
+    def current_frame(self):
+        """Absolute playback position in frames (across an A/B source swap)."""
+        if self.sink is None:
+            return 0
+        return self.start_frame + int(self.sink.processedUSecs() / 1_000_000 * self.rate)
 
     def _tick(self):
         if self.sink is None:
@@ -187,12 +207,12 @@ class PlaybackMeter(QObject):
             self._emit_levels()
         # done once everything pushed has actually played out
         if (self.cursor >= len(self.pcm)
-                and self.sink.processedUSecs() >= self.total_us):
+                and self.sink.processedUSecs() >= self.play_us):
             self.stop()
             self.finished.emit()
 
     def _emit_levels(self):
-        pos = int(self.sink.processedUSecs() / 1_000_000 * self.rate)
+        pos = self.current_frame()
         lo = max(0, pos - int(self.WINDOW_S * self.rate))
         window = self.audio[lo:pos]
         if window.shape[0] < int(0.4 * self.rate):  # too short for a gated read
@@ -228,6 +248,7 @@ class KeelWindow(QMainWindow):
         # editable so a custom label is still allowed (Keel is delivery-agnostic).
         self._label_choices = list(keel.KNOWN_LABELS) + [keel.OTHER_LABEL]
         self.master_wav = None        # last rendered master, for playback
+        self.mix_wav = None           # last rendered mix, for the loudness-matched A/B
         self._render_levels = None    # (lufs, tp) of that master, to restore
         self.player = PlaybackMeter(self)
         self.player.levels.connect(self._on_live_levels)
@@ -426,6 +447,16 @@ class KeelWindow(QMainWindow):
         self.play_btn.setEnabled(False)
         self.play_btn.clicked.connect(self._toggle_play)
         meters.addWidget(self.play_btn)
+
+        # Loudness-matched A/B: audition the pre-master mix, gain-matched to the
+        # master's loudness, so the comparison exposes character, not level.
+        self.ab_chk = QCheckBox("A/B: hear the mix, loudness-matched")
+        self.ab_chk.setToolTip(
+            "Compare against the pre-master mix, gain-matched to the master's "
+            "loudness so you judge character, not level. Switches live during play.")
+        self.ab_chk.setEnabled(False)
+        self.ab_chk.toggled.connect(self._on_ab_toggled)
+        meters.addWidget(self.ab_chk)
         right.addWidget(meters_box)
         right.addStretch(1)
 
@@ -753,9 +784,11 @@ class KeelWindow(QMainWindow):
         self._set_meters(mst.get("lufs"), mst.get("true_peak_db"))
         self._set_dynamics(mst)
         self.master_wav = res["master_wav"]
+        self.mix_wav = res.get("mix_wav")
         self._render_levels = (mst.get("lufs"), mst.get("true_peak_db"))
         if not self.player.playing:
             self.play_btn.setEnabled(True)
+        self.ab_chk.setEnabled(bool(self.mix_wav))
 
     def _render_failed(self, msg):
         self._say(f"ERROR: {msg}")
@@ -800,12 +833,41 @@ class KeelWindow(QMainWindow):
                                     "No audio output device is available.")
             return
         try:
-            self.player.play(self.master_wav)
+            audio, rate = self._selected_audio()
+            self.player.play_audio(audio, rate)
         except Exception as e:
             QMessageBox.warning(self, "Keel", f"Playback failed:\n{e}")
             return
         self.play_btn.setText("Stop")
-        self._say(f"Playing {Path(self.master_wav).name} (live meters)")
+        which = "mix (matched)" if self.ab_chk.isChecked() else "master"
+        self._say(f"Playing {which} (live meters)")
+
+    def _selected_audio(self):
+        """(audio, rate) for the current A/B selection: the master, or the
+        pre-master mix gain-matched to the master's integrated loudness."""
+        if not self.ab_chk.isChecked() or not self.mix_wav:
+            return sf.read(str(self.master_wav), dtype="float32", always_2d=True)
+        audio, rate = sf.read(str(self.mix_wav), dtype="float32", always_2d=True)
+        mix_lufs = float(keel.integrated_lufs(audio, rate))
+        master_lufs = self._render_levels[0] if self._render_levels else None
+        if (master_lufs is not None and math.isfinite(master_lufs)
+                and math.isfinite(mix_lufs)):
+            audio = audio * (10.0 ** ((master_lufs - mix_lufs) / 20.0))
+        return audio, rate
+
+    def _on_ab_toggled(self, _checked=False):
+        """Swap the audition source; if playing, switch live at the current spot."""
+        if self.player.playing:
+            frame = self.player.current_frame()
+            try:
+                audio, rate = self._selected_audio()
+            except Exception as e:
+                QMessageBox.warning(self, "Keel", f"A/B failed:\n{e}")
+                return
+            self.player.play_audio(audio, rate, start_frame=frame)
+        elif self.master_wav:
+            self.play_btn.setText("Play mix (matched)" if self.ab_chk.isChecked()
+                                  else "Play master")
 
     def _on_live_levels(self, lufs, tp):
         # the trailing-window short-term read, pushed onto the same meters
@@ -813,7 +875,8 @@ class KeelWindow(QMainWindow):
                          tp if math.isfinite(tp) else None)
 
     def _on_play_finished(self):
-        self.play_btn.setText("Play master")
+        self.play_btn.setText("Play mix (matched)" if self.ab_chk.isChecked()
+                              else "Play master")
         if self._render_levels is not None:  # restore the integrated readings
             self._set_meters(*self._render_levels)
 
@@ -822,7 +885,12 @@ class KeelWindow(QMainWindow):
         self.player.stop()
         self.play_btn.setText("Play master")
         self.play_btn.setEnabled(False)
+        self.ab_chk.blockSignals(True)
+        self.ab_chk.setChecked(False)
+        self.ab_chk.blockSignals(False)
+        self.ab_chk.setEnabled(False)
         self.master_wav = None
+        self.mix_wav = None
         self._render_levels = None
 
     def closeEvent(self, event):
