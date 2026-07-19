@@ -10,6 +10,22 @@ things are the way they are). Confirm direction with the user via the blue
 arrow-select option UI before writing code; don't assume the next roadmap item is
 today's task.
 
+## TODO (future session) — prior-art / competitive check
+
+The user wants a deliberate audit of Keel against other libraries, to see what
+we've been missing and whether we've been duplicating (or losing to) work that
+already exists elsewhere. Starting point they flagged:
+
+- **https://github.com/bogware/damp** — look at what it does and how; compare
+  scope, DSP approach, and quality against Keel. (Do NOT assume it's better or
+  worse until actually examined; report honestly, cite specifics.)
+
+When picking this up: broaden beyond that one repo (other automix/automaster /
+loudness / true-peak / mastering libraries), then tell the user candidly where
+Keel is genuinely differentiated (deterministic, balance+master-only, no ML) vs.
+where another lib does something better that we should adopt or learn from. This
+is an honest gap-analysis, not a reassurance exercise.
+
 ## What this is
 
 **Keel** is a deterministic, code-driven **automix + automaster engine**. It
