@@ -367,6 +367,8 @@ def _master_report_lines(ms, labelled=False):
         dyn.append(f"PLR {ms['plr']} dB")
     if ms.get("psr") is not None:
         dyn.append(f"PSR {ms['psr']} dB")
+    if ms.get("lra") is not None:
+        dyn.append(f"LRA {ms['lra']} LU")
     if ms.get("correlation") is not None:
         dyn.append(f"phase corr {ms['correlation']:+.2f}")
     if dyn:

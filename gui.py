@@ -410,6 +410,15 @@ class KeelWindow(QMainWindow):
             danger_above=self.tp_spin.value())
         meters.addWidget(self.lufs_meter)
         meters.addWidget(self.tp_meter)
+
+        # Richer post-render dynamics: PLR / PSR / LRA / phase-correlation.
+        self.dyn_label = QLabel("dynamics: --")
+        self.dyn_label.setFont(gui_theme.font(10))
+        self.dyn_label.setToolTip(
+            "PLR/PSR = peak-to-loudness / peak-to-short-term headroom; "
+            "LRA = loudness range (EBU R128); phase corr = mono compatibility.")
+        meters.addWidget(self.dyn_label)
+
         self.play_btn = QPushButton("Play master")
         self.play_btn.setToolTip(
             "Play the rendered master and drive the meters live (short-term, "
@@ -742,6 +751,7 @@ class KeelWindow(QMainWindow):
                   f"[{mst['path']}]  {mst['lufs']} LUFS  "
                   f"{mst['true_peak_db']} dBTP")
         self._set_meters(mst.get("lufs"), mst.get("true_peak_db"))
+        self._set_dynamics(mst)
         self.master_wav = res["master_wav"]
         self._render_levels = (mst.get("lufs"), mst.get("true_peak_db"))
         if not self.player.playing:
@@ -762,6 +772,20 @@ class KeelWindow(QMainWindow):
     def _set_meters(self, lufs, tp):
         self.lufs_meter.set_value(lufs)
         self.tp_meter.set_value(tp)
+
+    def _set_dynamics(self, mst):
+        """Show the whole-master dynamics meters (PLR/PSR/LRA/phase-correlation)."""
+        parts = []
+        if mst.get("plr") is not None:
+            parts.append(f"PLR {mst['plr']} dB")
+        if mst.get("psr") is not None:
+            parts.append(f"PSR {mst['psr']} dB")
+        if mst.get("lra") is not None:
+            parts.append(f"LRA {mst['lra']} LU")
+        if mst.get("correlation") is not None:
+            parts.append(f"corr {mst['correlation']:+.2f}")
+        self.dyn_label.setText("dynamics:  " + "   ".join(parts) if parts
+                               else "dynamics: --")
 
     # ---------------------------------------------------------------- playback
     def _toggle_play(self):

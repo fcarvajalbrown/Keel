@@ -95,6 +95,47 @@ def short_term_lufs_max(audio, rate, window_s=3.0, hop_s=1.0):
     return best
 
 
+def loudness_range(audio, rate, window_s=3.0, hop_s=1.0):
+    """Loudness range (LRA) in LU, per EBU R128 / Tech 3342: the P95 - P10 spread of
+    the gated short-term loudness distribution. Short-term loudness is measured over
+    a sliding `window_s`-second window stepped by `hop_s`, absolute-gated at -70
+    LKFS, then relatively gated at -20 LU below the (energy) mean; LRA is the
+    difference between the 95th and 10th percentiles of what survives. Returns None
+    when there isn't enough gated material (e.g. very short or silent audio).
+
+    This mirrors the plugin's live LRA (PluginProcessor.updateLra) so the GUI/CLI
+    readout and the plugin agree. Deterministic; measurement only."""
+    a = _as_2d(audio)
+    n = a.shape[0]
+    win = int(window_s * rate)
+    hop = max(1, int(hop_s * rate))
+    if win <= 0 or n < win:
+        return None
+    m = _meter(rate)
+    st = []
+    for start in range(0, n - win + 1, hop):
+        try:
+            loud = float(m.integrated_loudness(a[start:start + win]))
+        except Exception:
+            continue
+        if np.isfinite(loud) and loud >= -70.0:  # absolute gate
+            st.append(loud)
+    if len(st) < 2:
+        return None
+    # relative gate: -20 LU below the energy mean of the absolute-gated blocks
+    energies = [10.0 ** (x / 10.0) for x in st]
+    mean_loudness = 10.0 * np.log10(sum(energies) / len(energies))
+    rel = mean_loudness - 20.0
+    gated = sorted(x for x in st if x >= rel)
+    if len(gated) < 2:
+        return None
+
+    def _pct(p):
+        return gated[int(round((len(gated) - 1) * p))]
+
+    return round(_pct(0.95) - _pct(0.10), 2)
+
+
 def correlation(audio):
     """Stereo phase-correlation coefficient in [-1.0, +1.0]. +1 = fully in-phase
     (a mono signal folds down cleanly), 0 = decorrelated / wide, < 0 = out of

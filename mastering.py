@@ -132,6 +132,7 @@ def _report(audio, rate, path, out_path, target_lufs, tp_ceiling_db, **extra):
         "lufs": round(lufs, 2) if np.isfinite(lufs) else lufs,
         "true_peak_db": round(tp, 2) if np.isfinite(tp) else tp,
         "plr": plr, "psr": psr,
+        "lra": meters.loudness_range(audio, rate),
         "correlation": round(meters.correlation(audio), 3),
         "compliance": _compliance(lufs, tp, target_lufs, tp_ceiling_db),
         "out": str(out_path),
