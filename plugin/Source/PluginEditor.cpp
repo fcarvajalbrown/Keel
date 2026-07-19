@@ -96,6 +96,15 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     addAndMakeVisible (abToggle);
     abAttachment = std::make_unique<ButtonAttachment> (apvts, "abmatch", abToggle);
 
+    // --- Oversampling quality (plugin-only live chain; ADR-0033) ---
+    sectionLabel (osLabel, "Oversampling");
+    osBox.addItem ("2x (eco)", 1);
+    osBox.addItem ("4x", 2);
+    osBox.addItem ("8x (high)", 3);
+    osBox.setTooltip ("Live clip/limiter oversampling: higher = less aliasing, more CPU");
+    addAndMakeVisible (osBox);
+    osAttachment = std::make_unique<ComboAttachment> (apvts, "osquality", osBox);
+
     // --- Reference readout (passive; load a file, see its LUFS/TP) ---
     sectionLabel (referenceLabel, "Reference");
 
@@ -492,8 +501,8 @@ void KeelAudioProcessorEditor::resized()
     }
     r.removeFromTop (12);
 
-    // card: Drive (makeup + glue toggle)
-    cardDrive = r.removeFromTop (96);
+    // card: Drive (makeup + glue/AB toggles + oversampling)
+    cardDrive = r.removeFromTop (132);
     {
         auto c = cardDrive.reduced (14);
         labelledRow (c.removeFromTop (28), makeupLabel, makeupSlider);
@@ -501,6 +510,8 @@ void KeelAudioProcessorEditor::resized()
         auto toggles = c.removeFromTop (24);
         glueToggle.setBounds (toggles.removeFromLeft (toggles.getWidth() / 2));
         abToggle.setBounds (toggles);
+        c.removeFromTop (8);
+        labelledRow (c.removeFromTop (28), osLabel, osBox);
     }
     r.removeFromTop (12);
 

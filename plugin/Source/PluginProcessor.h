@@ -131,6 +131,16 @@ private:
     juce::dsp::Limiter<float>     limiter;
     std::unique_ptr<juce::dsp::Oversampling<float>> processOversampler;
     double oversampleRate { 192000.0 };
+    int    currentBlockSize { 0 };
+    std::atomic<bool> osQualityDirty { false };
+
+    // Plugin-only oversampling-quality selector (ADR-0033): the process
+    // (clip/limiter) oversampling factor trades CPU vs alias suppression. The TP
+    // METER oversampler stays fixed 4x for accurate measurement; the CLI/GUI path
+    // stays fixed too, so byte-identical determinism holds. Rebuilt off the audio
+    // thread (allocates), under suspendProcessing.
+    int  osFactorExponent() const;          // 1..3 -> 2x/4x/8x
+    void rebuildProcessOversampler();
 
     // Makeup gain: a STATIC, user-set drive (dB) applied before the clip/limiter,
     // standing in for mastering.py's whole-program pre-normalize. Static (not

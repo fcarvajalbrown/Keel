@@ -40,7 +40,7 @@ private:
     // hiDPI: the whole UI is laid out at a fixed logical size and scaled by an
     // AffineTransform on this holder (software renderer, no OpenGL -- see non-goals).
     static constexpr int kDesignW = 440;
-    static constexpr int kDesignH = 918;
+    static constexpr int kDesignH = 954;
     struct ContentPanel : juce::Component
     {
         std::function<void (juce::Graphics&)> onPaint;
@@ -77,6 +77,9 @@ private:
     juce::ToggleButton glueToggle { "Bus glue" };
     juce::ToggleButton abToggle   { "A/B (matched)" };
 
+    juce::Label    osLabel;         // oversampling-quality selector (plugin-only)
+    juce::ComboBox osBox;
+
     // Reference: a passive loudness/peak readout off a user-loaded file (ADR-0035),
     // NOT a live match. Load -> offline-measure -> show LUFS/TP next to the meters.
     juce::Label      referenceLabel, referenceReadout;
@@ -100,7 +103,7 @@ private:
     using ComboAttachment  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
-    std::unique_ptr<ComboAttachment>  presetAttachment;
+    std::unique_ptr<ComboAttachment>  presetAttachment, osAttachment;
     std::unique_ptr<SliderAttachment> lufsAttachment, tpAttachment, makeupAttachment;
     std::unique_ptr<ButtonAttachment> glueAttachment, abAttachment;
 

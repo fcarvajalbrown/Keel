@@ -123,22 +123,56 @@ KeelAudioProcessor::KeelAudioProcessor()
       apvts (*this, &undoManager, "PARAMS", makeParameterLayout())
 {
     apvts.addParameterListener ("preset", this);
+    apvts.addParameterListener ("osquality", this);
 }
 
 KeelAudioProcessor::~KeelAudioProcessor()
 {
     apvts.removeParameterListener ("preset", this);
+    apvts.removeParameterListener ("osquality", this);
     cancelPendingUpdate();
 }
 
 void KeelAudioProcessor::parameterChanged (const juce::String& id, float)
 {
-    if (id == "preset")
-        triggerAsyncUpdate();   // apply the macro on the message thread
+    if (id == "osquality")
+        osQualityDirty.store (true);
+    if (id == "preset" || id == "osquality")
+        triggerAsyncUpdate();   // apply on the message thread
+}
+
+int KeelAudioProcessor::osFactorExponent() const
+{
+    // param index 0/1/2 -> exponent 1/2/3 -> 2x/4x/8x
+    return (int) apvts.getRawParameterValue ("osquality")->load() + 1;
+}
+
+void KeelAudioProcessor::rebuildProcessOversampler()
+{
+    if (currentBlockSize <= 0)
+        return;
+
+    const int exp = osFactorExponent();
+    suspendProcessing (true);
+    processOversampler = std::make_unique<juce::dsp::Oversampling<float>> (
+        2, exp, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR);
+    processOversampler->initProcessing ((size_t) currentBlockSize);
+
+    oversampleRate = currentSampleRate * std::pow (2.0, exp);
+    juce::dsp::ProcessSpec osSpec {
+        oversampleRate, (juce::uint32) (currentBlockSize << exp), 2 };
+    limiter.prepare (osSpec);
+    limiter.setRelease (kLimReleaseMs);
+
+    setLatencySamples ((int) std::round (processOversampler->getLatencyInSamples()));
+    suspendProcessing (false);
 }
 
 void KeelAudioProcessor::handleAsyncUpdate()
 {
+    if (osQualityDirty.exchange (false))
+        rebuildProcessOversampler();
+
     const int idx = (int) apvts.getRawParameterValue ("preset")->load();
     if (idx == lastAppliedPreset)
         return;                 // no genuine change (e.g. state restore)
@@ -195,6 +229,13 @@ KeelAudioProcessor::makeParameterLayout()
     // master's loudness. Automatable so it can be toggled from the host.
     layout.add (std::make_unique<AudioParameterBool> (
         ParameterID { "abmatch", 1 }, "A/B (matched)", false));
+
+    // Plugin-only oversampling quality on the live clip/limiter (ADR-0033).
+    // 0 = 2x (eco), 1 = 4x (default), 2 = 8x (high). Meta: it re-preps the chain.
+    layout.add (std::make_unique<AudioParameterChoice> (
+        ParameterID { "osquality", 1 }, "Oversampling",
+        StringArray { "2x (eco)", "4x", "8x (high)" }, 1,
+        AudioParameterChoiceAttributes().withMeta (true)));
 
     return layout;
 }
@@ -297,14 +338,18 @@ void KeelAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     glueComp.setAttack (kCompAttackMs);
     glueComp.setRelease (kCompReleaseMs);
 
-    // True-peak limiter runs in the 4x-oversampled domain (threshold set per block).
-    oversampleRate = currentSampleRate * 4.0;
-    juce::dsp::ProcessSpec osSpec { oversampleRate, (juce::uint32) (block * 4), 2 };
+    // True-peak limiter runs in the oversampled domain (factor from the quality
+    // selector, ADR-0033; threshold set per block). Default index -> 4x.
+    currentBlockSize = (int) block;
+    const int osExp = osFactorExponent();
+    oversampleRate = currentSampleRate * std::pow (2.0, osExp);
+    juce::dsp::ProcessSpec osSpec {
+        oversampleRate, (juce::uint32) (block << (size_t) osExp), 2 };
     limiter.prepare (osSpec);
     limiter.setRelease (kLimReleaseMs);
 
     processOversampler = std::make_unique<juce::dsp::Oversampling<float>> (
-        2, 2, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR);
+        2, osExp, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR);
     processOversampler->initProcessing (block);
     setLatencySamples ((int) std::round (processOversampler->getLatencyInSamples()));
 
