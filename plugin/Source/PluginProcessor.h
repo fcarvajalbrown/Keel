@@ -126,8 +126,20 @@ private:
     juce::SmoothedValue<float> makeupGain;
 
     // BS.1770-4 K-weighting: a high-shelf pre-filter followed by an RLB
-    // high-pass, one of each per channel.
+    // high-pass, one of each per channel. A second set (…Dry) K-weights the
+    // captured dry input so the loudness-matched A/B knows the wet-vs-dry ratio.
     juce::dsp::IIR::Filter<float> kShelf[2], kHighpass[2];
+    juce::dsp::IIR::Filter<float> kShelfDry[2], kHighpassDry[2];
+
+    // Loudness-matched A/B: play the dry input gain-matched to the master's
+    // loudness so the comparison exposes character, not the deliberate loudness
+    // lift. Dry is captured pre-chain; wet/dry K-weighted energy is tracked as an
+    // EMA (~0.4 s) to derive the match gain; the blend is smoothed to declick.
+    juce::AudioBuffer<float> dryBuffer;
+    double dryEnergyEma { 0.0 };
+    double wetEnergyEma { 0.0 };
+    juce::SmoothedValue<float> abMixSmoothed;      // 0 = wet master, 1 = matched dry
+    juce::SmoothedValue<float> matchGainSmoothed;  // linear gain applied to dry
 
     // 400 ms sliding window of K-weighted mean-square energy, per channel.
     struct Block { double sumSq[2]; int numSamples; };

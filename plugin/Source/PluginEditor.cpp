@@ -72,9 +72,12 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     addAndMakeVisible (makeupSlider);
     makeupAttachment = std::make_unique<SliderAttachment> (apvts, "makeup", makeupSlider);
 
-    // --- Bus-glue toggle ---
+    // --- Bus-glue toggle + loudness-matched A/B toggle ---
     addAndMakeVisible (glueToggle);
     glueAttachment = std::make_unique<ButtonAttachment> (apvts, "glue", glueToggle);
+
+    addAndMakeVisible (abToggle);
+    abAttachment = std::make_unique<ButtonAttachment> (apvts, "abmatch", abToggle);
 
     // --- Reference readout (passive; load a file, see its LUFS/TP) ---
     sectionLabel (referenceLabel, "Reference");
@@ -278,7 +281,9 @@ void KeelAudioProcessorEditor::resized()
         auto c = cardDrive.reduced (14);
         labelledRow (c.removeFromTop (28), makeupLabel, makeupSlider);
         c.removeFromTop (10);
-        glueToggle.setBounds (c.removeFromTop (24));
+        auto toggles = c.removeFromTop (24);
+        glueToggle.setBounds (toggles.removeFromLeft (toggles.getWidth() / 2));
+        abToggle.setBounds (toggles);
     }
     r.removeFromTop (12);
 

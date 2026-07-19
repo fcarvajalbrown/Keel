@@ -150,6 +150,11 @@ KeelAudioProcessor::makeParameterLayout()
     layout.add (std::make_unique<AudioParameterBool> (
         ParameterID { "glue", 1 }, "Bus Glue", true));
 
+    // Loudness-matched A/B: when on, monitor the dry input gain-matched to the
+    // master's loudness. Automatable so it can be toggled from the host.
+    layout.add (std::make_unique<AudioParameterBool> (
+        ParameterID { "abmatch", 1 }, "A/B (matched)", false));
+
     return layout;
 }
 
@@ -183,6 +188,13 @@ void KeelAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
         kHighpass[ch].prepare (spec);
         kShelf[ch].reset();
         kHighpass[ch].reset();
+
+        kShelfDry[ch].coefficients = shelf;
+        kHighpassDry[ch].coefficients = hp;
+        kShelfDry[ch].prepare (spec);
+        kHighpassDry[ch].prepare (spec);
+        kShelfDry[ch].reset();
+        kHighpassDry[ch].reset();
     }
 
     windowCapacitySamples = juce::jmax (1, (int) std::round (currentSampleRate * 0.4));
@@ -260,6 +272,15 @@ void KeelAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     makeupGain.reset (currentSampleRate, 0.03);
     const float makeupDb0 = apvts.getRawParameterValue ("makeup")->load();
     makeupGain.setCurrentAndTargetValue ((float) dbToGain (makeupDb0));
+
+    // Loudness-matched A/B state.
+    dryBuffer.setSize (2, juce::jmax (1, samplesPerBlock), false, false, true);
+    dryEnergyEma = wetEnergyEma = 0.0;
+    abMixSmoothed.reset (currentSampleRate, 0.02);
+    abMixSmoothed.setCurrentAndTargetValue (
+        apvts.getRawParameterValue ("abmatch")->load() > 0.5f ? 1.0f : 0.0f);
+    matchGainSmoothed.reset (currentSampleRate, 0.05);
+    matchGainSmoothed.setCurrentAndTargetValue (1.0f);
 
     resetMeters();
 }
@@ -434,6 +455,11 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const float tpCeilDb  = apvts.getRawParameterValue ("tp")->load();
     const float makeupDb  = apvts.getRawParameterValue ("makeup")->load();
     const bool  glueOn    = apvts.getRawParameterValue ("glue")->load() > 0.5f;
+    const bool  abOn      = apvts.getRawParameterValue ("abmatch")->load() > 0.5f;
+
+    // Capture the dry input before the chain alters it (loudness-matched A/B).
+    for (int ch = 0; ch < numCh; ++ch)
+        dryBuffer.copyFrom (ch, 0, buffer, ch, 0, numSamples);
 
     // ============================ LIVE MASTER CHAIN ============================
     // A faithful preview of mastering.py (ADR-0027). Audio IS altered here; the
@@ -567,6 +593,32 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         momentaryLufs.store (juce::jmax (kSilenceFloor, lufs));
     }
 
+    // 1a) Loudness-matched A/B: K-weight the captured dry input and track wet vs
+    //     dry energy as an EMA (~0.4 s), so the dry passthrough can be replayed
+    //     gain-matched to the master's loudness. Metering above/below stays on the
+    //     wet master, so the A/B monitor never pollutes the integrated reading.
+    if (numSamples > 0)
+    {
+        double drySumSq = 0.0;
+        for (int ch = 0; ch < juce::jmin (numCh, 2); ++ch)
+        {
+            const float* in = dryBuffer.getReadPointer (ch);
+            double s2 = 0.0;
+            for (int i = 0; i < numSamples; ++i)
+            {
+                float s = kShelfDry[ch].processSample (in[i]);
+                s = kHighpassDry[ch].processSample (s);
+                s2 += (double) s * (double) s;
+            }
+            drySumSq += s2;
+        }
+        const double a = std::exp (- (double) numSamples / (currentSampleRate * 0.4));
+        const double zWet = (blk.sumSq[0] + blk.sumSq[1]) / (double) numSamples;
+        const double zDry = drySumSq / (double) numSamples;
+        wetEnergyEma = a * wetEnergyEma + (1.0 - a) * zWet;
+        dryEnergyEma = a * dryEnergyEma + (1.0 - a) * zDry;
+    }
+
     // 1b) Short-term LUFS over a 3 s window (same K-weighted block energies).
     stWindow.push_back (blk);
     stSumSq[0] += blk.sumSq[0];
@@ -656,6 +708,32 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     if (truePeakMaxLin > 1.0e-6f)
         truePeakMaxDb.store (juce::jmax (kSilenceFloor,
             juce::Decibels::gainToDecibels (truePeakMaxLin)));
+
+    // --- Loudness-matched A/B OUTPUT (last, so meters above measured the wet
+    //     master). Blends the buffer toward the gain-matched dry input when
+    //     engaged; a smoothed mix declicks the toggle.
+    if (numSamples > 0)
+    {
+        float matchLin = 1.0f;
+        if (dryEnergyEma > 1.0e-12 && wetEnergyEma > 1.0e-12)
+            matchLin = juce::jlimit (0.0625f, 16.0f,          // clamp to +/-24 dB
+                (float) std::sqrt (wetEnergyEma / dryEnergyEma));
+        abMixSmoothed.setTargetValue (abOn ? 1.0f : 0.0f);
+        matchGainSmoothed.setTargetValue (matchLin);
+
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float mix = abMixSmoothed.getNextValue();
+            const float mg  = matchGainSmoothed.getNextValue();
+            if (mix <= 1.0e-5f) continue;   // pure wet master; nothing to blend
+            for (int ch = 0; ch < numCh; ++ch)
+            {
+                float* x = buffer.getWritePointer (ch);
+                const float dry = dryBuffer.getReadPointer (ch)[i];
+                x[i] = x[i] + (dry * mg - x[i]) * mix;
+            }
+        }
+    }
 }
 
 juce::AudioProcessorEditor* KeelAudioProcessor::createEditor()

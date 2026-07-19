@@ -41,6 +41,7 @@ private:
     juce::Slider lufsSlider, tpSlider, makeupSlider;
 
     juce::ToggleButton glueToggle { "Bus glue" };
+    juce::ToggleButton abToggle   { "A/B (matched)" };
 
     // Reference: a passive loudness/peak readout off a user-loaded file (ADR-0035),
     // NOT a live match. Load -> offline-measure -> show LUFS/TP next to the meters.
@@ -67,7 +68,7 @@ private:
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::unique_ptr<ComboAttachment>  presetAttachment;
     std::unique_ptr<SliderAttachment> lufsAttachment, tpAttachment, makeupAttachment;
-    std::unique_ptr<ButtonAttachment> glueAttachment;
+    std::unique_ptr<ButtonAttachment> glueAttachment, abAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KeelAudioProcessorEditor)
 };
