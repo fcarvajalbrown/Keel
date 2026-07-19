@@ -9,6 +9,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <vector>
 
 namespace keel
 {
@@ -95,6 +96,40 @@ private:
     bool  hasDanger { false };
     bool  hasValue { false };
     float value { 0.0f };
+    KeelLookAndFeel& look;
+};
+
+// A right-anchored, time-scrolling history strip: title (top-left) + current
+// readout (top-right) + a teal trace over a fixed value range, with an optional
+// target line. Fed one sample per UI tick via push(); display-only. Reused for
+// loudness history and gain-reduction history. push(-100) breaks the trace (gap).
+class HistoryGraph : public juce::Component
+{
+public:
+    HistoryGraph (juce::String title, juce::String unit, float vmin, float vmax,
+                  KeelLookAndFeel& lnf);
+
+    void setTarget (float t)        { target = t; hasTarget = true; }
+    void setFillFromTop (bool b)    { fillFromTop = b; }   // GR hangs from the top
+    void setCapacity (int numSamples);                     // >= 2
+    void push (float v);            // newest sample; <= -99 => gap
+    void clearHistory();
+
+    void paint (juce::Graphics&) override;
+
+private:
+    float frac (float v) const;
+
+    juce::String title, unit;
+    float vmin, vmax;
+    float target { 0.0f };
+    bool  hasTarget { false };
+    bool  fillFromTop { false };
+
+    std::vector<float> buf;         // ring buffer of samples
+    int   capacity { 600 };
+    int   count { 0 };
+    int   head { 0 };               // next write index
     KeelLookAndFeel& look;
 };
 

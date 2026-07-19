@@ -1,5 +1,6 @@
 #include "KeelLookAndFeel.h"
 #include "BinaryData.h"
+#include <algorithm>
 
 namespace keel
 {
@@ -248,6 +249,123 @@ void Meter::paint (juce::Graphics& g)
     tick (target, palette::text);
     if (hasDanger)
         tick (dangerAbove, palette::red);
+}
+
+// ----------------------------------------------------------------- HistoryGraph
+HistoryGraph::HistoryGraph (juce::String t, juce::String u, float lo, float hi,
+                            KeelLookAndFeel& lnf)
+    : title (std::move (t)), unit (std::move (u)), vmin (lo), vmax (hi), look (lnf)
+{
+    buf.assign ((size_t) capacity, -100.0f);
+}
+
+void HistoryGraph::setCapacity (int numSamples)
+{
+    capacity = juce::jmax (2, numSamples);
+    buf.assign ((size_t) capacity, -100.0f);
+    count = 0;
+    head  = 0;
+}
+
+void HistoryGraph::push (float v)
+{
+    buf[(size_t) head] = v;
+    head  = (head + 1) % capacity;
+    count = juce::jmin (count + 1, capacity);
+    repaint();
+}
+
+void HistoryGraph::clearHistory()
+{
+    std::fill (buf.begin(), buf.end(), -100.0f);
+    count = 0;
+    head  = 0;
+    repaint();
+}
+
+float HistoryGraph::frac (float v) const
+{
+    return juce::jlimit (0.0f, 1.0f, (v - vmin) / (vmax - vmin));
+}
+
+void HistoryGraph::paint (juce::Graphics& g)
+{
+    const float w = (float) getWidth(), h = (float) getHeight();
+
+    // panel
+    g.setColour (palette::surface2);
+    g.fillRoundedRectangle (0.0f, 0.0f, w, h, 8.0f);
+    g.setColour (palette::line);
+    g.drawRoundedRectangle (juce::Rectangle<float> (0.0f, 0.0f, w, h).reduced (0.5f),
+                            8.0f, 1.0f);
+
+    // plot area (leave a top strip for title/readout)
+    const float topStrip = 16.0f;
+    juce::Rectangle<float> plot (6.0f, topStrip, w - 12.0f, h - topStrip - 6.0f);
+
+    auto yAt = [&] (float v) { return plot.getBottom() - frac (v) * plot.getHeight(); };
+
+    // target line (dashed)
+    if (hasTarget && target >= vmin && target <= vmax)
+    {
+        const float ty = yAt (target);
+        g.setColour (palette::faint);
+        const float dash[] = { 3.0f, 3.0f };
+        g.drawDashedLine ({ plot.getX(), ty, plot.getRight(), ty }, dash, 2, 1.0f);
+    }
+
+    // newest value (top-right readout); find the most recent non-gap sample
+    float current = -100.0f;
+    for (int i = 0; i < count; ++i)
+    {
+        const int idx = ((head - 1 - i) % capacity + capacity) % capacity;
+        if (buf[(size_t) idx] > -99.0f) { current = buf[(size_t) idx]; break; }
+    }
+    g.setColour (palette::muted);
+    g.setFont (look.display (8.5f));
+    g.drawText (title, juce::Rectangle<float> (6.0f, 0.0f, w, topStrip),
+                juce::Justification::centredLeft);
+    g.setColour (current <= -99.0f ? palette::faint : palette::teal);
+    g.setFont (look.display (10.0f, true));
+    g.drawText (current <= -99.0f ? "--" : juce::String (current, 1) + " " + unit,
+                juce::Rectangle<float> (0.0f, 0.0f, w - 6.0f, topStrip),
+                juce::Justification::centredRight);
+
+    if (count < 2)
+        return;
+
+    // Right-anchored trace: newest sample at the right edge, older to the left.
+    const float dx = plot.getWidth() / (float) (capacity - 1);
+    juce::Path trace;
+    bool penDown = false;
+    for (int i = 0; i < count; ++i)
+    {
+        // oldest kept sample first
+        const int idx = ((head - count + i) % capacity + capacity) % capacity;
+        const float v = buf[(size_t) idx];
+        const float x = plot.getRight() - (float) (count - 1 - i) * dx;
+        if (v <= -99.0f) { penDown = false; continue; }
+        const float y = yAt (v);
+        if (! penDown) { trace.startNewSubPath (x, y); penDown = true; }
+        else            trace.lineTo (x, y);
+    }
+
+    // subtle fill under (or over, for GR) the trace
+    if (! trace.isEmpty())
+    {
+        juce::Path fill = trace;
+        const auto b = trace.getBounds();
+        const float baseY = fillFromTop ? plot.getY() : plot.getBottom();
+        fill.lineTo (b.getRight(), baseY);
+        fill.lineTo (b.getX(),     baseY);
+        fill.closeSubPath();
+        g.setColour (palette::teal.withAlpha (0.12f));
+        g.fillPath (fill);
+
+        g.setColour (palette::teal);
+        g.strokePath (trace, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved,
+                                                   juce::PathStrokeType::rounded));
+    }
 }
 
 } // namespace keel

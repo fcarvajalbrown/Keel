@@ -14,7 +14,8 @@ namespace
 KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     : AudioProcessorEditor (&p), processor (p),
       lufsMeter ("INTEGRATED", "LUFS", -40.0f, 0.0f, look),
-      tpMeter   ("TRUE PEAK", "dBTP", -24.0f, 0.0f, look)
+      tpMeter   ("TRUE PEAK", "dBTP", -24.0f, 0.0f, look),
+      loudnessGraph ("LOUDNESS HISTORY", "LUFS", -40.0f, 0.0f, look)
 {
     setLookAndFeel (&look);
     auto& apvts = processor.apvts;
@@ -126,6 +127,11 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     tpMeter.setDangerAbove (-1.0f);
     addAndMakeVisible (tpMeter);
 
+    // Loudness history: ~40 s of short-term loudness at the 30 Hz UI tick.
+    loudnessGraph.setCapacity (40 * 30);
+    loudnessGraph.setTarget (-14.0f);
+    addAndMakeVisible (loudnessGraph);
+
     // --- Export note (no Finalize: this IS the master) ---
     exportNote.setText ("Reset, play a loud section, then raise Makeup so INTEGRATED "
                         "sits at target -- export with this on.",
@@ -135,7 +141,7 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     exportNote.setJustificationType (juce::Justification::centredTop);
     addAndMakeVisible (exportNote);
 
-    setSize (440, 738);
+    setSize (440, 800);
     startTimerHz (30);
 }
 
@@ -175,6 +181,9 @@ void KeelAudioProcessorEditor::timerCallback()
         + (lra < 0.0f ? juce::String ("--") : juce::String (lra, 1) + " LU");
     if (lraLabel.getText() != lraText)
         lraLabel.setText (lraText, juce::dontSendNotification);
+
+    loudnessGraph.setTarget (processor.apvts.getRawParameterValue ("lufs")->load());
+    loudnessGraph.push (processor.shortTermLufs.load());
 
     const float tpCeil = processor.apvts.getRawParameterValue ("tp")->load();
     tpMeter.setTarget (tpCeil);
@@ -275,7 +284,7 @@ void KeelAudioProcessorEditor::resized()
     r.removeFromTop (12);
 
     // card: Meters
-    cardMeters = r.removeFromTop (232);
+    cardMeters = r.removeFromTop (292);
     {
         auto c = cardMeters.reduced (14);
         lufsMeter.setBounds (c.removeFromTop (58));
@@ -288,6 +297,8 @@ void KeelAudioProcessorEditor::resized()
         lraLabel.setBounds (c.removeFromTop (18));
         c.removeFromTop (8);
         tpMeter.setBounds (c.removeFromTop (58));
+        c.removeFromTop (12);
+        loudnessGraph.setBounds (c.removeFromTop (70));
     }
     r.removeFromTop (10);
     exportNote.setBounds (r);

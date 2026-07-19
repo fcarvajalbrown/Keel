@@ -50,6 +50,7 @@ private:
     std::unique_ptr<juce::FileChooser> referenceChooser;
 
     keel::Meter lufsMeter, tpMeter;
+    keel::HistoryGraph loudnessGraph;   // short-term loudness over time (scrolling)
     // Short-term + momentary shown as a compact secondary line under the primary
     // (integrated) meter; the Reset button restarts the integrated measurement.
     juce::Label      lufsSecondary;
