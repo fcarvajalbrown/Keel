@@ -1,5 +1,17 @@
 #include "PluginEditor.h"
 
+namespace
+{
+    // Where user presets live: <user app data>/Keel/Presets/*.keelpreset (XML).
+    juce::File keelPresetsDir()
+    {
+        auto dir = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                       .getChildFile ("Keel").getChildFile ("Presets");
+        dir.createDirectory();
+        return dir;
+    }
+}
+
 KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     : AudioProcessorEditor (&p), processor (p),
       lufsMeter ("INTEGRATED", "LUFS", -40.0f, 0.0f, look),
@@ -49,6 +61,12 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     // Selecting a preset drives Target-LUFS + TP in the PROCESSOR (so host
     // automation of "preset" works headless too); no editor-side handler needed.
     presetAttachment = std::make_unique<ComboAttachment> (apvts, "preset", presetBox);
+
+    // --- User presets (save/recall the full parameter snapshot) ---
+    sectionLabel (userPresetLabel, "User presets");
+    userPresetButton.setTooltip ("Save the current settings as a preset, or load one");
+    userPresetButton.onClick = [this] { showUserPresetMenu(); };
+    addAndMakeVisible (userPresetButton);
 
     // --- Target LUFS (a meter reference, not an auto-driver) ---
     sectionLabel (lufsLabel, "Target LUFS");
@@ -201,7 +219,7 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     for (int i = 0; i < 6; ++i)
         lastParamValues[i] = processor.apvts.getRawParameterValue (undoIds[i])->load();
 
-    setSize (440, 882);
+    setSize (440, 918);
     startTimerHz (30);
 }
 
@@ -221,6 +239,72 @@ bool KeelAudioProcessorEditor::keyPressed (const juce::KeyPress& k)
         if (code == 'Y') { processor.undoManager.redo(); return true; }
     }
     return false;
+}
+
+void KeelAudioProcessorEditor::showUserPresetMenu()
+{
+    auto files = keelPresetsDir().findChildFiles (juce::File::findFiles, false, "*.keelpreset");
+    files.sort();
+
+    juce::PopupMenu menu;
+    menu.addItem (1, "Save current preset...");
+    menu.addSeparator();
+    if (files.isEmpty())
+    {
+        menu.addItem (2, "(no saved presets)", false);
+    }
+    else
+    {
+        juce::PopupMenu loadMenu, deleteMenu;
+        for (int i = 0; i < files.size(); ++i)
+        {
+            loadMenu.addItem   (100 + i, files[i].getFileNameWithoutExtension());
+            deleteMenu.addItem (1000 + i, files[i].getFileNameWithoutExtension());
+        }
+        menu.addSubMenu ("Load", loadMenu);
+        menu.addSubMenu ("Delete", deleteMenu);
+    }
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (userPresetButton),
+        [this, files] (int r)
+        {
+            if (r == 1)                    saveUserPreset();
+            else if (r >= 1000)            { const int i = r - 1000; if (i < files.size()) files[i].deleteFile(); }
+            else if (r >= 100)             { const int i = r - 100;  if (i < files.size()) loadUserPreset (files[i]); }
+        });
+}
+
+void KeelAudioProcessorEditor::saveUserPreset()
+{
+    auto* w = new juce::AlertWindow ("Save preset", "Name this preset:",
+                                     juce::MessageBoxIconType::NoIcon);
+    w->addTextEditor ("name", "My preset");
+    w->addButton ("Save",   1, juce::KeyPress (juce::KeyPress::returnKey));
+    w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    w->enterModalState (true, juce::ModalCallbackFunction::create (
+        [this, w] (int result)
+        {
+            if (result == 1)
+            {
+                const auto name = w->getTextEditorContents ("name").trim();
+                if (name.isNotEmpty())
+                {
+                    // A preset is master settings only -- drop the reference path.
+                    auto state = processor.apvts.copyState();
+                    state.removeProperty ("referencePath", nullptr);
+                    if (auto xml = state.createXml())
+                        xml->writeTo (keelPresetsDir().getChildFile (
+                            juce::File::createLegalFileName (name) + ".keelpreset"));
+                }
+            }
+            delete w;
+        }), false);
+}
+
+void KeelAudioProcessorEditor::loadUserPreset (const juce::File& file)
+{
+    if (auto xml = juce::XmlDocument::parse (file))
+        processor.setStateFromXml (*xml);
 }
 
 void KeelAudioProcessorEditor::showFirstRunNoteIfNeeded()
@@ -361,8 +445,8 @@ void KeelAudioProcessorEditor::resized()
         ctrl.setBounds (row);
     };
 
-    // card: Targets (preset + LUFS + TP)
-    cardTargets = r.removeFromTop (140);
+    // card: Targets (preset + LUFS + TP + user presets)
+    cardTargets = r.removeFromTop (176);
     {
         auto c = cardTargets.reduced (14);
         labelledRow (c.removeFromTop (28), presetLabel, presetBox);
@@ -370,6 +454,8 @@ void KeelAudioProcessorEditor::resized()
         labelledRow (c.removeFromTop (28), lufsLabel, lufsSlider);
         c.removeFromTop (8);
         labelledRow (c.removeFromTop (28), tpLabel, tpSlider);
+        c.removeFromTop (8);
+        labelledRow (c.removeFromTop (28), userPresetLabel, userPresetButton);
     }
     r.removeFromTop (12);
 

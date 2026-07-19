@@ -30,6 +30,12 @@ private:
 
     void showFirstRunNoteIfNeeded();
 
+    // User presets (full parameter snapshots on disk, distinct from the factory
+    // loudness presets).
+    void showUserPresetMenu();
+    void saveUserPreset();
+    void loadUserPreset (const juce::File&);
+
     KeelAudioProcessor& processor;
     keel::KeelLookAndFeel look;
 
@@ -49,6 +55,9 @@ private:
 
     juce::Label    presetLabel;
     juce::ComboBox presetBox;
+
+    juce::Label      userPresetLabel;
+    juce::TextButton userPresetButton { "Save / Load..." };
 
     juce::Label  lufsLabel, tpLabel, makeupLabel;
     juce::Slider lufsSlider, tpSlider, makeupSlider;

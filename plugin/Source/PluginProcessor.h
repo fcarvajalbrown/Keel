@@ -56,6 +56,8 @@ public:
 
     void getStateInformation (juce::MemoryBlock&) override;
     void setStateInformation (const void*, int) override;
+    // Restore from a parsed state tree (shared by host recall + user presets).
+    void setStateFromXml (const juce::XmlElement&);
 
     // --- spike API for the editor ---
     // Declared before apvts so it is constructed first (apvts takes its address).

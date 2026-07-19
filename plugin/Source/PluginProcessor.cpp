@@ -788,23 +788,27 @@ void KeelAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
         copyXmlToBinary (*xml, destData);
 }
 
+void KeelAudioProcessor::setStateFromXml (const juce::XmlElement& xml)
+{
+    if (! xml.hasTagName (apvts.state.getType()))
+        return;
+
+    apvts.replaceState (juce::ValueTree::fromXml (xml));
+
+    // Adopt the restored preset as already-applied so the queued async (fired by
+    // replaceState) does NOT overwrite the restored LUFS/TP.
+    lastAppliedPreset = (int) apvts.getRawParameterValue ("preset")->load();
+
+    // Re-measure a saved reference, if any, so its readout returns.
+    const auto path = apvts.state.getProperty ("referencePath", juce::String()).toString();
+    if (path.isNotEmpty())
+        loadReference (juce::File (path));
+}
+
 void KeelAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
-        if (xml->hasTagName (apvts.state.getType()))
-        {
-            apvts.replaceState (juce::ValueTree::fromXml (*xml));
-
-            // Adopt the restored preset as already-applied so the queued async
-            // (fired by replaceState) does NOT overwrite the restored LUFS/TP.
-            lastAppliedPreset = (int) apvts.getRawParameterValue ("preset")->load();
-
-            // Re-measure a saved reference, if any, so its readout returns.
-            const auto path = apvts.state.getProperty ("referencePath",
-                                                       juce::String()).toString();
-            if (path.isNotEmpty())
-                loadReference (juce::File (path));
-        }
+        setStateFromXml (*xml);
 }
 
 // JUCE entry point.
