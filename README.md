@@ -45,12 +45,15 @@ Keel is for two people. The **producer** with great stems who doesn't want to (o
 can't) mix and master by hand: one command, done. The **engineer** who wants a
 deterministic, scriptable balance+master stage in a pipeline: exact LUFS targets,
 a real oversampled true-peak meter, reproducible to the sample, with a QC report
-on every run. The long-term goal is a **standalone GUI** and a **VST/plugin** on
-the same engine — see [`ROADMAP.md`](ROADMAP.md).
+on every run. Keel also ships as a **standalone GUI app** and a **VST3 / AU
+plugin** on the same deterministic engine, so you can mix and master from a desktop
+window or right inside your DAW — see [`ROADMAP.md`](ROADMAP.md).
 
-> Keywords: automatic mixing, automatic mastering, loudness normalization, LUFS,
-> true peak, ITU-R BS.1770-4, stem balancing, limiter, mastering chain,
-> deterministic audio, reproducible, Python audio, VST (planned).
+> Keywords: automatic mixing, automatic mastering, loudness normalization, LUFS
+> meter, integrated LUFS, short-term LUFS, loudness range (LRA), true-peak limiter,
+> ITU-R BS.1770-4, stem balancing, mastering chain, gain reduction meter,
+> deterministic audio, reproducible mastering, Python audio, **VST3 plugin**,
+> **AU plugin**, DAW mastering, master bus plugin, Logic Pro, GarageBand.
 
 ---
 
@@ -66,6 +69,7 @@ the same engine — see [`ROADMAP.md`](ROADMAP.md).
 | **Mastering** | Internal clip -> limit chain, **or** match a commercial reference (Matchering) |
 | **Determinism** | Same inputs -> **identical** output. No ML, no randomness in the render path |
 | **Tone** | **Untouched** — Keel balances and masters; it never re-EQs your stems |
+| **Front-ends** | **CLI**, standalone **GUI app**, and **VST3 / AU plugin** — one shared deterministic engine |
 
 ---
 
@@ -336,7 +340,7 @@ ceiling, group balance, label matching) — no committed audio, no extra deps:
 
 ---
 
-## Desktop GUI (preview)
+## Desktop GUI (beta)
 
 A standalone window drives the same engine — drop a folder of stems, tweak the
 balance, click once for mix + master. Built on **PySide6 (Qt)**, installed
@@ -348,27 +352,29 @@ core engine):
 python gui.py
 ```
 
-What the scaffold does today: drag-a-folder / open-folder with auto-detected
-labels in an editable table, per-label **balance faders** (relative LU), a
-loudness **preset** picker with **save/load** of your own presets, an optional
-**reference** picker, a bus-glue toggle, **one-click render** to mix + master in
-a background thread, post-render **LUFS / true-peak meters** (the same
-`meters.py` math the engine uses), and **save/load** of the whole project
-(`keel.json`). Real-time playback metering and a signed installer are next (see
-[`ROADMAP.md`](ROADMAP.md) Phase 4).
+What the app does: drag-a-folder / open-folder with auto-detected labels in an
+editable table, per-label **balance faders** (relative LU), a loudness **preset**
+picker with **save/load** of your own presets, an optional **reference** picker, a
+bus-glue toggle, **one-click render** to mix + master in a background thread,
+**live playback metering** plus post-render **LUFS / true-peak meters** and a
+**PLR / PSR / LRA / phase-correlation** dynamics readout (the same `meters.py` math
+the engine uses), a **loudness-matched A/B** (audition the pre-master mix at
+matched loudness), and **save/load** of the whole project (`keel.json`). A signed
+installer is the remaining gate (see [`ROADMAP.md`](ROADMAP.md)).
 
 ### Download the app (prebuilt)
 
-GitHub Actions builds standalone executables on every version tag (and on demand
-from the **Actions -> build-app -> Run workflow** button):
+Every version tag publishes a GitHub **release** with prebuilt downloads (also
+buildable on demand from the **Actions -> build-app -> Run workflow** button):
 
-- **Windows:** `Keel.exe` — a single onefile, just run it.
+- **Windows:** `KeelSetup-<ver>.exe` (installer) or `Keel.exe` (portable onefile).
 - **macOS (Apple Silicon):** `Keel.dmg` — open it and drag Keel to Applications.
-  It is currently unsigned, so first launch needs right-click -> Open. (Intel
-  Macs aren't built yet — ask and a `macos-13` job can be added.)
+  Unsigned, so first launch needs right-click -> Open. (Intel Macs aren't built
+  yet — ask and a `macos-13` job can be added.)
 
-Grab them from the latest **build-app** run's artifacts. Each build self-tests
-the frozen app before it's uploaded.
+Grab them from the
+[latest release](https://github.com/fcarvajalbrown/Keel/releases/latest); each
+build self-tests the frozen app before it's published.
 
 ### Build the app yourself
 
@@ -380,18 +386,58 @@ the frozen app before it's uploaded.
 
 ---
 
+## Plugin (VST3 / AU) — master inside your DAW
+
+Keel also ships as a **self-contained real-time mastering plugin**: drop it on your
+master bus, dial it in against live meters, and deliver by exporting/bouncing from
+your DAW with the plugin active — there is no separate render step. It runs a
+faithful C++ port of the engine's master chain (tone -> Makeup drive -> oversampled
+soft-clip -> 4x true-peak limiter), so what you monitor is the master.
+
+- **Formats:** **VST3** (Windows + macOS) and **AU** (macOS — Logic Pro /
+  GarageBand), both built and pluginval-tested in CI and versioned in lockstep with
+  the app.
+- **Metering, built for streaming:** BS.1770-4 **integrated + short-term +
+  momentary LUFS** — aim Makeup at *integrated*, the number Spotify / YouTube /
+  Apple normalize on — plus **loudness range (LRA)**, a scrolling
+  **loudness-history** and **gain-reduction-history** graph, a **true-peak
+  peak-hold**, and a **loudness-matched A/B** bypass so you hear *character*, not
+  just level. Load a reference track for a passive integrated-LUFS / true-peak
+  readout beside the live meters.
+- **Workflow / quality-of-life:** hiDPI resize, undo/redo, user presets, tooltips +
+  a first-run note, host automation and accessibility labels, and a plugin-only
+  **2x / 4x / 8x oversampling** selector (CPU vs. alias suppression).
+- **Exact spec vs. live master:** the byte-identical **-14 LUFS / -1 dBTP** file
+  lives in the app / CLI; the plugin trades that exactness for a live, self-contained
+  master (streaming re-normalizes loudness anyway, and the true-peak ceiling is
+  enforced live so DAW exports stay peak-safe).
+
+**Download:** grab `Keel-VST3-windows-<ver>.zip` (Windows) or
+`Keel-plugins-macos-<ver>.zip` (macOS VST3 + AU) from the
+[latest release](https://github.com/fcarvajalbrown/Keel/releases/latest), unzip
+into your plugin folder, and rescan in your DAW. Unsigned beta (first-launch
+Gatekeeper / SmartScreen prompt).
+
+---
+
 ## Where Keel is headed
 
-Today Keel is a command-line tool. The mission is to reach any musician on the
-same deterministic engine:
+Keel started as a command-line tool and now also ships as a **standalone GUI app**
+and a **VST3 / AU plugin** on the same deterministic engine — the DSP core is done
+and validated, and all three front-ends drive one shared library (the DSP is never
+forked). What's left before a stable **1.0**:
 
-1. **Standalone GUI** — drag a folder of stems, see the labels and loudness
-   meters, get your mix + master.
-2. **VST / plugin** — run Keel's balance + master stage inside your DAW.
+1. **DSP carve-outs** — the two sanctioned master-tone options: a deterministic
+   **stereo-width** control and a single broadband **tilt** knob, both opt-in /
+   off by default so the default master is unchanged.
+2. **DSP settle** — a Python↔C++ parity harness + golden-file tests that lock the
+   plugin's live chain to the engine before the DSP is frozen.
+3. **Launch** — landing page, code-signing / notarization (removes the
+   SmartScreen / Gatekeeper prompts), and the 1.0 stamp.
 
-The DSP core is done and validated. See [`ROADMAP.md`](ROADMAP.md) for the plan
-and [`docs/adr/`](docs/adr/) for the decision records (why the engine, config,
-toolkit, licensing, and packaging are the way they are).
+See [`ROADMAP.md`](ROADMAP.md) for the staged plan and [`docs/adr/`](docs/adr/) for
+the decision records (why the engine, config, toolkit, licensing, and packaging are
+the way they are).
 
 ---
 
