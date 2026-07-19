@@ -54,6 +54,7 @@ private:
     // (integrated) meter; the Reset button restarts the integrated measurement.
     juce::Label      lufsSecondary;
     juce::TextButton resetIntgButton { "Reset" };
+    juce::Label      lraLabel;          // loudness range (EBU R128), LU
     juce::Label exportNote;
 
     // Card backgrounds: filled in resized(), painted in paint().

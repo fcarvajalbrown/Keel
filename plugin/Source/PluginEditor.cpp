@@ -117,6 +117,11 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     addAndMakeVisible (resetIntgButton);
     resetIntgButton.onClick = [this] { processor.resetIntegrated(); };
 
+    lraLabel.setText ("Loudness range  --", juce::dontSendNotification);
+    lraLabel.setFont (look.display (10.0f));
+    lraLabel.setColour (juce::Label::textColourId, keel::palette::muted);
+    addAndMakeVisible (lraLabel);
+
     tpMeter.setTarget (-1.0f);
     tpMeter.setDangerAbove (-1.0f);
     addAndMakeVisible (tpMeter);
@@ -130,7 +135,7 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     exportNote.setJustificationType (juce::Justification::centredTop);
     addAndMakeVisible (exportNote);
 
-    setSize (440, 712);
+    setSize (440, 738);
     startTimerHz (30);
 }
 
@@ -164,6 +169,12 @@ void KeelAudioProcessorEditor::timerCallback()
                                + "    Momentary  " + fmtLufs (processor.momentaryLufs.load());
     if (lufsSecondary.getText() != secText)
         lufsSecondary.setText (secText, juce::dontSendNotification);
+
+    const float lra = processor.loudnessRange.load();
+    const juce::String lraText = "Loudness range  "
+        + (lra < 0.0f ? juce::String ("--") : juce::String (lra, 1) + " LU");
+    if (lraLabel.getText() != lraText)
+        lraLabel.setText (lraText, juce::dontSendNotification);
 
     const float tpCeil = processor.apvts.getRawParameterValue ("tp")->load();
     tpMeter.setTarget (tpCeil);
@@ -264,7 +275,7 @@ void KeelAudioProcessorEditor::resized()
     r.removeFromTop (12);
 
     // card: Meters
-    cardMeters = r.removeFromTop (206);
+    cardMeters = r.removeFromTop (232);
     {
         auto c = cardMeters.reduced (14);
         lufsMeter.setBounds (c.removeFromTop (58));
@@ -273,7 +284,9 @@ void KeelAudioProcessorEditor::resized()
         resetIntgButton.setBounds (secRow.removeFromRight (60));
         secRow.removeFromRight (8);
         lufsSecondary.setBounds (secRow);
-        c.removeFromTop (10);
+        c.removeFromTop (4);
+        lraLabel.setBounds (c.removeFromTop (18));
+        c.removeFromTop (8);
         tpMeter.setBounds (c.removeFromTop (58));
     }
     r.removeFromTop (10);

@@ -196,6 +196,7 @@ void KeelAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
     gateHopSamples = juce::jmax (1, (int) std::round (currentSampleRate * 0.1));
     intgHist.assign ((size_t) kIntgNumBins, 0);
+    lraHist.assign ((size_t) kIntgNumBins, 0);
     intgBinEnergy.resize ((size_t) kIntgNumBins);
     for (int b = 0; b < kIntgNumBins; ++b)
     {
@@ -272,12 +273,14 @@ void KeelAudioProcessor::resetMeters()
     stSumSq[0] = stSumSq[1] = 0.0;
     stSamples = 0;
     std::fill (intgHist.begin(), intgHist.end(), 0);
+    std::fill (lraHist.begin(), lraHist.end(), 0);
     samplesSinceGate = 0;
     integratedResetRequested.store (false);
     truePeakHold = 0.0f;
     momentaryLufs.store (kSilenceFloor);
     shortTermLufs.store (kSilenceFloor);
     integratedLufs.store (kSilenceFloor);
+    loudnessRange.store (-1.0f);
     truePeakDb.store (kSilenceFloor);
 }
 
@@ -314,6 +317,51 @@ void KeelAudioProcessor::updateIntegrated()
     const double meanRel = sumEnergyRel / (double) countRel;
     integratedLufs.store (juce::jmax (kSilenceFloor,
         (float) (-0.691 + 10.0 * std::log10 (meanRel))));
+}
+
+// Recompute the loudness range (EBU R128 / Tech 3342) from the short-term
+// histogram: absolute-gate at -70 LKFS (all binned values already clear it), apply
+// the -20 LU relative gate, then LRA = P95 - P10 of the surviving short-term
+// loudness distribution. Bin-centre percentiles are accurate to the 0.1 LU bin
+// width, ample for a readout. Audio thread only; lraHist is written here only.
+void KeelAudioProcessor::updateLra()
+{
+    long long total = 0;
+    double sumEnergy = 0.0;
+    for (int b = 0; b < kIntgNumBins; ++b)
+    {
+        const int c = lraHist[(size_t) b];
+        if (c > 0) { total += c; sumEnergy += (double) c * intgBinEnergy[(size_t) b]; }
+    }
+    if (total < 2) { loudnessRange.store (-1.0f); return; }
+
+    const double meanAbs   = sumEnergy / (double) total;
+    const double relThresh = (-0.691 + 10.0 * std::log10 (meanAbs)) - 20.0;
+    int relBin = (int) std::floor ((relThresh - kIntgMinLufs) / kIntgBinWidth);
+    relBin = juce::jlimit (0, kIntgNumBins, relBin);
+
+    long long gated = 0;
+    for (int b = relBin; b < kIntgNumBins; ++b)
+        gated += lraHist[(size_t) b];
+    if (gated < 2) { loudnessRange.store (-1.0f); return; }
+
+    const long long lowRank  = (long long) std::floor ((double) (gated - 1) * 0.10 + 0.5);
+    const long long highRank = (long long) std::floor ((double) (gated - 1) * 0.95 + 0.5);
+
+    long long cum = 0;
+    double lLow = kIntgMinLufs, lHigh = kIntgMinLufs;
+    bool gotLow = false;
+    for (int b = relBin; b < kIntgNumBins; ++b)
+    {
+        const int c = lraHist[(size_t) b];
+        if (c == 0) continue;
+        const long long next = cum + c;
+        const double centre = kIntgMinLufs + (b + 0.5) * kIntgBinWidth;
+        if (! gotLow && lowRank < next) { lLow = centre; gotLow = true; }
+        if (highRank < next)            { lHigh = centre; break; }
+        cum = next;
+    }
+    loudnessRange.store ((float) juce::jmax (0.0, lHigh - lLow));
 }
 
 void KeelAudioProcessor::loadReference (const juce::File& file)
@@ -446,11 +494,14 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // --- Below we only MEASURE the OUTPUT; we never write to the buffer. ---
 
     // Honour a pending integrated reset before folding in this block's energy.
+    // Integrated + loudness range share one measurement session, so both clear.
     if (integratedResetRequested.exchange (false))
     {
         std::fill (intgHist.begin(), intgHist.end(), 0);
+        std::fill (lraHist.begin(), lraHist.end(), 0);
         samplesSinceGate = 0;
         integratedLufs.store (kSilenceFloor);
+        loudnessRange.store (-1.0f);
     }
 
     // 1) Momentary LUFS over a 400 ms sliding window (K-weighted mean square).
@@ -532,6 +583,24 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 b = juce::jlimit (0, kIntgNumBins - 1, b);
                 ++intgHist[(size_t) b];
                 updateIntegrated();
+            }
+        }
+
+        // Loudness range: bin the current short-term (3 s) loudness at the same
+        // cadence, once the short-term window has filled.
+        if (stSamples >= stCapacitySamples)
+        {
+            const double zst = (stSumSq[0] + stSumSq[1]) / (double) stSamples;
+            if (zst > 1.0e-12)
+            {
+                const double lst = -0.691 + 10.0 * std::log10 (zst);
+                if (lst >= kIntgMinLufs)
+                {
+                    int b = (int) std::floor ((lst - kIntgMinLufs) / kIntgBinWidth);
+                    b = juce::jlimit (0, kIntgNumBins - 1, b);
+                    ++lraHist[(size_t) b];
+                    updateLra();
+                }
             }
         }
     }

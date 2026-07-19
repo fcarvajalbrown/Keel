@@ -70,6 +70,10 @@ public:
     std::atomic<float> integratedLufs { -100.0f };
     std::atomic<float> truePeakDb     { -100.0f };
 
+    // Loudness range (EBU R128 / Tech 3342), LU. -1.0f means "not enough gated
+    // short-term data yet". Shares the integrated measurement session (same reset).
+    std::atomic<float> loudnessRange  { -1.0f };
+
     // Reset the integrated measurement (call from the UI thread). Integrated
     // accumulates from the last reset, so the user dials Makeup, resets, then lets
     // a representative loud section play and reads where it lands. RT-safe: this
@@ -144,7 +148,13 @@ private:
     int    samplesSinceGate { 0 };
     std::atomic<bool> integratedResetRequested { false };
 
+    // Loudness range: short-term loudness values sampled at the same 100 ms cadence
+    // into a parallel histogram (same 0.1 LU bins), so LRA = P95 - P10 over the
+    // -20 LU relatively-gated distribution can be read off in constant memory.
+    std::vector<int> lraHist;
+
     void updateIntegrated();   // recompute the integrated value from the histogram
+    void updateLra();          // recompute the loudness range from the ST histogram
 
     // True-peak: 4x oversample the block, take the inter-sample max. Built in
     // prepareToPlay for the host's actual channel count.
