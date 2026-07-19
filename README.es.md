@@ -24,12 +24,12 @@
 
 <div align="center">
 
-[![estado](https://img.shields.io/badge/estado-beta-yellow.svg)](ROADMAP.md)
-[![motor: AGPL v3](https://img.shields.io/badge/motor-AGPL%20v3-blue.svg)](LICENSE)
-[![uso comercial: USD 20/asiento](https://img.shields.io/badge/uso%20comercial-USD%2020%2Fasiento-blueviolet.svg)](COMMERCIAL-LICENSE.md)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](requirements.txt)
-[![loudness](https://img.shields.io/badge/loudness-ITU--R%20BS.1770--4-brightgreen.svg)](#bajo-el-capó-el-dsp)
-[![render](https://img.shields.io/badge/render-determinista-success.svg)](#)
+[![estado](assets/badges/estado.svg)](ROADMAP.md)
+[![motor: AGPL v3](assets/badges/motor.svg)](LICENSE)
+[![uso comercial: USD 20/asiento](assets/badges/uso-comercial.svg)](COMMERCIAL-LICENSE.md)
+[![Python](assets/badges/python.svg)](requirements.txt)
+[![loudness](assets/badges/loudness.svg)](#bajo-el-capó-el-dsp)
+[![render](assets/badges/render-determinista.svg)](#)
 
 </div>
 
