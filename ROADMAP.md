@@ -13,7 +13,7 @@ a tone-shaping suite. See "Non-goals" at the bottom.
 
 ---
 
-## Where we are: `v0.6.0-beta`
+## Where we are: `v0.7.0-beta`
 
 The DSP core is **done and validated**; the CLI, the desktop GUI, and the VST3
 plugin all drive the same engine and all build green. There are no unfinished
@@ -33,10 +33,13 @@ code stubs left — the remaining distance to a stable **1.0** is about
   re-measure gate; multi-target one-pass export; an opt-in loudness-keyed TP
   ceiling; album loudness-consistency mode; and deterministic reference-loudness
   matching. Suite **39 → 73**.
-- **Plugin depth** — the plugin's by-ear Makeup gain is steered by a *momentary*
-  LUFS meter while streaming normalizes on *integrated* LUFS, so users aim at the
-  wrong number; the metering/UX depth that fixes that (plus the decided
-  oversampling selector) is unbuilt (`v0.7`).
+- **Plugin depth — DONE (`v0.7`).** The plugin now shows real BS.1770 integrated +
+  short-term LUFS (the headline fix — Makeup is aimed at integrated, the number
+  streaming normalizes on), LRA, loudness + gain-reduction history graphs, a
+  true-peak peak-hold, and a loudness-matched A/B; plus hiDPI resize, undo/redo,
+  user presets, tooltips + first-run note, host-automation plumbing, accessibility
+  labels, and a plugin-only oversampling selector. The GUI mirrors LRA + the
+  loudness-matched A/B. Meter/UI/packaging only — no DSP SYNC (ADR-0036).
 - **DSP feature-complete** — the two sanctioned master-tone widenings
   (deterministic stereo-width, one broadband tilt knob) are still unbuilt (`v0.8`)
   and then locked/parity-proven (`v0.9`) before the freeze.
@@ -244,23 +247,23 @@ change). Test suite **39 → 73**.
       extracts a reference's integrated LUFS as a plain, replayable target — the
       non-ML face of reference matching; the spectral match stays offline Matchering).
 
-### `v0.7.0-beta` — Plugin depth (metering + UX)  (ADR-0036)
-Turn the plugin from "works" into "trustworthy and pro-grade". The credibility
-gap: Makeup is steered by a *momentary* LUFS meter while streaming judges
-*integrated* LUFS, so users aim at the wrong number. **All meter/UI/packaging — no
-master-tone math changes, so no DSP SYNC in this milestone.**
-- [ ] **Metering / credibility (plugin):** integrated + short-term LUFS meters
+### `v0.7.0-beta` — Plugin depth (metering + UX)  (ADR-0036)  ✓ shipped
+Turned the plugin from "works" into "trustworthy and pro-grade". The credibility
+gap: Makeup was steered by a *momentary* LUFS meter while streaming judges
+*integrated* LUFS, so users aimed at the wrong number. **All meter/UI/packaging — no
+master-tone math changed, so no DSP SYNC in this milestone.**
+- [x] **Metering / credibility (plugin):** integrated + short-term LUFS meters
       (the headline fix), **LRA** readout, a **loudness-history graph**,
       **gain-reduction history**, **true-peak peak-hold**, and a
       **loudness-matched A/B bypass** (proves *character*, not just level — Keel
       deliberately raises loudness).
-- [ ] **UX / quality-of-life (plugin):** hiDPI resize, undo/redo, user presets,
+- [x] **UX / quality-of-life (plugin):** hiDPI resize, undo/redo, user presets,
       tooltips + a first-run note (delivery-by-DAW-export is non-obvious),
       host-automation plumbing, accessibility labels. **No OpenGL/GPU** (it worsens
       JUCE VST3 hiDPI scaling — see non-goals).
-- [ ] **Oversampling-quality selector** on the plugin's live chain (ADR-0033) —
+- [x] **Oversampling-quality selector** on the plugin's live chain (ADR-0033) —
       plugin-only; the CLI/GUI stays fixed so byte-identical determinism holds.
-- [ ] **GUI mirror:** bring the useful additions into `gui.py` too —
+- [x] **GUI mirror:** brought the useful additions into `gui.py` too —
       loudness-matched A/B and richer post-render meters (LRA alongside the
       existing PLR/PSR + phase-correlation).
 

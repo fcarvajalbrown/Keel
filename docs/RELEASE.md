@@ -96,3 +96,12 @@ Prefer the tag + CI path when you can — it also builds and attaches the macOS
   (`--auto-tp`); album loudness-consistency mode (`--album`); and deterministic
   reference-loudness matching (`--match-loudness`). No master tone math changed, so
   no DSP SYNC. Test suite 39 → 73.
+- `v0.7.0-beta` — Plugin depth (metering + UX): the plugin gains real BS.1770
+  integrated + short-term LUFS meters (the headline fix — Makeup was aimed at a
+  momentary meter while streaming judges integrated), LRA, loudness + gain-reduction
+  history graphs, a true-peak peak-hold, and a loudness-matched A/B; plus hiDPI
+  resize, undo/redo, user presets, tooltips + first-run note, host-automation
+  plumbing, accessibility labels, and a plugin-only 2x/4x/8x oversampling selector
+  (CLI/GUI stays fixed). The GUI mirrors LRA into the post-render meters and gains a
+  loudness-matched A/B. All meter/UI/packaging — no master tone math changed, so no
+  DSP SYNC (ADR-0036).

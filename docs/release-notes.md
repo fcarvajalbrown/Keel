@@ -1,8 +1,12 @@
-**Beta** release of Keel (deterministic automix + automaster). This one is an
-**engine** release — "Delivery & metering depth". It turns Keel's loudness/true-
-peak-safe promise into a *measured guarantee* on every render, and adds the export
-formats and multi-target/album workflows a musician actually delivers with. No
-master tone math changed, so the plugin and the CLI/GUI master stay in step.
+**Beta** release of Keel (deterministic automix + automaster). This one is a
+**plugin** release — "Plugin depth". It closes the plugin's credibility gap
+(Makeup was aimed at a *momentary* meter while streaming normalizes on
+*integrated* LUFS) and makes it trustworthy and pro-grade: real BS.1770
+integrated + short-term meters, LRA, loudness + gain-reduction history graphs, a
+true-peak peak-hold, and a loudness-matched A/B — plus the quality-of-life a DAW
+user expects (hiDPI resize, undo/redo, user presets, tooltips, accessibility, a
+plugin-only oversampling selector). No master tone math changed anywhere, so the
+plugin and the CLI/GUI master stay in step.
 
 ## Downloads
 - **Windows app** — `KeelSetup-<ver>.exe` (recommended installer) or `Keel.exe` (portable).
@@ -16,32 +20,36 @@ master tone math changed, so the plugin and the CLI/GUI master stay in step.
   rescan (Logic Pro / GarageBand use the AU).
 
 ## New in this release
-- **PASS/FAIL compliance stamp + dynamics meters.** Every master in `out/REPORT.md`
-  now carries a PASS/FAIL verdict (loudness within tolerance of target, true-peak
-  at/under the ceiling) plus **PLR** (peak-to-loudness), **PSR** (peak-to-short-term)
-  and **stereo phase-correlation** — pure arithmetic on values Keel already measures.
-- **Encoded delivery formats** — `--format flac,mp3,ogg,aac`. FLAC/MP3/OGG go
-  through libsndfile (offline, no extra tool); AAC uses ffmpeg if present. FLAC is
-  bit-exact; the lossy formats are deterministic given the encoder version.
-- **Post-codec true-peak gate.** Each encoded file is decoded and re-metered, and
-  its post-codec true-peak graded PASS/WARN/FAIL against the ceiling — so "we leave
-  headroom for lossy transcoding" is auditable, not a claim. Advisory only; it never
-  reshapes the master.
-- **Multi-target one-pass export** — `--targets streaming,-16,loud` renders one
-  master per target in a single pass, each re-running the chain so every file is
-  genuinely at-spec, in its own file.
-- **Seeded dither for sub-32-bit export** — `--bit-depth 16 --dither tpdf` (or
-  `shaped`). TPDF dither removes quantization distortion when going to 16/24-bit,
-  and the PRNG is seeded so output stays deterministic (same stems + recipe + seed
-  = identical file).
-- **Loudness-keyed true-peak ceiling** — opt-in `--auto-tp` follows the target
-  (-14 → -1, -9 → -2 dBTP); an explicit `--tp` still wins. Off by default.
-- **Album loudness-consistency mode** — `--album` (with `--batch`) preserves the
-  intended loudness differences between tracks instead of flattening every track to
-  the same LUFS, while the album mean lands on target.
-- **Deterministic reference-loudness match** — `--match-loudness ref.wav` measures
-  a reference's integrated LUFS and uses it as the target (no ML/spectral match;
-  the spectral match stays the offline Matchering path).
+### Plugin metering (the credibility fix)
+- **Integrated + short-term LUFS meters.** The plugin now shows real BS.1770-4
+  **integrated** loudness as the primary aimed meter — the number streaming
+  services normalize on — with short-term + momentary alongside and a **Reset**.
+  Previously Makeup was steered against a momentary meter, so users aimed at the
+  wrong number.
+- **Loudness range (LRA)** readout (EBU R128), plus a scrolling **loudness-history
+  graph** and a **gain-reduction history graph** so consistency and how hard the
+  limiter works are visible, not guessed.
+- **True-peak peak-hold** — a latched maximum on the TP meter (red once it ever
+  crossed the ceiling), so a stray overshoot can't scroll away unseen.
+- **Loudness-matched A/B bypass** — audition the dry input gain-matched to the
+  master's loudness, so the comparison exposes *character*, not the loudness lift.
+
+### Plugin quality-of-life
+- **hiDPI resize** (aspect-locked, crisp vector scaling — no OpenGL), **undo/redo**
+  (buttons + Ctrl+Z/Y), **user presets** (save/recall full snapshots), **tooltips**
+  + a **first-run note** explaining the deliver-by-DAW-export workflow, cleaner
+  **host-automation** (the preset macro now applies under automation with no editor
+  open; params carry unit labels), and **accessibility** labels + screen-reader
+  meter values.
+- **Oversampling-quality selector** (2x / 4x / 8x) on the plugin's live clip/limiter
+  — trade CPU vs alias suppression. The true-peak *meter* stays fixed 4x, and the
+  byte-identical CLI/GUI path is unchanged, so determinism holds.
+
+### Standalone GUI mirror
+- **Loudness range (LRA)** now appears in the post-render dynamics readout alongside
+  PLR / PSR / phase-correlation (and in `out/REPORT.md`).
+- **Loudness-matched A/B** in the GUI: audition the pre-master mix gain-matched to
+  the master's loudness, switching live during playback.
 
 ## Heads-up: these builds are unsigned
 They are not yet code-signed, so the OS will warn on first launch:

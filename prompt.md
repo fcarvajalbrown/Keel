@@ -7,28 +7,43 @@ real-world material; the GUI scaffold + cross-platform builds now exist too.
 
 ## >>> START HERE — immediate next task
 
-**This session (2026-07-18) — road to 1.0 RESTRUCTURED (ADR-0036/0037/0038); no
-code yet.** The old plan was `v0.7` go-to-market → `v1.0` sign+freeze, with
-stereo-width + tilt parked post-1.0. New plan (decided with the user via the option
-UI): the remaining betas are **`v0.7` plugin depth → `v0.8` DSP carve-outs → `v0.9`
-DSP settle**, then **`v1.0` launch + freeze** (go-to-market folded into 1.0). The
-point: all DSP work finishes by `v0.8` and spends `v0.9` proving stable, so the 1.0
-freeze stays clean. Written into `ROADMAP.md` + ADR-0036/0037/0038 + ADR index;
-ADR-0031's *scheduling* superseded (its scope stands). **>>> IMMEDIATE NEXT TASK:
-build `v0.7.0-beta` — plugin depth (the user is handing this to me):**
-- **Metering/credibility (plugin):** integrated + short-term LUFS (the headline fix
-  — Makeup is aimed at a momentary meter today while streaming judges integrated),
-  LRA, loudness-history graph, gain-reduction history, true-peak peak-hold,
-  loudness-matched A/B bypass.
-- **UX/QoL (plugin):** hiDPI resize, undo/redo, user presets, tooltips + first-run
-  note, host-automation plumbing, accessibility labels. NO OpenGL/GPU.
-- **Oversampling-quality selector** (ADR-0033) — plugin-only; CLI/GUI stays fixed.
-- **GUI mirror:** loudness-matched A/B + richer post-render meters (LRA) into
-  `gui.py`.
-- **No master-tone math changes in v0.7 → no DSP SYNC.** Confirm scope/approach with
-  the user via the option UI before writing plugin code. Then `v0.8` = stereo-width
-  + tilt (opt-in, DSP-SYNC mirrored), `v0.9` = parity harness + golden tests +
-  frozen-DSP spec, `v1.0` = go-to-market + signing + freeze. See `ROADMAP.md`.
+**This session (2026-07-18, part 2) — `v0.7.0-beta` "Plugin depth" SHIPPED.** All
+14 roadmap items landed as 15 atomic commits (each built green — plugin via
+`plugin\build.ps1`, Python suite 73 tests + GUI `--selftest` green), version bumped
+to 0.7.0 in lockstep (`keel.py`, `installer/keel.iss`, `plugin/CMakeLists.txt`) +
+docs swept, tag `v0.7.0-beta` pushed. **No master tone math changed anywhere, so no
+DSP SYNC.** What shipped:
+- **Plugin metering (the credibility fix):** real BS.1770 **integrated + short-term
+  LUFS** (integrated is now the primary aimed meter — Makeup was aimed at momentary
+  while streaming judges integrated), **LRA**, a scrolling **loudness-history** +
+  **gain-reduction-history** graph, a **true-peak peak-hold** (latched, red once it
+  crossed the ceiling), and a **loudness-matched A/B** bypass. All hand-rolled
+  RT-safe on the audio thread (libebur128 stays off it).
+- **Plugin UX/QoL:** hiDPI resize (aspect-locked transform scale, no OpenGL),
+  undo/redo (APVTS UndoManager + coalesced transactions), user presets
+  (`*.keelpreset`), tooltips + a first-run note, host-automation plumbing (preset
+  macro applies headless; param unit labels), accessibility labels + screen-reader
+  meter values, and a plugin-only **2x/4x/8x oversampling selector** (ADR-0033; the
+  TP meter stays fixed 4x, CLI/GUI path unchanged).
+- **GUI mirror:** LRA into `meters.py` + the post-render dynamics readout (and
+  `out/REPORT.md`), and a **loudness-matched A/B** in `gui.py` (audition the
+  pre-master mix, gain-matched, switching live during playback).
+
+**>>> IMMEDIATE NEXT TASK: `v0.8.0-beta` — DSP carve-outs (ADR-0037).** The two
+sanctioned master-tone widenings, promoted from post-1.0, both **opt-in /
+off-by-default** so the default master + "printed image preserved" promise are
+unchanged:
+- **Deterministic stereo-width** — a flat linear M/S side-gain (NOT EQ), placed
+  **before** the true-peak limiter so the -1 dBTP guarantee holds. Off by default
+  (side-gain = 1.0). Lands in `mastering.py` / `recipes.py`.
+- **Single broadband tilt knob** — one deterministic brighter/darker curve; NOT
+  per-band, NOT M/S. Neutral by default (tilt = 0). Lands in `mastering.py` /
+  `recipes.py`.
+- **BOTH touch the master math → each carries a DSP-SYNC mirror into the plugin C++
+  live chain (`plugin/Source/`, ADR-0029) + an A/B re-check. Note the DSP SYNC in
+  the commits.** Then `v0.9` = parity harness + golden tests + frozen-DSP spec,
+  `v1.0` = go-to-market + signing + freeze. Confirm scope with the user via the
+  option UI before writing DSP. See `ROADMAP.md`.
 
 **This session (2026-07-11) — `v0.6.0-beta` "Delivery & metering depth" SHIPPED
 (engine milestone).** All seven roadmap items landed as atomic commits + tests,
