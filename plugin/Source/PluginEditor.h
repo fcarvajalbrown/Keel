@@ -23,6 +23,7 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    bool keyPressed (const juce::KeyPress&) override;
 
 private:
     void timerCallback() override;
@@ -38,6 +39,13 @@ private:
 
     keel::HullMark hullMark;
     juce::Label  titleLabel, subtitleLabel;
+
+    // Undo/redo of parameter edits (APVTS is wired to processor.undoManager). Edits
+    // are coalesced into one transaction each once a burst of changes settles.
+    juce::TextButton undoButton { "Undo" }, redoButton { "Redo" };
+    float lastParamValues[6] { 0, 0, 0, 0, 0, 0 };
+    int   undoIdleTicks   { 0 };
+    bool  undoPendingSeal { false };
 
     juce::Label    presetLabel;
     juce::ComboBox presetBox;

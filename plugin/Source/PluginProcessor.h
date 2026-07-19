@@ -58,6 +58,8 @@ public:
     void setStateInformation (const void*, int) override;
 
     // --- spike API for the editor ---
+    // Declared before apvts so it is constructed first (apvts takes its address).
+    juce::UndoManager undoManager;
     juce::AudioProcessorValueTreeState apvts;
 
     // Display-only meter values, written on the audio thread, read on the UI

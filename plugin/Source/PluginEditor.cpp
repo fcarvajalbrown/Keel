@@ -23,6 +23,15 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     subtitleLabel.setColour (juce::Label::textColourId, keel::palette::muted);
     addAndMakeVisible (subtitleLabel);
 
+    // --- Undo / redo of parameter edits ---
+    undoButton.onClick = [this] { processor.undoManager.undo(); };
+    redoButton.onClick = [this] { processor.undoManager.redo(); };
+    undoButton.setTitle ("Undo"); undoButton.setTooltip ("Undo parameter change (Ctrl+Z)");
+    redoButton.setTitle ("Redo"); redoButton.setTooltip ("Redo parameter change (Ctrl+Shift+Z)");
+    addAndMakeVisible (undoButton);
+    addAndMakeVisible (redoButton);
+    setWantsKeyboardFocus (true);
+
     auto sectionLabel = [this] (juce::Label& l, const juce::String& t)
     {
         l.setText (t, juce::dontSendNotification);
@@ -187,6 +196,11 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     addChildComponent (firstRunNote);
     showFirstRunNoteIfNeeded();
 
+    // Seed the undo-coalescing snapshot with current values (no spurious edit).
+    static const char* const undoIds[] = { "preset", "lufs", "tp", "makeup", "glue", "abmatch" };
+    for (int i = 0; i < 6; ++i)
+        lastParamValues[i] = processor.apvts.getRawParameterValue (undoIds[i])->load();
+
     setSize (440, 882);
     startTimerHz (30);
 }
@@ -195,6 +209,18 @@ KeelAudioProcessorEditor::~KeelAudioProcessorEditor()
 {
     stopTimer();
     setLookAndFeel (nullptr);
+}
+
+bool KeelAudioProcessorEditor::keyPressed (const juce::KeyPress& k)
+{
+    if (k.getModifiers().isCommandDown())
+    {
+        const int code = k.getKeyCode();
+        if (code == 'Z' && k.getModifiers().isShiftDown()) { processor.undoManager.redo(); return true; }
+        if (code == 'Z') { processor.undoManager.undo(); return true; }
+        if (code == 'Y') { processor.undoManager.redo(); return true; }
+    }
+    return false;
 }
 
 void KeelAudioProcessorEditor::showFirstRunNoteIfNeeded()
@@ -223,6 +249,26 @@ void KeelAudioProcessorEditor::showFirstRunNoteIfNeeded()
 
 void KeelAudioProcessorEditor::timerCallback()
 {
+    // Coalesce parameter edits into one undo transaction each: reset the idle
+    // counter on any change, and seal the transaction ~300 ms after edits settle.
+    {
+        static const char* const undoIds[] = { "preset", "lufs", "tp", "makeup", "glue", "abmatch" };
+        bool changed = false;
+        for (int i = 0; i < 6; ++i)
+        {
+            const float v = processor.apvts.getRawParameterValue (undoIds[i])->load();
+            if (v != lastParamValues[i]) { lastParamValues[i] = v; changed = true; }
+        }
+        if (changed) { undoIdleTicks = 0; undoPendingSeal = true; }
+        else if (undoPendingSeal && ++undoIdleTicks >= 9)
+        {
+            processor.undoManager.beginNewTransaction();
+            undoPendingSeal = false;
+        }
+        undoButton.setEnabled (processor.undoManager.canUndo());
+        redoButton.setEnabled (processor.undoManager.canRedo());
+    }
+
     lufsMeter.setTarget (processor.apvts.getRawParameterValue ("lufs")->load());
     lufsMeter.setValue (processor.integratedLufs.load());
 
@@ -298,6 +344,12 @@ void KeelAudioProcessorEditor::resized()
     auto header = r.removeFromTop (48);
     hullMark.setBounds (header.removeFromLeft (48).reduced (2));
     header.removeFromLeft (10);
+    {
+        auto row = header.removeFromRight (108).withSizeKeepingCentre (108, 24);
+        undoButton.setBounds (row.removeFromLeft (50));
+        row.removeFromLeft (8);
+        redoButton.setBounds (row.removeFromLeft (50));
+    }
     titleLabel.setBounds (header.removeFromTop (30));
     subtitleLabel.setBounds (header);
     r.removeFromTop (12);

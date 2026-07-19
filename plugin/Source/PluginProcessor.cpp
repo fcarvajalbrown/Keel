@@ -120,7 +120,7 @@ KeelAudioProcessor::KeelAudioProcessor()
     : AudioProcessor (BusesProperties()
           .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts (*this, nullptr, "PARAMS", makeParameterLayout())
+      apvts (*this, &undoManager, "PARAMS", makeParameterLayout())
 {
     apvts.addParameterListener ("preset", this);
 }
