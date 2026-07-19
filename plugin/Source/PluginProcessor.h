@@ -26,11 +26,13 @@
 #include <atomic>
 #include <vector>
 
-class KeelAudioProcessor : public juce::AudioProcessor
+class KeelAudioProcessor : public juce::AudioProcessor,
+                           private juce::AudioProcessorValueTreeState::Listener,
+                           private juce::AsyncUpdater
 {
 public:
     KeelAudioProcessor();
-    ~KeelAudioProcessor() override = default;
+    ~KeelAudioProcessor() override;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -106,6 +108,14 @@ public:
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout makeParameterLayout();
+
+    // Preset is a macro: selecting one sets Target-LUFS + TP. Applied in the
+    // processor (not just the editor) so host automation of "preset" works with no
+    // editor open. parameterChanged() may fire on the audio thread, so it only
+    // flags an AsyncUpdater that applies the targets on the message thread.
+    void parameterChanged (const juce::String& id, float newValue) override;
+    void handleAsyncUpdate() override;
+    int  lastAppliedPreset { 0 };   // guards against re-applying over restored state
 
     // --- LIVE master chain (ADR-0027 preview; mirror of mastering.py) ---
     // Tone stage: 1st-order HPF + low-shelf + air high-shelf (per channel), then a

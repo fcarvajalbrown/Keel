@@ -26,6 +26,14 @@ namespace
     constexpr double kIntgBinWidth = 0.1;
     constexpr int    kIntgNumBins  = 760;
 
+    // Preset macro table -- keep in sync with recipes.PRESETS and the editor combo.
+    struct PresetTargets { float lufs, tp; };
+    const PresetTargets kPresetTargets[] = {
+        { -14.0f, -1.0f },   // Streaming (default, ADR-0003)
+        { -10.0f, -1.0f },   // Loud
+        { -16.0f, -1.0f },   // Broadcast
+    };
+
     // --- LIVE master chain constants -- MIRROR of mastering.py._internal_master.
     //     DSP SYNC RULE (ADR-0027): if these change in Python, change them here too.
     constexpr double kHpfHz        = 28.0;    // sub-rumble high-pass
@@ -114,6 +122,34 @@ KeelAudioProcessor::KeelAudioProcessor()
           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "PARAMS", makeParameterLayout())
 {
+    apvts.addParameterListener ("preset", this);
+}
+
+KeelAudioProcessor::~KeelAudioProcessor()
+{
+    apvts.removeParameterListener ("preset", this);
+    cancelPendingUpdate();
+}
+
+void KeelAudioProcessor::parameterChanged (const juce::String& id, float)
+{
+    if (id == "preset")
+        triggerAsyncUpdate();   // apply the macro on the message thread
+}
+
+void KeelAudioProcessor::handleAsyncUpdate()
+{
+    const int idx = (int) apvts.getRawParameterValue ("preset")->load();
+    if (idx == lastAppliedPreset)
+        return;                 // no genuine change (e.g. state restore)
+    lastAppliedPreset = idx;
+    if (idx < 0 || idx >= (int) (sizeof (kPresetTargets) / sizeof (kPresetTargets[0])))
+        return;
+
+    if (auto* p = apvts.getParameter ("lufs"))
+        p->setValueNotifyingHost (p->convertTo0to1 (kPresetTargets[idx].lufs));
+    if (auto* p = apvts.getParameter ("tp"))
+        p->setValueNotifyingHost (p->convertTo0to1 (kPresetTargets[idx].tp));
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout
@@ -122,22 +158,27 @@ KeelAudioProcessor::makeParameterLayout()
     using namespace juce;
     AudioProcessorValueTreeState::ParameterLayout layout;
 
+    // Preset is a meta parameter: changing it drives Target-LUFS + TP.
     layout.add (std::make_unique<AudioParameterChoice> (
         ParameterID { "preset", 1 }, "Preset",
-        StringArray { "Streaming (-14)", "Loud (-10)", "Broadcast (-16)" }, 0));
+        StringArray { "Streaming (-14)", "Loud (-10)", "Broadcast (-16)" }, 0,
+        AudioParameterChoiceAttributes().withMeta (true)));
 
     layout.add (std::make_unique<AudioParameterFloat> (
         ParameterID { "lufs", 1 }, "Target LUFS",
-        NormalisableRange<float> (-24.0f, -6.0f, 0.1f), -14.0f));
+        NormalisableRange<float> (-24.0f, -6.0f, 0.1f), -14.0f,
+        AudioParameterFloatAttributes().withLabel ("LUFS")));
 
     layout.add (std::make_unique<AudioParameterFloat> (
         ParameterID { "tp", 1 }, "True-Peak Ceiling",
-        NormalisableRange<float> (-3.0f, 0.0f, 0.1f), -1.0f));
+        NormalisableRange<float> (-3.0f, 0.0f, 0.1f), -1.0f,
+        AudioParameterFloatAttributes().withLabel ("dBTP")));
 
     // Static drive into the clip/limiter -- you set it by ear against the meter.
     layout.add (std::make_unique<AudioParameterFloat> (
         ParameterID { "makeup", 1 }, "Makeup",
-        NormalisableRange<float> (-12.0f, 24.0f, 0.1f), 0.0f));
+        NormalisableRange<float> (-12.0f, 24.0f, 0.1f), 0.0f,
+        AudioParameterFloatAttributes().withLabel ("dB")));
 
     // NOTE: there is intentionally no "reference" parameter. The reference is a
     // user-loaded file measured offline for a passive LUFS/TP readout (ADR-0035),
@@ -753,6 +794,10 @@ void KeelAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
         if (xml->hasTagName (apvts.state.getType()))
         {
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
+
+            // Adopt the restored preset as already-applied so the queued async
+            // (fired by replaceState) does NOT overwrite the restored LUFS/TP.
+            lastAppliedPreset = (int) apvts.getRawParameterValue ("preset")->load();
 
             // Re-measure a saved reference, if any, so its readout returns.
             const auto path = apvts.state.getProperty ("referencePath",

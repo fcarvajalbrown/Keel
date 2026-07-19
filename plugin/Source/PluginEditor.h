@@ -26,7 +26,6 @@ public:
 
 private:
     void timerCallback() override;
-    void applyPresetToTargets();
 
     KeelAudioProcessor& processor;
     keel::KeelLookAndFeel look;

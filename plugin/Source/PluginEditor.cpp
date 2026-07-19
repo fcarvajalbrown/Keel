@@ -1,16 +1,5 @@
 #include "PluginEditor.h"
 
-namespace
-{
-    // Keep these in sync with recipes.PRESETS in the Python engine.
-    struct Preset { float lufs, tp; };
-    const Preset kPresets[] = {
-        { -14.0f, -1.0f },   // Streaming (default, ADR-0003)
-        { -10.0f, -1.0f },   // Loud
-        { -16.0f, -1.0f },   // Broadcast
-    };
-}
-
 KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     : AudioProcessorEditor (&p), processor (p),
       lufsMeter ("INTEGRATED", "LUFS", -40.0f, 0.0f, look),
@@ -48,8 +37,9 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     presetBox.addItem ("Loud (-10)", 2);
     presetBox.addItem ("Broadcast (-16)", 3);
     addAndMakeVisible (presetBox);
+    // Selecting a preset drives Target-LUFS + TP in the PROCESSOR (so host
+    // automation of "preset" works headless too); no editor-side handler needed.
     presetAttachment = std::make_unique<ComboAttachment> (apvts, "preset", presetBox);
-    presetBox.onChange = [this] { applyPresetToTargets(); };
 
     // --- Target LUFS (a meter reference, not an auto-driver) ---
     sectionLabel (lufsLabel, "Target LUFS");
@@ -163,18 +153,6 @@ KeelAudioProcessorEditor::~KeelAudioProcessorEditor()
 {
     stopTimer();
     setLookAndFeel (nullptr);
-}
-
-void KeelAudioProcessorEditor::applyPresetToTargets()
-{
-    const int idx = (int) processor.apvts.getRawParameterValue ("preset")->load();
-    if (idx >= 0 && idx < (int) (sizeof (kPresets) / sizeof (kPresets[0])))
-    {
-        if (auto* lufs = processor.apvts.getParameter ("lufs"))
-            lufs->setValueNotifyingHost (lufs->convertTo0to1 (kPresets[idx].lufs));
-        if (auto* tp = processor.apvts.getParameter ("tp"))
-            tp->setValueNotifyingHost (tp->convertTo0to1 (kPresets[idx].tp));
-    }
 }
 
 void KeelAudioProcessorEditor::timerCallback()
