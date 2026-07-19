@@ -117,7 +117,12 @@ KeelAudioProcessorEditor::KeelAudioProcessorEditor (KeelAudioProcessor& p)
     addAndMakeVisible (lufsSecondary);
 
     addAndMakeVisible (resetIntgButton);
-    resetIntgButton.onClick = [this] { processor.resetIntegrated(); };
+    resetIntgButton.onClick = [this]
+    {
+        processor.resetIntegrated();     // integrated + LRA + true-peak hold
+        loudnessGraph.clearHistory();
+        grGraph.clearHistory();
+    };
 
     lraLabel.setText ("Loudness range  --", juce::dontSendNotification);
     lraLabel.setFont (look.display (10.0f));
@@ -196,6 +201,7 @@ void KeelAudioProcessorEditor::timerCallback()
     tpMeter.setTarget (tpCeil);
     tpMeter.setDangerAbove (tpCeil);
     tpMeter.setValue (processor.truePeakDb.load());
+    tpMeter.setHold (processor.truePeakMaxDb.load());
 
     // Reference readout: "measuring..." -> "<name>:  -14.2 LUFS   -0.8 dBTP".
     juce::String refText;

@@ -83,6 +83,7 @@ public:
     void setTarget (float t)       { target = t; }
     void setDangerAbove (float d)  { dangerAbove = d; hasDanger = true; }
     void setValue (float v);       // pass -100 (or below floor) for "no signal"
+    void setHold (float h);        // latched peak-hold marker; -100 hides it
 
     void paint (juce::Graphics&) override;
 
@@ -96,6 +97,8 @@ private:
     bool  hasDanger { false };
     bool  hasValue { false };
     float value { 0.0f };
+    bool  hasHold { false };
+    float holdValue { 0.0f };
     KeelLookAndFeel& look;
 };
 

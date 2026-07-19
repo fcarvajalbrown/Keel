@@ -197,6 +197,13 @@ void Meter::setValue (float v)
     repaint();
 }
 
+void Meter::setHold (float h)
+{
+    if (h <= -99.0f) { hasHold = false; }
+    else             { hasHold = true; holdValue = h; }
+    repaint();
+}
+
 float Meter::frac (float v) const
 {
     return juce::jlimit (0.0f, 1.0f, (v - vmin) / (vmax - vmin));
@@ -249,6 +256,14 @@ void Meter::paint (juce::Graphics& g)
     tick (target, palette::text);
     if (hasDanger)
         tick (dangerAbove, palette::red);
+
+    // latched peak-hold marker (brighter, wider); red once it crossed the ceiling
+    if (hasHold)
+    {
+        const float hx = w * frac (holdValue);
+        g.setColour (hasDanger && holdValue > dangerAbove ? palette::red : palette::teal_hi);
+        g.fillRect (juce::Rectangle<float> (hx - 1.0f, ty - 4.0f, 2.5f, th + 8.0f));
+    }
 }
 
 // ----------------------------------------------------------------- HistoryGraph

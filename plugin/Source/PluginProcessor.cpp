@@ -277,6 +277,7 @@ void KeelAudioProcessor::resetMeters()
     samplesSinceGate = 0;
     integratedResetRequested.store (false);
     truePeakHold = 0.0f;
+    truePeakMaxLin = 0.0f;
     grHold = 0.0f;
     momentaryLufs.store (kSilenceFloor);
     shortTermLufs.store (kSilenceFloor);
@@ -284,6 +285,7 @@ void KeelAudioProcessor::resetMeters()
     loudnessRange.store (-1.0f);
     gainReductionDb.store (0.0f);
     truePeakDb.store (kSilenceFloor);
+    truePeakMaxDb.store (kSilenceFloor);
 }
 
 // Recompute the integrated loudness from the gating-block histogram: the -10 LU
@@ -512,15 +514,17 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // --- Below we only MEASURE the OUTPUT; we never write to the buffer. ---
 
-    // Honour a pending integrated reset before folding in this block's energy.
-    // Integrated + loudness range share one measurement session, so both clear.
+    // Honour a pending reset before folding in this block's energy. Integrated,
+    // loudness range and the true-peak peak-hold share one measurement session.
     if (integratedResetRequested.exchange (false))
     {
         std::fill (intgHist.begin(), intgHist.end(), 0);
         std::fill (lraHist.begin(), lraHist.end(), 0);
         samplesSinceGate = 0;
+        truePeakMaxLin = 0.0f;
         integratedLufs.store (kSilenceFloor);
         loudnessRange.store (-1.0f);
+        truePeakMaxDb.store (kSilenceFloor);
     }
 
     // 1) Momentary LUFS over a 400 ms sliding window (K-weighted mean square).
@@ -646,6 +650,12 @@ void KeelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     truePeakDb.store (truePeakHold > 1.0e-6f
         ? juce::jmax (kSilenceFloor, juce::Decibels::gainToDecibels (truePeakHold))
         : kSilenceFloor);
+
+    // Latched peak-hold: the maximum true-peak reached since the last reset.
+    truePeakMaxLin = juce::jmax (truePeakMaxLin, blockPeak);
+    if (truePeakMaxLin > 1.0e-6f)
+        truePeakMaxDb.store (juce::jmax (kSilenceFloor,
+            juce::Decibels::gainToDecibels (truePeakMaxLin)));
 }
 
 juce::AudioProcessorEditor* KeelAudioProcessor::createEditor()

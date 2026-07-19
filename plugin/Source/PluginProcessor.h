@@ -69,6 +69,9 @@ public:
     std::atomic<float> shortTermLufs  { -100.0f };
     std::atomic<float> integratedLufs { -100.0f };
     std::atomic<float> truePeakDb     { -100.0f };
+    // Latched maximum true-peak since the last reset (the "did I cross the ceiling"
+    // peak-hold). -100.0f = nothing yet.
+    std::atomic<float> truePeakMaxDb  { -100.0f };
 
     // Loudness range (EBU R128 / Tech 3342), LU. -1.0f means "not enough gated
     // short-term data yet". Shares the integrated measurement session (same reset).
@@ -164,6 +167,7 @@ private:
     // prepareToPlay for the host's actual channel count.
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
     float truePeakHold { 0.0f };       // linear, with decay for display
+    float truePeakMaxLin { 0.0f };     // linear, latched max for peak-hold
     float grHold { 0.0f };             // dB (<= 0), fast attack + slow release
     double currentSampleRate { 48000.0 };
 
