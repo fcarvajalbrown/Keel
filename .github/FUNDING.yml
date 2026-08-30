@@ -1,4 +1,3 @@
-# GitHub "Sponsor" button config.
-# PayPal has no native key, so the donate link goes under `custom`.
 custom:
   - "https://www.paypal.com/donate/?business=fcarvajalbrown%40protonmail.com&item_name=Support%20Keel%20development&currency_code=USD"
+ko_fi: fcarvajalbrown4
