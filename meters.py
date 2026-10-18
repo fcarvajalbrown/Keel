@@ -200,6 +200,24 @@ def normalize_to_lufs(audio, rate, target_lufs):
     return apply_gain_db(audio, target_lufs - loud)
 
 
+def loudest_rms_db(audio, rate, window_s=0.4):
+    a = _as_2d(audio)
+    if a.size == 0:
+        return float("-inf")
+    power = np.mean(a ** 2, axis=1)
+    size = max(1, int(window_s * rate))
+    if power.size <= size:
+        mean = float(np.sum(power)) / size
+    else:
+        running = np.concatenate([[0.0], np.cumsum(power)])
+        mean = float(np.max(running[size:] - running[:-size])) / size
+    return 10.0 * np.log10(mean) if mean > 0 else float("-inf")
+
+
+def crest_db(audio, rate, window_s=0.4):
+    return true_peak_db(audio, rate) - loudest_rms_db(audio, rate, window_s)
+
+
 def _as_2d(audio):
     """pyloudnorm wants (frames, channels); accept mono (frames,) too."""
     a = np.asarray(audio, dtype=np.float64)

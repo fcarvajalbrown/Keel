@@ -90,6 +90,16 @@ def _os_limit(sig, rate, ceiling_db, factor=OVERSAMPLE):
     return np.asarray(out, dtype=np.float32)
 
 
+def _cap_crest(sig, rate, cap_db, passes=6):
+    for _ in range(passes):
+        over = meters.crest_db(sig, rate) - cap_db
+        if not np.isfinite(over) or over <= 0.05:
+            break
+        ceiling_db = meters.true_peak_db(sig, rate) - over
+        sig = _soft_clip(sig, ceiling_db)
+    return np.asarray(sig, dtype=np.float32)
+
+
 def _compliance(lufs, tp, target_lufs, tp_ceiling_db, lufs_tol=0.5, tp_tol=0.1):
     """PASS/FAIL verdict for a rendered master against its spec. Keel's internal
     chain normalizes to the exact target and enforces the true-peak ceiling, so a
@@ -142,7 +152,8 @@ def _report(audio, rate, path, out_path, target_lufs, tp_ceiling_db, **extra):
 
 
 def _internal_master(mix_path, out_path, target_lufs, tp_ceiling_db,
-                     bit_depth=24, dither_mode=None, dither_seed=0):
+                     bit_depth=24, dither_mode=None, dither_seed=0,
+                     crest_cap_db=None):
     audio, rate = sf.read(str(mix_path), dtype="float32", always_2d=True)
     # guard --master-only on a foreign/corrupt mix: NaN/Inf samples become
     # silence so they can't poison the loudness/true-peak math (Keel's own mix
@@ -168,6 +179,9 @@ def _internal_master(mix_path, out_path, target_lufs, tp_ceiling_db,
     # 2) oversampled soft-clip: round off the sharpest transients. Clip a hair
     #    ABOVE the limiter ceiling so the clipper takes the very top and the
     #    limiter cleans the rest (clipper-then-limiter spreads the loudness work).
+    if crest_cap_db is not None:
+        audio = _cap_crest(audio, rate, float(crest_cap_db))
+
     clip_ceiling_db = min(0.0, tp_ceiling_db + 1.0)
     audio = _soft_clip(audio, clip_ceiling_db)
 
@@ -264,4 +278,5 @@ def master(mix_path, recipe, out_path, references_dir=None,
         target_lufs=recipe.get("target_lufs", -9.0),
         tp_ceiling_db=recipe.get("tp_ceiling_db", -1.0),
         bit_depth=bit_depth, dither_mode=dither, dither_seed=dither_seed,
+        crest_cap_db=recipe.get("crest_cap_db"),
     )

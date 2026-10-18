@@ -217,7 +217,8 @@ def _resolve_master_targets(targets, preset, target_lufs):
 def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
                 preset=None, target_lufs=None, tp_ceiling=None, ref=None,
                 glue=None, auto_tp=None, bit_depth=24, dither=None, dither_seed=0,
-                formats=None, targets=None, do_mix=True, do_master=True):
+                formats=None, targets=None, do_mix=True, do_master=True,
+                crest_cap=None):
     """Mix and/or master one folder of stems via its keel.json mapping. Returns a
     REPORT.md row dict, or None if it was skipped."""
     stems_dir = Path(stems_dir)
@@ -284,6 +285,8 @@ def process_one(stems_dir, out_dir, name, *, map_file=None, scan=False,
             elif eff_auto_tp:
                 tgt = m_ov.get("target_lufs", recipes.DEFAULT_MASTER["target_lufs"])
                 m_ov["tp_ceiling_db"] = recipes.tp_ceiling_for_lufs(tgt)
+            if crest_cap is not None:
+                m_ov["crest_cap_db"] = crest_cap
             if ref_name:  # a reference dictates loudness -> targets don't apply
                 m_ov["reference"] = ref_name
             recipe = recipes.master_recipe(m_ov)
@@ -524,6 +527,9 @@ def main(argv):
                     help="override the mapping's master loudness target")
     ap.add_argument("--tp", type=float, metavar="dBTP",
                     help="override the mapping's true-peak ceiling")
+    ap.add_argument("--crest-cap", type=float, metavar="dB", dest="crest_cap",
+                    help="soft-clip until the true peak sits at most this many dB "
+                         "over the loudest 0.4 s RMS, before the limiter")
     ap.add_argument("--ref", metavar="FILE",
                     help="reference master; if set, Keel matches it (--lufs ignored)")
     ap.add_argument("--match-loudness", metavar="FILE", dest="match_loudness",
@@ -637,7 +643,8 @@ def main(argv):
                     auto_tp=args.auto_tp, bit_depth=args.bit_depth,
                     dither=args.dither, dither_seed=args.dither_seed,
                     formats=formats, targets=targets,
-                    do_mix=do_mix, do_master=do_master)
+                    do_mix=do_mix, do_master=do_master,
+                    crest_cap=args.crest_cap)
             except (ValueError, FileNotFoundError) as e:
                 print(f"  [error] {name}: {e}")
                 errors += 1
