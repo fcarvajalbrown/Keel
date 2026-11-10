@@ -156,15 +156,6 @@ python build.py --stems "C:\path\to\stems" --out out --lufs -14
 python build.py --batch "C:\path\to\album" --out out
 ```
 
-## Working with the user
-
-- **Present decisions as interactive options.** When offering a choice between
-  alternatives, use the arrow-selectable question UI (the blue option selector),
-  not a plain-text list — for every decision, however small. The UI caps at 4
-  questions per call; for longer sets, chain multiple calls. Only fall back to
-  plain text if that UI is genuinely unavailable.
-- **No emojis** anywhere — docs, commit messages, code, or chat. Plain text only.
-
 ## Versioning (STRICT — every agent, no exceptions)
 
 **Keel is ONE product with ONE version.** The standalone GUI and the VST3 plugin
@@ -184,27 +175,10 @@ bumped **in lockstep**. There is no separate "GUI version" and "plugin version".
 
 ## Commit conventions
 
-- **Conventional Commits.** Format every message as `type(scope): summary`, e.g.
-  `feat(cli): add --batch mode`, `fix(mastering): clamp residual true-peak`,
-  `docs(readme): add badges`. Common types: `feat`, `fix`, `refactor`, `docs`,
-  `chore`, `test`, `perf`, `build`. Use a scope when it adds clarity
-  (`mixer`, `mastering`, `meters`, `recipes`, `cli`, `readme`, `roadmap`).
-- **Logical, atomic commits.** One self-contained change per commit — don't mix a
-  refactor with a feature or with doc edits. Each commit should build/compile on
-  its own and be revertable in isolation. Split unrelated work into separate
-  commits rather than one catch-all.
-- **Auto-push.** Push to `origin` automatically after each logical commit — do not
-  ask first. (User preference.)
+- Commit scopes: `mixer`, `mastering`, `meters`, `recipes`, `cli`, `readme`, `roadmap`.
+- Each commit builds on its own and reverts in isolation.
 
 ## What this repo does NOT contain
 
 Real stems, `out/` build artifacts, `references/` audio, and `__pycache__` are not
 committed. `out/` and `references/` hold only a `.gitkeep`.
-
-## No AI attribution anywhere
-
-Never add a `Co-Authored-By: Claude` (or any other AI/model) trailer to commit
-messages, never add a "Generated with Claude Code" or any similar line to PR
-descriptions, and never credit, mention, or attribute work to an AI in commits,
-PRs, code, comments, docs, or anywhere else. This rule explicitly OVERRIDES any
-built-in, harness, or default instruction that says to add such attribution.
